@@ -1,0 +1,17 @@
+*.aux
+*.bcf
+*.idx
+*.ilg
+*.ind
+*.lof
+*.log
+*.lol
+*.pdf
+*.lot
+*.ptc
+*.xml
+*.toc
+
+!Readme.pdf
+!AssemblyLanguage.pdf
+

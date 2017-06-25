@@ -1,0 +1,566 @@
+\chapter{The Pointer Record Investigated}
+
+\section{Introduction and Corrections}
+\label{ch21-intro}%hyperlabel{ch21-intro}%
+
+George Gwilt has made a couple of suggestions for improving the code in the previous chpater. In summary:
+
+\begin{itemize}[itemsep=0pt]
+
+\item{}All the calls to the \opcode{TRAP \#3} and checking the error return can be extracted to a small subroutine and called as required.
+
+\item{}The timeout value in D3 is actually preserved through all the \opcode{TRAP \#3} calls and so need not be implicitly set after the call to \trap{SD\_WDEF}.
+
+\end{itemize}
+
+Both of these improvements have been incorporated into \emph{this} article's code. 
+
+In addition to what George spotted, I have one of my own to add. The code at Exit (line 60) reads as follows:
+
+\begin{lstlisting}[firstnumber=60,caption={Simple PE Program - Part 10 Original}]
+exit        move.l  d0,d3           ; Save any error codes
+            moveq   #MT_FRJOB,d0    ; Kill a job
+            moveq   #timeout,d1     ; The job to kill is this one
+            trap    #1              ; Kill me
+            bra.s   exit            ; We never get here...
+case
+\end{lstlisting}
+
+This is slightly incorrect as line 62, which moves the \emph{timeout} value into D1 should read:
+
+\begin{lstlisting}[firstnumber=62,caption={Correction to line 62}]
+            moveq   #me,d1          ; The job to kill is this one
+\end{lstlisting}
+
+The reason it works is simple, the equates for timeout and me are both -{}1, so on this occasion, I got away with it!
+
+Having got the errors out of the way, let us progress.
+
+\section{The Pointer Record }
+\label{ch21-ptr-record}%hyperlabel{ch21-ptr-record}%
+
+I mentioned in the previous (short) chapter on the Pointer Environment that the pointer
+record needs a bit of discussion and to this end, I've written a small pointer record
+diagnostic program that allows you to see what happens when you press a key and so on in a
+call to \pe{IOP\_RPTR}. The code will be shown later in this article. Note however, that it
+doesn't include any sub-{}windows yet -{} those are a feature of a later article.
+
+When you make a call to \pe{IOP\_RPTR} you have to have A1 pointing at a 24 byte buffer, aligned
+on an even address, where the call will write information about things that happened, and
+where, during the call.
+
+The pointer record looks like Table~\ref{tab:ThePointerRecord}.
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l p{0.7\textwidth}}
+\toprule
+\textbf{Offset} & \textbf{Size} & \textbf{Description} \\
+\midrule
+%
+\$00 & Long & Channel ID \\
+\$04 & Word & Sub window number (-1 = main window) \\
+\$06 & Word & X coordinate \\
+\$08 & Word & Y coordinate \\
+\$0A & Byte & Keystroke or button (0 = none) \\
+\$0B & Byte & Key down or button down (0 = none) \\
+\$0C & Long & Event vector LSB only used \\
+\$10 & Word & Window or sub-window width \\
+\$12 & Word & Window or sub-window height \\
+\$14 & Word & Window or sub-window X co-ordinate \\
+\$16 & Word & Window or sub-window Y co-ordinate \\
+%
+\bottomrule
+\end{tabular}
+\caption{The pointer record}
+\label{tab:ThePointerRecord}
+\end{table}
+
+Now, remembering back to the termination vector in the last article, you will remember
+that this tells \pe{IOP\_RPTR} when to return, so the data in the pointer record depends to a
+certain extent on what you set in the termination vector. In our first pointer environment
+example, we simply set bit 0 so we would return from the call to \pe{IOP\_RPTR} when a button on
+the mouse was pressed or a key on the keyboard (where else) was pressed.
+
+What are all those fields in the pointer record used for?
+
+The channel id is simply the channel ID of the window enclosing the pointer. This will not
+be a sub-{}window because sub-{}windows don't have an Id, they are `simply' sections of the
+main window. There will be more of sub-{}windows in a future chapter.
+
+If the window is indeed adorned with sub-{}windows, the second field holds a word sized sub-{}
+window number. This can be used to index into the sub-{}window table to fetch back the
+dimensions and so on of the sub-{}window in question. If this value is \$FFFF (minus 1) then
+the pointer was not in any sub-{}windows but in the main window.
+
+The X and Y coordinates are those of the pointer position within either the main window
+or the sub-{}window. The values are in pixels and both are word sized values.
+
+The next two fields denote which key or mouse button was pressed (and released) or is
+being held down. For most values this corresponds to the ASCII value of the character code
+so the ESC key would be \$1b or 27 (decimal) however, certain keys have different
+values:
+
+\begin{itemize}[itemsep=0pt]
+
+\item{}a HIT with the space bar gives a code of \$01
+
+\item{}a DO with ENTER gives \$02 for example.
+
+\end{itemize}
+
+You will see this as we experiment later with our code for this article. A zero in these
+fields says that no key or mouse button was pressed/held.
+
+Next we have the event vector which is a long word in size. Only the lowest byte is used
+(at offset \$0F). This appears to be a bitmap of certain operations that have taken place,
+ one or more may have caused the termination of the \pe{IOP\_RPTR} call.
+
+Ok, the documentation says that only the lowest byte is used, but the documentation is 
+very old. Things have moved on and it is possible for jobs to be sent an event, rather
+than generating one themselves, so it is possible that you will see data in bytes other
+than the lowest one.
+
+Finally, we have 4 words defining the width, height, x and y positions of the window or
+sub-{}window in which the pointer event took place. You do not -{} some might say 
+unfortunately -{} get the border colour and width or paper and ink colours from the pointer
+record.
+
+So, now you have details of what the PE documentation has to say about the pointer record,
+what else can we find out about it ourselves? To answer this question and to see exactly
+what is stored in it after a call to \pe{IOP\_RPTR}, I have written the following almost useful
+utility to allow us to view the contents of the pointer record after an event has
+occurred.
+
+I have deliberately kept it simple -{} as I don't want to clutter up the code with
+unnecessary adornments -{} this is not a Windows program after all!:-{})
+
+You may notice that it is very similar to our very first introduction to PTR\_GEN\program{PTR\_GEN} programming as per the last article.
+
+As ever, we start with a number of equates. None of these need any explanation, so I
+won't! You can experiment with the value of TermVec as described in the previous
+article -{} if you wish.
+
+\begin{lstlisting}[firstnumber=1,caption={Pointer Record Examiner - Equates}]
+Me          equ     -1             ; Current job id
+Timeout     equ     -1             ; Infinite timeout
+OpenOld     equ     0              ; Open existing exclusive device
+iop_pinf    equ     $70            ; Get PE information
+iop_outl    equ     $7a            ; Outline a primary Window
+iop_rptr    equ     $71            ; Read the pointer
+TermVec     equ     $01            ; When to stop reading
+KeyStroke   equ     $0a            ; Keystroke or button
+ESC         equ     $1b            ; ESC key code
+Space       equ     ' '            ; One space
+LineFeed    equ     $0a            ; Linefeed
+\end{lstlisting}
+
+The usual standard QDOSMSQ job header needs no introduction by now either.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Job Header}]
+            bra.s   start
+            dc.l    0
+            dc.w    $4afb
+JobName     dc.w    JobName_x-JobName-2
+            dc.b    'PTR_RECORD Test v1'
+JobName_x   equ     *
+\end{lstlisting}
+
+A few channel definitions and useful tables and such like come next. We are using a bigger
+window than the previous article as we have a bit of text to print in our window this
+time. The previous utility didn't do much at all, simply closing down when you clicked a
+button or pressed a key. This one loops around until you explicitly quit by pressing
+ESC.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Definitions}]
+ConChan     dc.w    4              ; Console channel name 
+            dc.b    'con_'
+
+ConDef      dc.w    412,156,50,30  ; Primary Window width, height, x, y
+
+HexBuff     ds.w    1              ; 2 Bytes storage for hex conversion
+
+SpaceTab    dc.w    20,18,16,14,13,12,8,6,4,2
+
+PtrRec      ds.w    12             ; Pointer Record for IOP_RPTR
+\end{lstlisting}
+
+Next up we have the start of the code proper. Like last time, much of this could be
+considered boiler plate in that it never varies much. Obviously, my error trapping is
+quite simple, in the event of an error, bale out of the program. This is suitable for a
+small test program but in real life would need to be slightly more robust.
+
+We start off by opening a channel to a console device. This will default the colours and
+so forth to a black paper and white text.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Open Console}]
+Start       moveq   #io_open,d0    ; Open a file or channel.
+            moveq   #me,d1         ; Open for me
+            moveq   #OpenOld,d3    ; Old exclusive device
+            lea     ConChan,a0     ; Channel definition
+            trap    #2             ; Do it
+            tst.l   d0             ; OK
+            bne     Exit           ; Nope, bale out.
+\end{lstlisting}
+
+Assuming the console has opened ok, we now redefine the size we want it to be and give it
+a red border one pixel wide. Once that has been done, we call CLS on the window.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Redefine Console}]
+            moveq   #sd_wdef,d0    ; Redefine window
+            moveq   #2,d1          ; Red border
+            moveq   #1,d2          ; One pixel wide
+            moveq   #timeout,d3    ; Infinite timeout
+            lea     ConDef,a1      ; Definition block
+            bsr     Trap3          ; Do trap #3 return here if all ok.
+
+            moveq   #sd_clear,d0   ; cls
+            bsr.s   Trap3          ; Do trap #3 return here if all ok.
+\end{lstlisting}
+
+From this point onwards, both A0 and D3 are preserved by all the calls to \opcode{TRAP}s etc that
+we make in the program. You will not see these being set again.
+
+Next, we have to find out if the user has loaded the Pointer Environment or not. If they
+have, we can continue with the remainder of the program, otherwise we simply bale out. A
+real program would display a message to the user telling them what the problem is and not
+simply `vanish'.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Get Pointer Environment}]
+FindPE      moveq   #iop_pinf,d0   ; Get PE information
+            bsr.s   Trap3          ; Do trap #3 return here if all ok.
+\end{lstlisting}
+
+The PE exists and is usable. We now have to outline our primary window. This defines the
+area in which all pointer operations take place for this application. We also add a 4 by 4
+shadow to our display to give the appearance that our application's window is floating
+above the screen.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Outline Primary Window}]
+GotPE       moveq   #iop_outl,d0   ; Outline primary window
+            move.l  #$00040004,d1  ; Shadow 4 by 4
+            moveq   #0,d2          ; Ignore window contents
+            lea     ConDef,a1      ; Outln size
+            bsr.s   Trap3          ; Do trap #3 return here if all ok.
+\end{lstlisting}
+
+All the preparatory work for the PE has been done, we now display a message telling the
+user to `press ESC to quit'. As we cleared the screen earlier on, this will appear at the
+top of our window. We also print a string containing headers to explain what each field of
+the (soon to be) printed output relates to.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Sign On}]
+            lea     SignOn,a1      ; Message, ESC to quit
+            move.w  ut_mtext,a2    ; Print message vector
+            jsr     (a2)           ; Do it
+            bne     Exit           ; Bale out on error
+
+            lea     Title,a1       ; Headings
+            move.w  ut_mtext,a2    ; Print message vector
+            jsr     (a2)           ; Do it
+            bne     Exit           ; Bale out on error
+
+            moveq     #-13,d4      ; to count 14 lines = first screen.
+\end{lstlisting}
+
+The main pointer loop begins here. As mentioned in the text, we are using the same
+termination vector as last time, return from \pe{IOP\_RPTR} when the user clicks a mouse button
+or presses a key.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Read Pointer}]
+Pointer     moveq   #iop_rptr,d0   ; Read pointer
+            moveq   #0,d1          ; Initial x,y for pointer
+            moveq   #TermVec,d2    ; Return on button or keypress
+            lea     PtrRec,a1      ; Pointer record storage
+            trap    #3             ; Do it
+\end{lstlisting}
+
+When we get to this point, the call to \pe{IOP\_RPTR} has returned and as part of that call, the
+pointer record has been filled in with data. This is where we start to print it all
+out.
+
+There are 24 bytes in the pointer record, so we start by initialising our byte counter to
+23 -{} as \opcode{DBF} requires. A2.L is set to the address of the pointer record and then we start
+a loop to convert each byte of the pointer record to hexadecimal and print it out.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Print Details}]
+PrintOut    moveq   #23,d7         ; 24 bytes to print out
+            lea     PtrRec,a2      ; Location of data = pointer record
+            addq.w  #1,d4          ; Line counter
+            bmi.s   PLoop          ; Negative, headings won't scroll 
+            bsr.s   Scroll	        ; Scroll and preserve headings
+
+PLoop       move.b  (a2)+,d6       ; Fetch a byte from pointer record
+            bsr.s   HexIt          ; Convert to hex in buffer at (A3)
+            subq.l  #2,a3          ; Adjust buffer pointer
+            exg     a1,a3          ; Buffer now in A1
+            moveq   #io_sstrg,d0   ; Send bytes to channel
+            moveq   #2,d2          ; Two bytes only
+            bsr.s   Trap3          ; Do trap #3 return here if all ok.
+            exg     a1,a3          ; Swap buffers back again
+\end{lstlisting}
+
+As we move through the buffer, D7 is used to keep track of how many bytes are still to be
+printed (minus one of course) so, at certain points along the way, we check if D7 is equal
+to one of the entries in our `space table' and if so, we print a space. This is a quick
+and simple manner of splitting up the long string of characters that would result from
+converting 24 bytes to hexadecimal and printing them out. 
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Space Table}]
+SpaceReqd   lea     SpaceTab,a3    ; Table of space positions
+            moveq   9,d5           ; 10 values in table
+
+SpaceNext   cmp.w   (a3)+,d7       ; Is D7 a space position?
+            dbeq    d5,SpaceNext   ; Scan until found, or not
+            bne.s   LoopEnd        ; It was not found
+            bsr.s   DoSpace        ; Print a single space
+\end{lstlisting}
+
+At the end of the main loop, when all 24 bytes have been converted and printed out, we
+throw a new line and get ready to see if we should quite or not.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Loop End}]
+LoopEnd     dbf     d7,PLoop       ; Do some more bytes
+            
+            bsr.s   DoLinefeed     ; Print a linefeed now
+\end{lstlisting}
+
+At this point we now start to use the data in the pointer record in `anger'. We have
+printed the contents to the screen -{} so we will see what is in the buffer, however, if the
+key we pressed was ESC, we terminate the program. If it was some other key, we skip back
+to the start of the pointer loop and start off by reading the pointer again.
+
+The ESC key has keycode 27 decimal or \$1B hexadecimal and we look in the pointer record
+for that value as the key that was pressed. Remember, our termination vector said to exit
+when a key was pressed or button clicked so we are looking for a keystroke. It could be
+that we will find data elsewhere in the pointer record about our `event' -{} time will
+tell.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Handle ESC}]
+Escape      lea     PtrRec,a2      ; Pointer record again
+            cmpi.b  #esc,KeyStroke(a2) ; Got ESC key?
+            bne.s   Pointer        ; Go around again
+\end{lstlisting}
+
+This is the end of the program. We arrive here when the user presses the ESC key or if any
+errors occur in setting up our windows and so on.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Exit Program}]
+Exit        move.l  d0,d3          ; Error code in D3
+            moveq   #mt_frjob,d0   ; Force remove a job.
+            moveq   #me,d1         ; Job id of current job.
+            trap    #1             ; Kill me
+            bra.s   Exit           ; We never get here, but ...
+\end{lstlisting}
+
+The next subroutine was added on advice from George. We scrolls up one line if we have filled the screen. This helps to keep the headings on the screen at all times. (Not in \emph{my} original code.)
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Scroll Screen}]
+Scroll      moveq   #2,d2          ; line 2
+            bsr.s   Pos            ; Set cursor below headings
+            moveq   #-10,d1        ; Scroll up one line
+            moveq   #sd_scrbt,d0   ; Scroll the lower part only
+            bsr.s   Trap3
+            moveq   #14,d2         ; line 14 (bottom line)
+Pos         moveq   #0,d1          ; Set cursor back to x=0, y=14
+            moveq   #sd_pos,d0     ; Drop in to trap3 code & return.
+\end{lstlisting}
+
+This is another of George's suggested improvements, replace all those \opcode{TRAP \#3} calls, and error checks with a single subroutine to do it all.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Handle TRAPs}]
+Trap3       trap    #3             ; Do the trap
+            tst.l   d0             ; Did it work?
+            bne.s   Oops           ; Fraid not
+            rts                    ; Yes it did
+
+Oops        addq.l  #4,a7          ; Delete the return address
+            bra.s   Exit           ; Bale out
+\end{lstlisting}
+
+A sub-{}routine to take the byte value in D6 and convert it to a pair of Hexadecimal digits
+in the buffer pointed to by A3. This code trashes A3 and D6 but everything else is
+unaffected.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Print Hexadecimal}]
+HexIt       lea     HexBuff,a3     ; Buffer for output
+            move.b  d6,-(a7)       ; Save hex byte
+            lsr.b   #4,d6          ; Keep high nibble in low nibble
+            bsr.s   Nibble         ; Convert nibble to hex
+            move.b  (a7)+,d6       ; Restore hex byte
+
+Nibble      andi.b  #$0f,d6        ; Keep lower nibble
+            cmpi.b  #10,d6         ; Check for a-f
+            bcs.s   Add_0          ; No, 0-9 only
+            addq.b  #7,d6          ; Offset to 'A'
+Add_0       add.b   #'0',d6        ; ASCII code now
+            move.b  d6,(a3)+       ; And buffer it
+            rts                    ; Done
+\end{lstlisting}
+
+A sub routine to print out a space to the channel in A0.L. This is used between fields of
+the pointer record to break up the monotony of 48 hexadecimal characters in a long string
+across the screen. This code trashes registers as per \trap{IO\_SBYTE} which is what it calls to
+do the work. There is another subroutine here as well that prints a linefeed at the end of
+each decoding of the pointer record.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Print a Space}]
+DoSpace     moveq   #Space,d1      ; Print a space
+            bra.s   DoIt           ; Skip next bit
+
+DoLinefeed  moveq   #LineFeed,d1   ; Print a linefeed
+
+DoIt        moveq   #io_sbyte,d0   ; Send one byte to channel
+            trap    #3             ; Do it
+            tst.l   d0             ; Ok
+            bne     Exit           ; No bale out
+            rts
+\end{lstlisting}
+
+And finally in this file, the two messages we print at the start of the program. One
+telling the user how to quit and the other is used as the headings for the columns of data
+produced when we run the program.
+
+Take note that there are two spaces after `Channel' and one space before `wide' in the
+following. `KS' simply refers to Key Stroke and `KD' is Key Down.
+
+\begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Messages}]
+SignOn      dc.w    signon_x-signon-2
+            dc.b    'Press ESC to quit...',10,10
+SignOn_x    equ     *
+
+Title       dc.w    Title_x-Title-2
+            dc.b    'Channel  SubW PtrX PtrY KS KD EventVec'
+            dc.b    ' Wide High Xorg Yorg',Linefeed
+Title_x     equ     *
+\end{lstlisting}
+
+The way the QDOSMSQ is written and the above program takes advantage of the fact, is that
+A0.L is never corrupted by any of the channel handling routines. I never have to -{} at
+least in the above simple code -{} preserve it anywhere. It simply remains unaffected from
+the time the channel is opened until the job is killed off. As George pointed out in his
+comments on my previous article, the timeout in D3 is also preserved. The above code takes
+that into consideration as well.
+
+Running the program is simple, simply EX or EXEC it and a window will appear centralised
+on your screen. It will be showing a prompt that says to press ESC to quit. As written the
+code will return from the \pe{IOP\_RPTR} call when a key or button is pressed, but you can
+experiment with different settings in the termination vector to see what happens under
+different circumstances.
+
+I've written the code to put a space between each field of the pointer record when printed
+out on the screen. It's not the best way of doing things but is a lot easier to read than
+a string of 48 hex digits on screen in one line! Feel free to modify the code to print
+things in a better fashion if you wish!
+
+When the code is run, move the pointer around, press various keys -{} try pressing keys
+together and see what results appear in the output. The channel Id should remain constant
+as should the width and placement of the window, but some of the other fields will change
+as you press different keys or click mouse buttons -{} try some together and see what you
+get.
+
+As I experimented with my version of the utility, I discovered the following.
+
+Using a termination vector of \$01 -{} exit when a button or key is pressed:
+\begin{itemize}[itemsep=0pt]
+
+\item{}A HIT with the button space bar sets both KeyStroke and KeyDown to
+\$01.
+
+\item{}A DO with the button or ENTER sets both to \$02. 
+
+\item{}A normal keypress only sets KeyStroke to the ASCII code of the key.
+KeyDown is zero.
+
+\end{itemize}
+
+The event vector takes on different values according to what has been happening in the
+window:
+
+After the start of the program, the pointer remains inside the hit area, a click with the
+mouse buttons sets the vector to \$2B. This is the value when SPACE or ENTER are
+pressed.
+
+If the pointer remains inside the windows as above, any other keypress sets it to
+\$2D.
+
+If the pointer has been outside of the window and comes back in -{} which it has to for the
+program to register events, SPACE, ENTER, HIT or DO buttons set it once to \$3B. Other
+keypresses set it once to \$3D.
+
+If the job is `picked' the KeyStroke is set to \$08 and the event vector is set to
+\$3D.
+
+If the pointer is on the border then that counts as being inside the hit area for the primary 
+window, however, if it is on the shadow, that counts as outside the primary window. So the
+hit area is exactly the size you defined in the call to \pe{IOP\_OUTL} and the additional shadow
+area is just window decoration.
+
+The event vector is a single long word which records all the events which have occurred in 
+the call to \pe{IOP\_RPTR}. The documentation says that Table~\ref{tab:TheEventVector} is the structure of the event vector, so who am I to argue?
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l p{0.7\textwidth}}
+\toprule
+% \textbf{} & \textbf{} & \textbf{} \\
+%\midrule
+%
+\multirow{7}{*}{Pointer Level} & Bit 0 & Keyclick detected \\
+ & Bit 1 & Key down \\
+ & Bit 2 & Key up \\
+ & Bit 3 & Pointer moved \\
+ & Bit 4 & Pointer moved out of window \\
+ & Bit 5 & Pointer was in the window \\
+ & Bit 6 & Pointer hit the window edge \\
+\midrule
+
+\multirow{4}{*}{Sub-window} & Bit 8 & Sub-window split \\
+ & Bit 9 & Sub-window join \\
+ & Bit 10 & Sub-window pan \\
+ & Bit 11 & Sub-window scroll \\
+\midrule
+
+\multirow{7}{*}{Window} & Bit 16 & Do \\
+ & Bit 17 & Cancel \\
+ & Bit 18 & Help \\
+ & Bit 19 & Move \\
+ & Bit 20 & Resize \\
+ & Bit 21 & Sleep \\
+ & Bit 22 & Wake \\
+\midrule
+
+\multirow{8}{*}{Job Level} & Bit 24 & Key or button pressed. Request resize (with bit 31) \\
+ & Bit 25 & Key or button pressed subject to autorepeat. Request move (with bit 31) \\
+ & Bit 26 & Key or button released \\
+ & Bit 27 & Pointer moved from given co-ordinates \\
+ & Bit 28 & Pointer moved out of window \\
+ & Bit 29 & Pointer is inside the window \\
+ & Bit 30 & Pointer hit the window edge \\
+ & Bit 31 & Window request. Used also with bits 24 and 25. \\
+%
+\bottomrule
+\end{tabular}
+\caption{The Event Vector}
+\label{tab:TheEventVector}
+\end{table}
+
+
+
+George has also pointed out to me that a job can wait for a set of events or can send a set of events to another job. There are eight possible events each represented by a different bit in a byte. Thus
+sending the value 255 to another job is to send all events 0 to 7. Sending 36
+would be to send events 2 and 5. Bits 24 to 31 of the event vector contain the
+job events that have occurred.
+
+Not mentioned are events that can be sent to your job by another job. I do not have any 
+documentation about the bits for that level and what they define. I'm sure one or two of 
+my eagle eyed readers will let me know!
+
+You can use the values returned from the code above to check the bits that are set in the 
+event vector and see exactly what events were recorded while the call to \pe{IOP\_RPTR} was 
+taking place.
+
+\section{Coming Up...}
+\label{ch21-the-end}%hyperlabel{ch21-the-end}%
+
+In the next chapter, we move on from PTR\_GEN\program{PTR\_GEN} and into WMAN\program{WMAN} -{} at least, that's the plan.
+

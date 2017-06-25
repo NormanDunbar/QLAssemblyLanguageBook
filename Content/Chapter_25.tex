@@ -1,0 +1,451 @@
+\chapter{Easy PEasy -{} Part 1.}
+
+\section{Introduction.}
+\label{ch25-intro}%hyperlabel{ch25-intro}%
+
+At the end of the previous chapter, we had created a very minimal `Hello
+    World' window using George Gwilt's SETW\program{SETW} application. In this chapter, we
+    take a first look at George's other utility to make PE programming easy,
+    EasyPEasy\program{EasyPEasy}. As mentioned last time, you should have downloaded the
+ peasp02.zip file from George's website. If you find a
+    later version (say peasp03.zip or higher, get that
+    instead!) The website address is \url{http://gwiltprogs.info/}.
+
+\section{Easy PEasy.}
+\program{EasyPEasy}
+\label{ch25-std-windef-cntd}%hyperlabel{ch25-std-windef-cntd}%
+
+Unlike many other utilities, Easy PEasy\program{EasyPEasy} isn't a program you can run,
+    it is a collection of information and small binary files that you can
+    include with your own programs -{} using the LIB and IN commands in your
+    source code and assembling with GWASL\program{Gwasl} -{} to make programming the Pointer
+    Environment a little easier. Actually, quite a lot easier as George has
+    done much of the hard work, all we have to do is open a console, make a
+    few checks and write the code to handle our own needs as opposed to the
+    needs of getting the PE up and running.
+
+Much of what follows in this chapter is a blatant theft of George's
+    readme file. For this I make no apology -{} there is no better way to
+    document something that straight from the horse's mouth!
+
+\section{The Nine Steps To Happiness.}
+
+With Easy PEasy\program{EasyPEasy}, there are nine steps to happiness. The following is
+    basically a skeleton for writing a PE program in assembly language:
+
+\begin{enumerate}[itemsep=0pt]
+
+\item{}Initialise your program and open a con\_ channel.
+
+\item{}Are the PTR\_GEN\program{PTR\_GEN} \& WMAN\program{WMAN} present? Abort the program if not.
+
+\item{}Set up the window working definition.
+
+\item{}Position the window.
+
+\item{}Draw the window contents.
+
+\item{}Read the pointer.
+
+\item{}Did we have an error -{} exit if so, else it was an event.
+
+\item{}Process the event.
+
+\item{}Goto step 6.
+
+\end{enumerate}
+
+Each step in the above, thanks to the coding that George has done,
+    is quite simple.
+
+\subsection{Initialise.}
+
+The initialisation step consists of setting up your console
+      channel and opening it. The standard QDOSMSQ job header is also
+      required. The code is very simple, and looks like that shown in \lstlistingname~\ref{lst:EasyPEasy-1}. It
+      is best to do the setup as soon as possible after the program is
+      executed rather than setting up other stuff first. It saves time and
+      effort -{} in case something goes wrong and you have to bale out.
+
+\begin{lstlisting}[firstnumber=1,caption={EasyPEasy Standard Code - Initialisation},label={lst:EasyPEasy-1}]
+        bra.s     start
+        dc.l      0
+        dc.w      $4afb
+
+id      equ       0                 ; Storage for channel id
+wmvec   equ       4                 ; Storage for WMAN vector
+slimit  equ       8                 ; Storage for Window limits call
+
+jname   dc.w      jname_e-jname-2
+        dc.b      "My EPE Program"
+jname_e ds.b      0
+        ds.w      0
+
+; Console definition.
+con     dc.w      4
+        dc.b      'con_'
+
+; The job starts here.
+start   lea       (a6,a4.l),a6      ; Get the dataspace address in A6.L
+
+        lea       con,a0            ; Con_ channel definition
+        moveq     #-1,d1            ; Required for this job
+        moveq     #0,d3                          
+        moveq     #io_open,d0
+        trap      #2                ; Open the channel
+        tst.l     do                ; Did it work?
+        bne       sui               ; Exit via sui routine in EasyPEasy
+        move.l    a0,id(a6)         ; Save the channel id
+\end{lstlisting}
+
+\subsection{Check The PE \& WMAN.}
+
+The console is open now, or we have baled out of the program.
+      Obviously we don't get much feedback from the program if anything went
+      wrong, a proper user friendly application would, of course, display a
+      suitable error message. The next easy step is to check for the presence
+      or otherwise of PTR\_GEN\program{PTR\_GEN} and WMAN\program{WMAN} as per \lstlistingname~\ref{lst:EasyPEasy-2}.
+
+The following code requires a channel id, for a CON\_ channel, to
+      be in A0.
+
+\begin{lstlisting}[firstnumber=last,caption={EasyPEasy Standard Code - Checking for the PE},label={lst:EasyPEasy-2}]
+; Check for PE being present.
+        moveq     #iop_pinf,d0
+        moveq     #-1,d3
+        trap      #3
+        tst.l     d0                ; Ptr_gen present?
+        bne       sui               ; No, bale out
+        move.l    a1,wmvec(a6)      ; Yes, save WMAN vector
+        beq       sui               ; Oops! Bale out, no WMAN
+        movea.l   a1,a2             ; Keep WM vector in A2
+        lea       slimit(a6),a1     ; Storage, 4 words long
+        moveq     #iop_flim,d0      ; Need maximum size of window
+        trap      #3
+        subi.l    #$C0008,(a1)      ; Less 12 (width) and 8 (height)
+\end{lstlisting}
+
+The code in \lstlistingname~\ref{lst:EasyPEasy-2} checks for the PE being present and if not found,
+      bales out via the code at sui. If the PE is found, the WMAN\program{WMAN} vector is
+      saved in data space for later use -{} however, if WMAN\program{WMAN} is not loaded (but
+      PTR\_GEN\program{PTR\_GEN} is) the job will exit via the familiar sui routine. Easy PEasy\program{EasyPEasy}
+      requires both the PTR\_GEN\program{PTR\_GEN} and WMAN\program{WMAN} files to be loaded in order to
+      create and run PE programs.
+
+Next up, we find out the maximum size that the con\_ channel can
+      grow to. We assume that that code always works -{} but it may be good
+      practice to check, just in case. The 4 words returned indicate the size
+      and position of the con\_ channel, and these 4 words are placed into the
+      job's data space and a small margin is subtracted from the width and
+      height.
+
+\subsection{Set The Window Definition.}
+
+The window definition is expected to hold a value in wd0 for the
+      size of working definition and status area space. The code in \lstlistingname~\ref{lst:EasyPEasy-3} reads
+      the amount of memory required for the window definition (created by SETW\program{SETW}
+      and defined in ww0\_0) and allocates space in the common heap for our
+      program to use. If this fails, the call to getsp will never return -{} it
+      exits through the sui code on error.
+
+\begin{lstlisting}[firstnumber=last,caption={EasyPEasy Standard Code - Allocate Memory for the Window Definition},label={lst:EasyPEasy-3}]
+; Reserve memory for the window working definition.
+        lea       wd0,a3           ; Address of window definition
+        move.l    #ww0_0,d1        ; Size of working definition
+        bsr       getsp            ; Allocate space
+        movea.l   a0,a4            ; Save in A4.L too
+\end{lstlisting}
+
+If the memory allocation worked, the address is returned in A0 and
+      we save it in A4 for later use. This is a handy feature of Easy PEasy\program{EasyPEasy}
+      and the way it was written by George.
+
+Before we can call the WMAN\program{WMAN} routine to set up our window -{}
+      \pe{wm\_setup} -{} we need to make sure that the status area for loose items is
+      all initialised properly. The code in \lstlistingname~\ref{lst:EasyPEasy-4} assumes that all loose
+      items will be available when the program starts. Zero is the value we
+      need for available.
+
+The labels wst0 and wst0\_e are defined by the SETW\program{SETW} program. (As
+      you can see SETW\program{SETW} does most of the hard work of calculating various sizes
+      and labels for us!)
+
+\begin{lstlisting}[firstnumber=last,caption={EasyPEasy Standard Code - Loose Item Initialisation},label={lst:EasyPEasy-4}]
+; Preset all Loose Items to available.
+         movea.l   id(a6),a0       ; Restore channel ID
+         moveq     #wst0_e-wst0-1,d1 ; Size of status area - 1
+         lea       wst0,a1         ; Wst0 = status area address
+
+loop     clr.b     (a1)+           ; Zero = Loose Item is available
+         dbf       d1,loop         ; Clear entire area
+         lea       wst0,a1         ; Reset pointer to status area
+         moveq     #0,d1           ; Default window size
+         lea       wd0,a3          ; Wd0 = window definition address
+         jsr       wm_setup(a2)    ; Create the working definition
+\end{lstlisting}
+
+\subsection{Position The Window.}
+
+This is probably one of the easiest parts of the code! We assume
+      that the pointer is in the position on screen where we wish the window
+      to appear. The position of the window may move to make sure that it
+      remains on the screen, however, in normal circumstances, the pointer in
+      our window will be positions in exactly the same place where the on
+      screen pointer is now.
+
+\begin{note}
+If you don't default the pointer position to -{}1 to indicate
+        where the pointer is now, then you must note that the value in D1 is
+        in absolute screen coordinates relative to the start of the screen (at
+        0,0) and not relative to the program's main window or to any
+        application sub-{}windows within.
+\end{note}
+
+This can be useful if a window has no `move' abilities -{} you can
+      simply put the pointer where you wish the window to appear, and execute
+      the program. The window will be drawn exactly (adjusted to fit on
+      screen) where you have put the pointer.
+
+\begin{lstlisting}[firstnumber=last,caption={EasyPEasy Standard Code - Position the Window},label={lst:EasyPEasy-5}]
+; Position, but do not draw, the window.
+         moveq     #-1,d1          ; Position at pointer position
+         jsr       wm_prpos(a2)    ; It's a primary window
+\end{lstlisting}
+
+\subsection{Draw The Contents.}
+
+The windows has been positioned, however, it has not been drawn on
+      screen, so we need to draw it now. This is even simpler than the
+      positioning of the windows.
+
+\begin{lstlisting}[firstnumber=last,caption={EasyPEasy Standard Code - Draw the Window},label={lst:EasyPEasy-6}]
+; Draw the window.
+         jsr       wm_draw(a2)     ; Draw the window and its contents
+\end{lstlisting}
+
+That was difficult! ;-{})
+
+\subsection{The Pointer Loop.}
+
+At this point, we have the windows on screen and the user is
+      waiting to use the application. We have to enter a loop to read the
+      pointer and act accordingly.
+
+\begin{lstlisting}[firstnumber=last,caption={EasyPEasy Standard Code - Reading the Pointer},label={lst:EasyPEasy-7}]
+; Main pointer reading loop.
+read_ptr jsr       wm_rptr(a2)     ; Read the pointer. 
+;                                  ; Does not return until
+;                                  ; Either D0 or D4 are non-zero
+\end{lstlisting}
+
+For most loose items, application windows and so on, an action
+      routine will have been defined and coded. These action routines will be
+      discussed later. The pointer reading routine -{} \pe{wm\_rptr} -{} will not return
+      until either D0 or D4 are non-{}zero as a result of an action
+      routine.
+
+\subsection{Error Or Event?}
+
+If D0 is non-{}zero, and error has occurred and we should (somehow)
+      handle it and probably bale out of the program. Alternatively, we can
+      simply ignore errors and try again. The program developer
+      decides.
+
+If D4 is non-{}zero, an event has occurred and we need to handle
+      that in our code before, possibly, returning to the pointer reading loop
+      again.
+
+An event is defined as a key press such as ENTER while the pointer
+      is not positioned on a loose item or menu item, ESC, F1 (Help) or any of
+      the CTRL+Fn key combinations -{} SLEEP, WAKE, MOVE or SIZE -{} but only
+      provided that the key press doesn't select a menu item.
+
+An event can be generated by any of the action routines as well.
+      Within the action routines the programmer has the choice of either
+      handling the action code there and then, or, setting an event in D4 and
+      returning. This will cause the call to \pe{wm\_rptr} to exit and return back
+      to the application where the event can be handled.
+
+Some programmers like to control where and when the action
+      handling code is performed and like to keep it all in the main code,
+      others like to carry out the actions within the action handlers. It's
+      entirely up to the developer -{} the end user will see no difference
+      whichever method is chosen.
+
+Obviously, how a program handles errors and events is up to the
+      programmer and a generic method can't be given here. However, as an
+      example, the following may suffice.
+\begin{lstlisting}[firstnumber=last,caption={EasyPEasy Standard Code - Error or Event Check},label={lst:EasyPEasy-8}]
+; Ignore errors.
+         bne.s     read_ptr        ; Error in D0? If so, ignore it
+;                                  ; This assumes there is an option in
+;                                  ; the program to let the user EXIT
+\end{lstlisting}
+
+
+\subsection{Process Events.}
+
+At this stage in our program, we have returned from reading the
+      pointer (\pe{wm\_rptr}) and no errors have been reported (in D0), so we must
+      have detected an event in D4. We have three choices here -{} if our action
+      routines should have handled things, then perhaps we should ignore the
+      event and read the pointer again -{} alternatively, this could be an error
+      and we should abort the program. The other alternative is that our
+      action routines have set the event in D4, so our code should now process
+      the appropriate event.
+
+As above when trapping errors, there's no `one size fits all'
+      answer and every program should handle events accordingly. The following
+      is an example whereby the events are simply ignored and we return to
+      reading the pointer.
+
+\begin{lstlisting}[firstnumber=last,caption={EasyPEasy Standard Code - Ignore Events},label={lst:EasyPEasy-9}]
+; Ignore events.
+         bra.s     read_ptr        ; Ignore event numbers in D4
+\end{lstlisting}
+
+Obviously, if your code is processing events `outside the action
+      routines' then your own code, to process the appropriate event, would go
+      here, rather than simply ignoring the events.
+
+The event numbers are discussed below in `Loose Item Action
+      Routines'.
+
+\subsection{Repeat.}
+
+Repeat has already been handled above. All we do -{} in this simple
+      example -{} is loop back to read the pointer when we hit an error or when
+      any event occurs.
+
+\section{Loose Item Action Routines.}
+
+There are two kinds of action routines you need to be aware of.
+    Those for loose items and those for application menu items. As we have not
+    yet discussed much for Application Windows or their menu items, they will
+    be discussed later.
+
+An action routine for a loose item is called from within the \pe{wm\_rptr}
+    call, and if the action routine exits with D0 and D4 both set to zero, the
+    \pe{wm\_rptr} call will resume again -{} in other words, control will not return
+    to your own code just yet.
+
+On entry to a loose item action routine various registers are set
+    with specific parameters:
+
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l p{0.8\textwidth}}
+\toprule
+\textbf{Register} & \textbf{Description}  \\
+\midrule
+%
+D1.L & High word = pointer X position, Low Word = pointer Y position.  \\
+D2.W & Selection keystroke letter, in its \emph{upper cased} format, or 1 = Hit/SPACE or 2 = DO/ENTER.  D2.W may be an \emph{event code} if an event triggered this action.  \\
+D4.B & An event number - see below - if an event triggered this action routine.  \\
+A0.L & Channel id.  \\
+A1.L & Pointer to the status area.  \\
+A2.L & WMAN vector.  \\
+A3.L & Pointer to loose menu item.  \\
+A4.L & Pointer to window working definition.  \\
+%
+\bottomrule
+\end{tabular}
+\caption{Loose Item Action Routine - Entry Registers}
+\label{tab:Loose ItemActionRoutineEntryRegisters}
+\end{table}
+
+If the loose item was triggered as the result of a selection
+    keystroke, D2.W will hold the uppercased letter code.
+
+If the loose item was triggered as a result of an event, D4.B holds
+    the \emph{event number} and D2.W holds the \emph{event
+    code} in the table below.
+
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l c c}
+\toprule
+\textbf{Event} & \textbf{Keystroke} & \textbf{Event Number (D4.B)} & \textbf{Event Code (D2.W)}  \\
+\midrule
+%
+Hit    & Space    &  0 & 1 \\
+Do     & Enter    & 16 & 2 \\
+Cancel & ESC      & 17 & 3 \\
+Help   & F1       & 18 & 4 \\
+Move   & CTRL+F4  & 19 & 5 \\
+Size   & CTRL+F3  & 20 & 6 \\
+Sleep  & CTRL+F1  & 21 & 7 \\
+Wake   & CTRL+F2  & 22 & 8 \\
+%
+\bottomrule
+\end{tabular}
+\caption{Loose Item Action Routine - Event Settings}
+\label{tab:Loose ItemActionRoutineEventSettings}
+\end{table}
+
+In addition to the above, the status of the loose item which
+    triggered the action routine will be set to selected. It is not reset to
+    available on exit, this is your responsibility.
+
+Action routines must exit with D5, D6 and D7, A0 and A4 preserved to
+    the same value that they had on entry to the routine. In addition, the
+    code must set the SR according to the value in D0. A5 and A6 can be used
+    and left at any value by the action routines, while D1 -{} D3 and A1 -{} A3
+    appear to be undefined as to their exit status.
+
+If an error is detected, the routine should exit with an error code
+    in D0 and the SR set accordingly. If the action routine simply wishes to
+    cause \pe{wm\_rptr} to return to the user's code where an event will be
+    processed -{} rather than processing it in the action routine itself, D4
+    should be set to the correct event number that the user code should
+    process.
+
+Obviously, if setting D4 with an event number then D4 should be set
+    before D0 otherwise the SR will take on the settings for D4 instead of
+    D0.
+
+If no error was detected by the action routine, and no event is to
+    be returned, both D0 and D4 must be set to zero on exit.
+
+The action routine needs to perform the application specific code to
+    process the loose item that was triggered, however, it must also reset the
+    status of the loose item that triggered the action routine. This can be
+    done as follows.
+
+\begin{lstlisting}[firstnumber=last,caption={EasyPEasy Standard Code - Actions},label={lst:EasyPEasy-10}]
+; Action routine code goes here ...
+         move.l    d5-d7/a0-a4,-(a7) ; Preserve registers that we need
+         ...                         ; Do your stuff!
+         move.l    (a7)+,d5-d7/a0-a4 ; Restore registers prior to exit
+      
+; Reset loose item status as part of action routine.
+         move.w    wwl_item(a3),d1 ; Get the loose item number
+         move.b    #wsi_mkav,ws_litem(a1,d1.w) ; Redraw as available
+         moveq     #-1,d3          ; Request a selective redraw
+         jsr       wm_ldraw(a2)    ; Redraw selected lose items
+         moveq     #0,d4           ; No event signalled here
+         moveq     #0,d0           ; No errors either
+         rts                       ; Back to wm_rptr
+\end{lstlisting}
+
+The code above could be used as a template for loose item action
+    routines. It begins by preserving the registers that we must preserve
+    plus, it stacks A1 and A2 as well -{} for added safety, as they will be
+    required in the code to reset the loose item status.
+
+Should you reset the status on entry to the routine or exit? It's up
+    to your code obviously. However, I prefer to do it at the end of the
+    action routine. If the action routine is short and quick, it probably
+    makes no difference. If the routine takes some time -{} lets say, it's
+    formatting a floppy disc -{} then it's best to leave it at selected until
+    the format finishes and then reset it. However, it's your choice.
+
+\section{Coming Up...}
+
+In the upcoming chapter, we'll take a deeper look at
+    Easy PEasy\program{EasyPEasy} and the routines that George has written for us. If we have
+    time and space, we might take a look at an example of its use. See you
+    then.
+

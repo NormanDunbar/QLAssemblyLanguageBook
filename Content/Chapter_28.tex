@@ -1,0 +1,490 @@
+\chapter{Application Sub-{}Windows}
+
+\section{Introduction}
+\label{ch28-intro}%hyperlabel{ch28-intro}%
+
+Last issue I left you looking at a wonderful but practically useless program - ApplTest\_asm - which displayed itself on screen and reacted only to the user clicking on a loose
+        item or pressing the ESC key to quit the program. Apart from that, the most useful
+        thing it did was to move the pointer into the middle of the application sub-{}window
+        when the user pressed the TAB key.
+
+This time, we get to add a little code, and see what happens when we hit an
+        application sub-{}window. Let's get coding.
+
+\section{The Hit Routine.}
+\label{ch28-appl-hit}%hyperlabel{ch28-appl-hit}%
+
+You don't actually need to have a hit routine for all your application
+        sub-{}windows, there's nothing wrong with setting up an application sub-{}window in a
+        program and then not having a hit routine. This is especially true if you intend
+        to display information in it rather than handle user interactions and so on. As
+        you will see when running the code below, the hit routine for an application
+        sub-{}window gets called very frequently, so if you don't need one, don't use
+        one.
+
+You can disable the hit routine, if you don't need or want one, by setting
+        the pointer to the hit routine to zero in the window definition file created by SETW\program{SETW}. 
+        
+\begin{note}
+George isn't fond of having an application window just for display purposes and points out that information windows are much, much simpler. He is, of course, correct!
+\end{note}        
+ 
+ Now, it's time to get down to editing our new
+        program.
+
+We need to copy the two files we created last time, and rename them. So,
+        copy ApplTest\_asm to ApplHitTest\_asm,
+        and ApplTestWin\_asm to ApplHitTestWin\_asm. These are going to be used in our first
+        experiment.
+
+First of all, we need to change one text object in the file
+ ApplHitTestWin\_asm, so edit that file and change the caption
+        text to `Application Window Hit Test' from `Application Window Test 1'. Save the
+        file.
+
+Next up, we need to edit ApplHitTest\_asm. 
+
+\begin{note}
+Where possible, line numbers reference those in the file we created in the previous chapter. Lines starting at 1, will be new ones that should be inserted. Anything else will be noted in the text.
+\end{note}
+
+\begin{lstlisting}[firstnumber=5,caption={ApplTest\_asm - New Job Name}]
+fname   dc.w  fname_e-fname-2
+        dc.b  "Application Window Hit Test"
+fname_e ds.b  0
+\end{lstlisting}
+
+Next we need to change the application sub-{}window hit routine. Look through
+        the code for the routine named ahit0, which should be around line 83, and change it to the following.
+
+\begin{lstlisting}[firstnumber=83,caption={ApplTest\_asm - New Application Window HIT Routine}]
+; Application sub-window hit routine
+
+ahit0   movem.l d1/d3/d5-d7/a0/a4,-(a7) ; Save the workers
+        moveq #0,d1               ; D1.W = Application window number
+        moveq #0,d2               ; D2.W = Ink colour = black
+;                                   A4 already = Working definition
+        jsr wm_swapp(a2)          ; Set channel id to the sub window
+
+        movem.l a1-a2,-(a7)       ; A1 & A2 get corrupted
+        lea hit,a1                ; Text string to print
+        move.w ut_mtext,a2        ; Print string vector
+        jsr (a2)                  ; Print the message
+
+        lea hitter,a1             ; Hit counter location
+        move.w (a1),d1            ; Hit counter value
+        addq.w #1,(a1)            ; Increment counter
+        move.w ut_mint,a2         ; Print integer vector
+        jsr (a2)                  ; Print it
+
+        movem.l (a7)+,a1-a2       ; Restore working registers
+
+        movem.l (a7)+,d1/d3/d5-d7/a0/a4 ; Restore the workers
+
+        moveq #0,d4               ; No events
+        moveq #0,d0               ; No errors
+        rts
+
+; Strings and things go here
+
+hitter  dc.w 0                    ; How many times have I been hit?
+
+hit     dc.w hit_e-hit-2          ; Hit message
+        dc.b 'HIT: '
+hit_e   equ *
+\end{lstlisting}
+
+Then, right at the end, line 100, where we include our window definition, change the
+        file name to suit our new name -{} from ApplTestWin\_asm to
+ ApplHitTestWin\_asm.
+
+\begin{lstlisting}[firstnumber=100,caption={ApplTest\_asm - Including the Window Definition}]
+; Pull in our window definition file.
+
+        in  win1_source_ApplHitTestWin_asm
+\end{lstlisting}
+
+Save the file. We are done.
+
+Note in the above code, the call to \pe{wm\_swapp}. This sets the channel id in A0
+        to point to the application sub-{}window that we specify in D1. The ink colour is
+        set according to the value in D2.W and the \emph{sub-{}window is
+        cleared}. If we don't do this call, we might still print to the
+        application window however, if we do, it's just luck! You should
+ \emph{always} ensure that the channel id in A0 has been explicitly
+        pointed to the appropriate application window before attempting to print, cls, set
+        paper or ink, etc when executing code within a hit routine. If you don't, any text
+        printed by the code in the hit routine may well end up writing all over a loose
+        item, or an information window or some random place in the window.
+
+Obviously if you are running a program that has an application sub-{}window
+        that doesn't have a hit routine, you will still need to call \pe{wm\_swapp} to make sure
+        that the channel id in A0 points to where the sub-{}window is on screen -{} assuming
+        of course, that you wish to write text to that sub-{}window as part of the
+        application.
+
+When you assemble it and execute it, note how the counter changes as you
+        move the pointer over and around the application sub-{}window. It seems that you
+        don't have to use the left mouse button or space bar to get a HIT. In fact using
+        the right mouse button or ENTER both add 1 to the counter. The documentation says
+        that \emph{If there is no keystroke, or the keystroke is not the selection
+        keystroke for a loose menu item or an application sub-{}window, then, if the pointer
+        is within a sub-{}window, the hit routine is called, or else the loose menu item
+        list is searched to find a new current item}.
+
+Press ESC to stop the program, then execute it again, try to keep the
+        pointer outside the application sub-{}window. Now, press TAB. The pointer jumps into
+        the sub-{}window, but what happens to the counter? It increases by two rather than
+        one on every \emph{subsequent} press of the TAB key.
+
+This happens when you press some other key combinations, F1 increases the
+        counter by two as well. Other letter or digit keys increment the counter by
+        one.
+
+I wonder why? Maybe, in the case of F1, the keystroke itself causes a hit
+        and then the HELP event that the keystroke causes forces another hit? This doesn't
+        explain the TAB key having the same effect though -{} that doesn't cause a hit. I
+        mentioned above that a hit routine gets called very frequently didn't I?
+
+\begin{note}
+Ok, as an aside, I tested it. Using QMON2, I
+            put a breakpoint at Ahit0 -{} the entry point for the application sub-{}window hit
+            routine. On hitting the TAB key, I got a breakpoint. Looking at the registers
+            I found that the pointer position in D1 was well outside my window limits,
+            very strange. D2, the keystroke was set to -{}1 to indicate that an
+ \emph{external keystroke} fired the hit routine. There was no
+            event in D4 -{} it was zero and D6, an undefined register was zero. So far so
+            good, I noted down the registers and let the program continue.
+
+It immediately stopped at the hit routine again, this time the pointer
+            position had moved into my screen bounds from wherever it had been in
+            hyperspace. D2 was now zero to indicate that no key has been pressed. D4 was
+            still zero -{} so no events either. D6 had changed to \$80. Wonder what that
+            means?
+
+Letting the program run again, I pressed F1 this time -{} without moving
+            the pointer. Once again I hit the breakpoint. I could see the pointer position
+            in D1 had not changed, D4 still showed no events, D2 showed no key press and
+            D6 had returned to zero.
+
+And again, I let the program run and it broke again. D6 was back at \$80
+            again. D1, D2, D4 were all unchanged (as were all the other registers.)
+
+I hit space this time, when I let QMON\program{QMON} run
+            the program. As expected this showed a \$01 in D2 -{} the key press for a HIT is
+            converted to \$01, D6 was showing zero again. D4 still showed no events.
+
+Once more, QMON\program{QMON} let the program run and this
+            time, I pressed ENTER. D4 showed the value \$10 or the event number for a DO.
+            The key press in D2 was set to \$02 for a DO. D6 was zero and nothing else
+            changed.
+
+Finally, I pressed ESC to quit. Now, according to the docs, I should
+            have stopped at Ahit0 again with D4 showing the CANCEL event, however, as
+            documented above there was a loose item which had the ESC key set as the
+            selection keystroke. That code was executed to exit from the program, rather
+            than the application sub-{}window hit code being called with D4 set to the
+            CANCEL event number.
+\end{note}
+
+\section{The Advanced Hit Routine.}
+\label{ch28-appl-adv-hit}%hyperlabel{ch28-appl-adv-hit}%
+
+So, that's our first very simple hit test program done and dusted. It's
+        quite simple but quite useless, all it does is show you the running total of hits
+        in the window. You will soon get bored of it.
+
+For our next trick, we shall improve the utility to display full details of
+        what data gets passed to the hit routine. Copy
+ ApplHitTest\_asm to ApplHitTest\_2\_asm,
+        and ApplHitTestWin\_asm to
+ ApplHitTestWin\_2\_asm.
+
+As before, we need to change one text object in the file
+ ApplHitTestWin\_2\_asm, so edit that file and change the
+        caption text to `Application Window Hit Test 2' from `Application Window Hit Test'.
+        Save the file.
+
+Next up, we need to edit ApplHitTest\_2\_asm.
+
+\begin{lstlisting}[firstnumber=1,]
+fname   dc.w  fname_e-fname-2
+        dc.b  "Application Window Hit Test 2"
+fname_e ds.b  0
+\end{lstlisting}
+
+Next we need to change the application sub-{}window hit routine. Look through
+        the code for the routine named ahit0 and change it to the following.
+
+\begin{lstlisting}[firstnumber=1,]
+; Application sub-window hit routine
+
+ahit0   movem.l d1/d3/d5-d7/a0/a4,-(a7) ; Save Hit Routine registers
+
+        bsr.s apinit              ; Initialise the sub-window
+        bsr.s ptrpos              ; Show the pointer position
+        bsr.s keystr              ; Display keystroke
+        bsr events                ; Print event details
+
+        movem.l (a7)+,d1/d3/d5-d7/a0/a4 ; Restore Hit Routine registers
+        moveq #0,d0               ; No errors
+        rts
+\end{lstlisting}
+
+The main code in this advanced hit routine is simple -{} it stacks all the
+        registers that we require to preserve throughout the hit routine, and makes calls
+        to a few helper routines to carry out one specific task. I admit, this is not the
+        most efficient method, but it allows me to split the code into manageable chunks
+        for describing in the text.
+
+\begin{lstlisting}[firstnumber=1,]
+; Helper - Initialise the sub-window.
+
+apinit  movem.l d1-d2/a1-a2,-(a7) ; We need these registers later
+        moveq #0,d1               ; D1.W = Application window number
+        moveq #0,d2               ; D2.W = Ink colour
+;                                   A4 = Working definition
+        jsr wm_swapp(a2)          ; Set channel id to the sub window
+        movem.l (a7)+,d1-d2/a1-a2 ; Ptr position & keystroke back again
+        rts
+\end{lstlisting}
+
+The first subroutine called simply initialises the application sub-{}window
+        setting the ink to black and forcing the channel Id to cover the application
+        sub-{}window. Any registers corrupted by the routine are stacked on entry and
+        restored on exit.
+
+\begin{lstlisting}[firstnumber=1,]
+; Helper - Display pointer position details.
+
+ptrpos  movem.l d1-d3/a1,-(a7)    ; These get corrupted here
+        lea ptrx,a1               ; 'Ptr_x: '
+        bsr.s print               ; Print it
+
+        move.l (a7),d1            ; Restore the old D1 again.
+
+        swap d1                   ; Lo = pointer X, Hi = pointer Y 
+        bsr pr_int2               ; Print pointer X
+
+        lea ptry,a1               ; ' Ptr_Y: '
+        bsr.s print               ; Print it
+
+        movem.l (a7)+,d1-d3/a1    ; Retrieve other registers
+        bsr.s pr_int2             ; Print pointer Y
+        rts
+\end{lstlisting}
+
+The code above preservers all registers that will be corrupted and then
+        displays the current pointer position in absolute screen coordinates. These are
+        relative to the 0,0 position of the entire screen and not relative to the 0,0
+        position of the actual main window for our application. 
+
+\begin{lstlisting}[firstnumber=1,]
+; Helper - Display keystroke
+
+keystr  movem.l d1-d3/a1,-(a7)    ; These get corrupted here
+        lea keystk,a1             ; 'Key: '
+        bsr.s print               ; Print it
+
+        move.l 4(a7),d2           ; Retrieve D2
+        cmpi.b #-1,d2             ; External keystroke?
+        bne.s k_hit               ; no, try a HIT
+
+        lea keyext,a1             ; 'External'
+        bra.s k_doit              ; Print & exit
+
+k_hit   cmpi.b #1,d2              ; HIT?
+        bne.s k_do                ; No, try a DO
+
+        lea keyhit,a1             ; 'HIT'
+        bra.s k_doit              ; Print & exit
+
+k_do    cmpi.b #2,d2              ; DO?
+        bne.s k_zero              ; No, must be a key code or zero
+
+        lea keydo,a1              ; 'DO'
+        bra.s k_doit              ; Print & exit
+
+k_zero  cmpi.b #0,d2              ; Zero = no key pressed
+        bne.s k_keys              ; Has to be a key press
+
+        lea keyzero,a1            ; 'No key'
+        bra.s k_doit              ; Print & exit
+
+k_keys  move.w d2,d1              ; Need keystroke in D1.B
+        moveq #io_sbyte,d0
+        moveq #-1,d3
+        trap #3                   ; Print keystroke
+        bra.s k_done              ; Exit
+
+k_doit  bsr.s print               ; Print message
+k_done  movem.l (a7)+,d1-d3/a1    ; Restore working registers
+        rts
+\end{lstlisting}
+
+The code above starts, as usual, by preserving the working registers. It
+        then checks the value in D2 to see which, if any Key was pressed to cause a hit in
+        the application sub-{}window. D2 can be any of the following:
+\begin{itemize}
+
+\item{}Negative 1 = the activation key was pressed to place the pointer
+                into the application sub-{}window.
+
+
+\item{}1 -{} HIT -{} the left mouse button was clicked within the application
+                sub-{}window, or the space bar was pressed.
+
+
+\item{}2 -{} DO -{} the right mouse button or the ENTER key was pressed while
+                the pointer was within the application sub-{}window.
+
+
+\item{}Zero -{} no key or mouse button has been pressed.
+
+
+\item{}Anything else -{} this will be the upper cased key code for the actual
+                key that was pressed.
+
+\end{itemize}
+
+If the TAB key is pressed, you might briefly see the `external keystroke'
+        message flash across the screen quickly followed by `No key pressed' -{} as I
+        mentioned previously, pressing TAB (the activation key for the sub-{}window) results
+        in two separate calls to the hit routine.
+
+\begin{lstlisting}[firstnumber=1,]
+; Helper - Print event details
+
+events  movem.l d1-d3/a1,-(a7)    ; Save the usual bunch
+        lea event,a1              ; 'Event: '
+        bsr.s print               ; Print message
+        move.w d4,d1              ; Event number
+        bsr.s pr_int2             ; Print it
+        movem.l (a7)+,d1-d3/a1    ; Restore the workers
+        rts
+\end{lstlisting}
+
+Finally, we have the helper routine that displays details of whatever event
+        was detected which caused the hit routine to be activated. As ever, the code
+        starts by preserving the working registers and then examines D4 to see which, if
+        any, event took place.
+
+\begin{lstlisting}[firstnumber=1,]
+; Helper - Print string at (a1) to channel in A0. 
+; Then CLS to end of line.
+
+print   move.w ut_mtext,a2        ; Vector to print string
+        jsr (a2)                  ; Print it
+        movem.l d1/d3/a1,-(a7)    ; These get corrupted
+        moveq #sd_clrrt,d0        ; CLS to end of cursor line
+        moveq #-1,d3
+        trap #3                   ; Do it
+        movem.l (a7)+,d1/d3/a1    ; Restore
+        rts
+
+
+; Helper - Print word int at (a1) to channel in A0.
+
+pr_int  move.w (a1),d1            ; Get word to print
+pr_int2 move.w ut_mint,a2         ; Print word int vector
+        jsr (a2)                  ; Print it
+        rts
+\end{lstlisting}
+
+The above routines are called by the main sub-{}routines themselves to display
+        messages and numeric values on screen. The various messages are defined in the
+        code below.
+
+\begin{lstlisting}[firstnumber=1,]
+; Assorted TEXT messages etc follow.
+
+ptrx    dc.w ptrx_e-ptrx-2
+        dc.b 'Ptr_X: '
+ptrx_e  equ *
+
+ptry    dc.w ptry_e-ptry-2
+        dc.b ' Ptr_Y: '
+ptry_e  equ *
+
+keystk  dc.w keystk_e-keystk-2
+        dc.b $0a
+        dc.b 'Key: '
+keystk_e equ *
+
+keyhit  dc.w keyhit_e-keyhit-2
+        dc.b '1 = HIT'
+keyhit_e equ *
+
+keydo   dc.w keydo_e-keydo-2
+        dc.b '2 = DO'
+keydo_e equ *
+
+keyext  dc.w keyext_e-keyext-2
+        dc.b '-1 = External Keystroke'
+keyext_e equ *
+
+keyzero dc.w keyzero_e-keyzero-2
+        dc.b '0 = No Key Pressed'
+keyzero_e equ *
+
+event   dc.w event_e-event-2
+        dc.b $0a
+        dc.b 'Event: '
+event_e equ *
+\end{lstlisting}
+
+So, there you have it, a small and incredibly inefficient hit routine to
+        display some of the data that are passed into an application sub-{}window hit
+        routine when it is executed. I have not bothered to display the various window
+        definition addresses etc -{} if you wish, feel free to create a 32 bit long to
+        hexadecimal conversion routine to display these values.
+
+I have deliberately left these out in an effort to save space in the
+        magazine\footnote{\emph{QL Today}} -{} my listings can get a tad on the long side!
+
+There is one final change we need to make to our source code, right at the
+        end, where we include our window definition, change the file name to
+ ApplHitTestWin\_2\_asm.
+
+\begin{lstlisting}[firstnumber=1,]
+; Pull in our window definition file.
+
+        in  win1_source_ApplHitTestWin_2_asm
+\end{lstlisting}
+
+Save the file. We are done.
+
+When assembled and executed, the code in the hit routine displays a few
+        details of register settings on entry to the hit routine. It's not very useful,
+        but shows the pointer position in absolute screen coordinates as opposed to
+        relative to the start of the actual sub-{}window (which would have been a lot more
+        useful in my opinion), it shows the key press if any key was pressed and it shows
+        which event, if any, occurred. Remember, only a limited number of events get
+        through to a application sub-{}window hit routine.
+
+If you press the TAB key and watch closely, you might see a brief message
+        saying `External Keystroke' before the text is replaced by `No key pressed'. This
+        shows, once again, that the TAB key results in two calls to the hit
+        routine.
+
+\section{Conclusion}
+
+One thing has become obvious from even these two little routines, an
+        application sub-{}window results in a huge number of hits! Even moving the pointer
+        within a sub-{}window results in multiple hits. It might be better to display
+        information -{} whatever the application needs to print on screen -{} to an
+        information window instead. This should certainly save on processing time.
+        However, as I mentioned above, only use a hit routine if you absolutely need
+        one.
+
+Failing this, the ideal hit routine for an application window should be
+        hugely efficient -{} and it should exit quickly when it doesn't need to do any
+        [further] processing, rather than just doing everything each time the code is
+        entered.
+
+\section{Coming Up...}
+\label{ch28-the-end}%hyperlabel{ch28-the-end}%
+
+The next chapter continues looking at application sub-{}windows, but we will be
+        loading them with menus!
+

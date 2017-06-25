@@ -1,0 +1,298 @@
+\chapter{Assorted Revisions And Ramblings!}
+
+\section{Introduction}
+\label{ch19-intro}%hyperlabel{ch19-intro}%
+
+Greetings from the basement!
+
+We have moved house and are getting settled.\footnote{That was written originally in 2007. Treat with a pinch of salt now!} We have still got a lot of
+        boxes to unpack and things to find, but we are getting there. I have a new
+        `office' deep down in the basement where it is nice and cool. This is the first in
+        the Assembler series to come from the basement.
+
+With all the upheaval of getting moved and unpacked etc, I have not got a
+        lot of code for you this time, hopefully, you won't be too bored by this episode
+        in which I go over bits and pieces of assembly language programming that causes me
+        grief.
+
+It all started when I was having a think the other day about life in general
+        and assembly language in particular. I was pondering on the bits of programming in
+        assembler that I always get wrong, or have to really think about -{} and still get
+        wrong.
+
+\section{SIGNED And UNSIGNED Tests}
+\label{ch19-signed-unsigned}%hyperlabel{ch19-signed-unsigned}%
+
+I don't know about you, but I seem to have severe difficulties in
+        remembering which are the signed and which are the unsigned tests. I have to
+        confess that I always have a list of them written down (or printed out) and stuck
+        to my work area -{} wherever that happens to be.
+
+Table~\ref{tab:SignedAndUnsignedTests} is a reminder of the `cc' code to use in a \opcode{Bcc} or whatever for signed and unsigned comparisons:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l}
+\toprule
+\textbf{Desired Test} & \textbf{Signed} & \textbf{Unsigned} \\
+\midrule
+%
+Greater Equal  & GE & CC  \\
+Greater Than   & GT & HI  \\
+Equal/Zero     & EQ & EQ  \\
+Not Equal/Zero & NE & NE  \\
+Less Equal     & LE & LS  \\
+Less Than      & LT & CS  \\
+Negative       & MI & n/a  \\
+Positive       & PL & n/a  \\
+%
+\bottomrule
+\end{tabular}
+\caption{Signed and Unsigned Tests}
+\label{tab:SignedAndUnsignedTests}
+\end{table}
+
+So, if D0.B contains the value \$FF it represents either 255 (unsigned) or -{}1
+        (signed). You, as the programmer should know whether the value is considered
+        signed or not and can make the correct comparison checks.
+
+The EQ and NE tests are interesting in that they either mean `two values are
+        [not] the same' when comparing things such as memory and registers, or two
+        registers etc, or, when having just loaded a register with a value, they mean `the
+        value just loaded into a data register is [not] zero'.
+
+The following code examples are identical in result, one is just quicker
+        than the other:
+
+\begin{lstlisting}[firstnumber=1,]
+    MOVE.W (A1),D0
+    BEQ.S  D0Zero
+    ....
+\end{lstlisting}
+
+and
+
+\begin{lstlisting}[firstnumber=1,]
+    MOVE.W (A1),D0
+    CMPI.W #0,D0
+    BEQ.S  D0Zero
+    ...
+\end{lstlisting}
+
+\section{Which Way Round Is The `Subtraction' In CMP?}
+\label{ch19-cmp-way-round}%hyperlabel{ch19-cmp-way-round}%
+
+If I see \lstinline{CMPI.W #1234,D0} then it is obvious, I am comparing D0.W with the
+        value 1234. That's easy. However, when I see \lstinline{CMP.W D0,D1} I lose the plot.
+
+What am I comparing here is it D0 with D1 or the other way around. My brain
+        hurts already.
+
+Is the value of 1234 subtracted from D0 or is the value in D0 subtracted
+        from 1234. Which way round is the subtraction and the resulting setting of
+        flags?
+
+The answer, I note from part 2 of this series is that the source register is
+        subtracted from the destination register exactly as a \opcode{SUB} instruction would do,
+        the result is simply discarded. So in the instruction \lstinline{CMP.W D0,D1} the flags are
+        set according to D1.W minus D0.W.
+
+It is assumed that after this pseudo-{}subtraction, some \opcode{Bcc}, \opcode{Scc} or \opcode{DBcc} instruction will no doubt check the flags and do something useful with the
+        result.
+
+\section{Which CC Code To Use After CMP}
+\label{ch19-cc-code-after-cmp}%hyperlabel{ch19-cc-code-after-cmp}%
+
+Leading on from the above, I never remember which `cc' code to use after a
+        \opcode{CMP} -{} although, having written out the above it is becoming clearer. The following
+        code gives me the willies time after time:
+
+\begin{lstlisting}[firstnumber=1,]
+    ...
+    CMP.L D0,D1
+    BHI   somewhere
+    ...
+\end{lstlisting}
+
+This fragment has everything that confuses me, almost. It has a \opcode{CMP} followed
+        by a `cc' instruction -{} so I have to think about the two `problem areas' I mention
+        above. Signed or unsigned and which register is causing the HI to be true or
+        false.
+
+Well, the HI is, from my table above, unsigned and using my new found
+        knowledge of the \opcode{CMP} instruction I know (for a short while at least) that the flag
+        are set to the result of (D1.L -{} D0.L) but which way around does it go
+        again?
+
+The \opcode{BHI} should be read as `branch if destination register HI source
+        register' in the preceding \opcode{CMP} or \opcode{SUB} or whatever was used to set the flags. So,
+        using this explanation, I now know that the code above branches if D1.L is higher
+        (in an unsigned manner) than D0.L.
+
+This leads me to surmise that the following pseudo-{}code:
+
+\begin{lstlisting}[firstnumber=1,]
+IF unsigned (D1.L > D0.L) THEN
+...
+ELSE
+...
+END IF
+\end{lstlisting}
+
+Becomes:
+
+\begin{lstlisting}[firstnumber=1,]
+IF    CMP.L D0,D1    Flags = result of D1.L - D0.L
+      BHI.s THEN     D1 is indeed (unsigned) greater than than D0
+ELSE  ...            D0 is less or equal to D1 (the ELSE bit)
+      BRA.s ENDIF    Skip over the THEN clause
+THEN  ...            Do the THEN stuff
+ENDIF ...            Together again.
+\end{lstlisting}
+
+Alternatively, reverse the jumps to look more like the pseudo code:
+
+\begin{lstlisting}[firstnumber=1,]
+IF    CMP.L D0,D1    Flags = result of (D1.L - D0.L)
+      BLS.s ELSE     D1 is not HI (unsigned) than D0
+THEN  ...            D1 is indeed HI than D0, (the THEN bit)
+      BRA.s ENDIF    Skip over the ELSE clause
+ELSE  ...            Do the ELSE stuff
+ENDIF ...            Together again.
+\end{lstlisting}
+
+Maybe we should think about writing our assembly language in pseudo code and
+        having a pre-{}processor convert it into the real assembler code ....
+
+\section{Loops With Conditions}
+\label{ch19-loop-conditions}%hyperlabel{ch19-loop-conditions}%
+
+The instruction format for decrement and branch on condition instructions is
+        \opcode{DBcc} where `cc' is one of the many condition codes noted above.
+
+So, you have an area of RAM full of data and you go looking through it for
+        the first occurrence of a specific byte value, let's say \$00, and you know that
+        the leading word of the data defines the length in bytes. So, the following
+        fragment would do the job -{} assuming A0.L points to the data and D1.W holds a
+        valid data length.
+
+\begin{lstlisting}[firstnumber=1,]
+LOOP    CMP.B #$00,(A0)+
+        DBcc D1,LOOP
+ENDLOOP ...
+\end{lstlisting}
+
+What we need to figure out is which `cc' we require and also, what is result
+        when we get to the ENDLOOP label if we found a zero byte or if we didn't.
+
+One way we will end up at ENDLOOP is when our counter in D1 expires -{}
+        reaches minus 1 -{} that indicates that we ran out of data before finding what we
+        wanted. But, what happens if we find a zero byte -{} and which `cc' do we
+        need.
+
+If we remember that \opcode{DBcc} really means `test condition and decrement if false
+        and branch' then we should be ok. Alternatively:
+
+\begin{lstlisting}[firstnumber=1,]
+    IF 'cc' is FALSE THEN
+       D1 = D1 - 1
+       IF D1 <> -1 Then
+         GOTO LOOP
+       ELSE
+         GOTO ENDLOOP
+       END IF
+    ELSE
+       GOTO ENDLOOP
+    END IF
+\end{lstlisting}
+
+So, we want to check for a zero byte, we can use the `EQ' test -{} remember EQ
+        means we have hit a zero or two values are not equal -{} and our code now
+        becomes:
+
+\begin{lstlisting}[firstnumber=1,]
+LOOP    CMP.B #$00,(A0)+
+        DBEQ D1,LOOP
+ENDLOOP ...
+\end{lstlisting}
+
+So, we have reached ENDLOOP and we need to know if we hit a zero byte or if
+        we ran out of data. How to tell?
+
+Well the good news is that the \opcode{DBcc} instructions do not alter the flags. So
+        on exit from a \opcode{DBcc} loop, if the `cc' is still true, then the condition was met
+        and the loop terminated before the counter ran out. All we have to do is retest
+        with the same condition as follows:
+
+\begin{lstlisting}[firstnumber=1,]
+LOOP    CMP.B #$00,(A0)+
+        DBEQ D1,LOOP
+ENDLOOP BEQ.S FoundZeroByte
+\end{lstlisting}
+
+In this case, we check for the EQ condition which tells us that the loop
+        terminated early. We can test the inverse condition as well to see if the loop
+        expired without hitting the required condition:
+
+\begin{lstlisting}[firstnumber=1,]
+LOOP    CMP.B #$00,(A0)+
+        DBEQ D1,LOOP
+ENDLOOP BNE.S NotFound
+\end{lstlisting}
+
+Which we see makes the branch if the loop expired when the counter in D1.W
+        hit minus 1. I propose that we rename this family of instructions to `Decrement
+        and Branch UNLESS condition'. That makes more sense to me.
+
+\section{Do I TST.L D0 After TRAPs And Vectors?}
+\label{ch19-trap-vector}%hyperlabel{ch19-trap-vector}%
+
+I always get corrected on this one, either by George or Simon. For years I
+        have always done this:
+
+\begin{lstlisting}[firstnumber=1,]
+    ...
+    TRAP #1
+    TST.L D0
+    BNE HandleError
+    ...
+\end{lstlisting}
+
+Which is fine for a \opcode{TRAP} call -{} it \emph{has} to be done this
+        way. However, for a vector call it is different:
+
+\begin{lstlisting}[firstnumber=1,]
+    ...
+    MOVE.W UT_GTSTR,A2
+    JSR (A2)
+    TST.L D0
+    BNE HandleEror
+    ...
+\end{lstlisting}
+
+This is \emph{wrong} -{} I do not need to test D0 after a \emph{vectored} utility call. The
+        reason I do after a \opcode{TRAP} and don't after a vector is quite subtle and was only
+        recently pointed out to me by Simon when it all became very clear indeed.
+
+A TRAP call is treated as an exception and to return from an exception
+        handler, you use the \opcode{RTE} instruction. To return from a vectored call, it is an \opcode{RTS}
+        instruction. The difference between the two is that the \opcode{RTE} restores the status
+        register as well as the program counter. \opcode{RTS} simply restores the program
+        counter.
+
+So, all these years where I've been testing D0 on return from vectors I've
+        been wasting clock cycles when I need not have done. The status register is
+        correctly set on exit from a vectored utility but has only D0 is set on return
+        from a TRAP.
+
+Simple, but it has caught me out for years. I now need to unlearn my habit
+	        of coding a \lstinline{TST.L D0} every time I use a vectored utility.
+
+Happy coding.
+
+\section{Coming Up...}
+\label{ch19-the-end}%hyperlabel{ch19-the-end}%
+
+After many years of studious avoidance, I'm biting the bullet and attempting
+        to learn to code programs under the Pointer Environment.
+

@@ -1,0 +1,511 @@
+\chapter{WMAN, The Window Manager}
+
+\section{Introduction}
+\label{ch22-intro}%\hyperlabel{ch22-intro}%
+
+At the end of the last chapter I mentioned that we
+    would be delving into the WMAN\program{WMAN} system next. Well, here we are. However,
+    before we get down and dirty in the code, I need to make sure you all know
+    what I'm talking about, so let's start with a brief introduction/reminder
+    to WMAN\program{WMAN} and all its constituent parts.
+
+\section{WMAN}
+\label{ch22-wman}%\hyperlabel{ch22-wman}%
+
+Until now, we have been playing with the PE or Pointer Environment
+    routines. These allow for a window to be outlined, the pointer to be drawn
+    and read and so on. However, to use these few routines to write
+    applications with multiple windows and so on, loose items, menus whatever,
+    would be quite difficult. This isn't to say that it cannot be done, it's
+    just difficult.
+
+What we really need is a utility to allow us the ability to define
+    our window structure, the loose items and so on contained within it and
+    convert that into what QDOSMSQ really needs to have to be able to give us
+    all the goodies we get from the PE, well, WMAN\program{WMAN} is just that.
+
+Using WMAN\program{WMAN} we can define a window and all its contents, then use
+    the vectors from WMAN\program{WMAN} to setup, display, remove and interact with our
+    application without having to write code to handle everything
+    ourselves.
+
+George Gwilt mentioned in a comment about part 20 of this series
+    that I treated the call to \pe{IOP\_PINF} as a method of finding out whether or
+    not the Pointer Environment had been loaded. While it does indeed do this,
+    it also returns a vector to the current location of the WMAN\program{WMAN} utilities in
+    memory in A1.L -{} and it is these vectors we will be exploring in the
+    coming articles.
+
+\section{A Very Brief Overview Of WMAN}
+\label{ch22-overview}%\hyperlabel{ch22-overview}%
+
+Before we go on, we need to know what all the bits of the PE
+    actually are, so there now follows a small briefing on that very subject.
+    I won't be spending a lot of time in the discussions so if you need
+    further information there is a very good ``Idiot's Guide To The PE''
+    available on Dilwyn's web site at
+    http://www.dilwyn.uk6.net/pe/peig/pe.html if you want to read it online or
+    http://www.dilwyn.uk6.net/pe/peig.zip if you want to download it to read
+    at your leisure.
+
+\subsection{Selection Keys}
+\label{ch22-sel-keys}%\hyperlabel{ch22-sel-keys}%
+
+A selection key is simply the key that you press -{} when the
+      pointer is over the appropriate primary window (see below) -{} to activate
+      some function or feature of the program in question. It may cause an
+      action to be carried out or simply highlight an option is a menu.
+      Normally, the selection key is shown underlined, but this is not
+      necessary, although it is more helpful to the user of the program if it
+      is.
+
+\subsection{Hit and Do}
+\label{ch22-hit-do}%\hyperlabel{ch22-hit-do}%
+
+When the mouse buttons are in use then a HIT is what happens when
+      you click with the left mouse button and a DO is when you click with the
+      right one. On the keyboard, a HIT is when you tap the spacebar and a DO
+      is when you tap ENTER. The actions carried out when you HIT or DO may be
+      the same or may be different -{} it's all down to how the programmers
+      wrote the code.
+
+\subsection{Outline or Primary Window}
+\label{ch22-outln}%\hyperlabel{ch22-outln}%
+
+I have mentioned outlines before, however, for the same of
+      completeness, I'm reiterating here. The outline (or primary window) is
+      the rectangle of your screen that the program will perform all its
+      workings within. Any secondary windows (see below) opened by the program
+      must be fully contained within the area bounded by the outline.
+
+Of course, some programs allow you to move their windows around
+      the screen. This also moves the outline around and wherever the window
+      ends up when the user has moved it, becomes the new outlined area and
+      all secondary windows will now appear within the new location.
+
+The biggest size that an outline can be is the maximum width and
+      height of the screen minus the shadow width and depth.
+
+\subsection{Secondary Windows}
+\label{ch22-sec-win}%\hyperlabel{ch22-sec-win}%
+
+Secondary Windows are things like QMENU's file open utilities
+      and so on, pop-{}up messages giving you error messages and anything else
+      that takes place within the outline or primary window.
+
+\subsection{Information Sub Windows}
+\label{ch22-sub-win}%\hyperlabel{ch22-sub-win}%
+
+These are small areas of the primary or secondary windows that
+      show static text or little images or whatever. The most commonly seen
+      and recognisable ones are those green and white stippled `caption bars'
+      that most PE programs have at the top of every window.
+
+Indeed, the caption bar for most PE programs that I know of is set
+      up with a green and white stippled information window all the way across
+      the top of the window, then on top of that there is another plain white
+      information window nicely centralised horizontally on top of the first
+      one. The program name or caption is then inserted as an Information
+      Objects (see below) into this second information window.
+
+\subsection{Information Objects}
+\label{ch22-info-obj}%\hyperlabel{ch22-info-obj}%
+
+Once an information sub window has been created you need something
+      to put in it -{} for information purposes. To this end you need to create
+      information objects. These can be text or blobs, sprites or patterns
+      (see below). The most noticeable ones are the program name shown in the
+      `caption bar' of most PE programs.
+
+\subsection{Loose Items}
+\label{ch22-loose}%\hyperlabel{ch22-loose}%
+
+Loose items are small `buttons' with text or graphics on them.
+      They usually have a border that magically appears when the pointer is
+      within the bounds of the loose item in question. A hit or do on a loose
+      item will cause some action to be carried out.
+
+The popular loose items known to most users would probably be the
+      ZZz, ESC, resize and move ones that appear in the caption bars of may
+      PE programs.
+
+\subsection{Application Sub Windows}
+\label{ch22-app-sub-win}%\hyperlabel{ch22-app-sub-win}%
+
+There's not much to say about the application sub windows really.
+      They are what's left of the primary or secondary window after borders,
+      information sub windows and loose items etc have been removed. They are
+      the areas of the screen that the program prints its output or allows
+      input from the user and so on.
+
+A graphics drawing program, for example, would use the application
+      sub window to allow the user to draw whatever it is that they are
+      drawing.
+
+\subsection{Pan and Scroll Bars}
+\label{ch22-pan-scroll}%\hyperlabel{ch22-pan-scroll}%
+
+These are displayed if the data in an application sub window is
+      too wide (pan) or too tall( scroll) to be displayed completely within
+      the area of the screen set aside for the application sub window. GUI
+      users on other system (Linux or Windows) will be familiar with the
+      concept.
+
+At first, these can be a nightmare as a `DO' within the scroll bar
+      (or pan bar) will split it and you then end up with two separately
+      scrollable (and/or pannable) windows within the application window.
+      Could be useful at times I suppose!
+
+\subsection{Sprites, Blobs and Patterns}
+\label{ch22-sprites}%\hyperlabel{ch22-sprites}%
+
+A SPRITE is a picture that appears on the display somewhere. A
+      pointer is just a sprite that is moved around the screen. Sprites may be
+      drawn to look like text, for example, in logos and programmer's names
+      etc, or they may be small pictures to represent some function of the
+      program.
+
+A BLOB is part of a sprite and holds only data that defines the
+      shape. It has no colour information at all. The PATTERN is the part of
+      the sprite that holds the colour data. Why separate them like this? I
+      suspect it was to save memory -{} why bother having sprites defined with
+      the same shape, just different colours -{} by defining the BLOB once and
+      the PATTERS for the colours, you save repeating the blob data -{}
+      perhaps?
+
+Blobs and patters can be used independently of sprites
+      though.
+
+\subsection{Border}
+\label{ch22-border}%\hyperlabel{ch22-border}%
+
+The border around the primary and secondary windows, and indeed
+      any other object, is optional and up to the programmer. However, most
+      programs use borders.
+
+When you move the pointer over a loose item, a border may appear
+      around it to indicate that you can carry out some form of action if you
+      were to hit or do the loose item in question. Once the pointer is
+      outside the loose item boundary, the border may vanish.
+
+\subsection{Shadow}
+\label{ch22-shadow}%\hyperlabel{ch22-shadow}%
+
+The shadow for a window is drawn down the right side and along the
+      bottom. It is optional and entirely at the discretion of the developer.
+      When in use, a shadow gives the impression that the window is hovering
+      above the desktop. The shadow is outside the outline and does not
+      register hit or do actions. It is purely decorative.
+
+\section{More Useful Utilities From George}
+\label{ch22-utilities}%\hyperlabel{ch22-utilities}%
+
+The GWASL\program{Gwasl} assembler that George Gwilt wrote has been used as the
+    assembler of choice throughout this long running series. George has come up
+    trumps again with another utility that allows the easy generation of
+    assembler code that defines a WMAN\program{WMAN} windows definition (more on this later)
+    and I've been testing it out. Unfortunately, my holiday got in the way and
+    I have a new version of the utility and GWASL\program{Gwasl} to test out at the
+    moment.
+
+I'm sure that these programs will soon be available from George's
+    usual repository of fine code. In addition, I shall be trying these
+    utilities out myself and reporting back.
+
+\section{WMAN Windows Definition.}
+\label{ch22-wdef-intro}%\hyperlabel{ch22-wdef-intro}%
+
+As mentioned above, WMAN\program{WMAN} is slightly more involved that the bare
+    bones PE in as much as it carries out a huge amount of work on your
+    behalf. This is all work that you would have to write into each and every
+    program you write using the WMAN\program{WMAN} system (here-{}after known collectively
+    as the PE or the Pointer Environment) but in order to take advantage of
+    all this hard work, you have to set things up in a standard manner.
+
+If you look back an issue or so, you will notice that up until now,
+    all my PE test programs simply opened a console and set an outline before
+    entering the main loop to read the pointer, act upon it, repeat as
+    necessary. Obviously, my test programs were small and insignificant -{} but
+    even though, they could benefit from a bit more added `sparkle'. The WMAN\program{WMAN}
+    routines make this possible.
+
+The first thing we have to do is create a definition of our window
+    in memory. This will be in a standard format and when done, we call a WMAN\program{WMAN}
+    routine (\pe{WM\_SETUP}) to initialise the various internals required to make
+    our window work under WMAN\program{WMAN}. Let's now take a look at the standard
+    definition as required by WMAN\program{WMAN}.
+
+\section{Standard Windows Definition}
+\label{ch22-wdef}%\hyperlabel{ch22-wdef}%
+
+So, now you know what all the bits in a window are, we can get right
+    in and start discussing the standard way we have to define a windows and
+    all its \emph{decorations}. Let's take a look at one that
+ \emph{someone else} prepared earlier.
+
+The following is extracted from a small utility written by \emph{Oliver
+    Fink} many years ago. The utility shows various bits of information about
+    the running QDOSMSQ system. I have modified the original in a few places
+    but the full credit must remain with Oliver. The code is in the public
+    domain.
+
+The start of the definition is the main window itself:
+
+\begin{lstlisting}[firstnumber=1,caption={Main Window - Fixed Part}]
+;Main window definition :
+           dc.w  160                  ; default window width
+           dc.w  84                   ; height
+           dc.w  146                  ; initial pointer x position 
+           dc.w  8                    ; y position
+\end{lstlisting}
+
+So far so simple, nothing much here that we haven't met already. All
+    we are doing here is telling WMAN\program{WMAN} how big our window is to be and where
+    within the window the pointer is to be positioned when the window is first
+    drawn.
+
+The above positioning of the pointer is relative to the window
+    outline. So in our window which is 160 pixels wide, the pointer is located
+    146 pixels along -{} nearly at the far right end. It is located 8 pixels
+    down from the top. When drawn on screen, this places the pointer directly
+    over the ESC loose item.
+
+When the program is first executed, the PE attempts to position the
+    main window on the screen so that the requested position of the pointer is
+    superimposed on the current pointer position on screen. This prevents
+    disconcerting jumps of the pointer every time you start up a new
+    program.
+
+You can see this in action if you move the mouse around on screen,
+    note where it ends up, then EX a new program that uses the PE. You will
+    see that the main window appears wrapped around where you last saw the
+    pointer.
+
+Next we define the attributes for our window.
+
+\begin{lstlisting}[firstnumber=last,caption={Main Window - Window Attributes}]
+           dc.b  $00               ; MSbit clear to call CLS
+;                                  ; LSbit clear allows cursor keys
+;                                  ; to move pointer.
+           dc.b  2                 ; shadow depth 
+           dc.w  1                 ; border width 
+           dc.w  0                 ; border colour (black)
+           dc.w  7                 ; paper colour (white)
+\end{lstlisting}
+
+Again, there's nothing remarkably difficult here. Bit 7 of the first
+    byte tells WMAN\program{WMAN} whether or not the window is to be cleared. Setting bit 7
+    says that the window \emph{must not} be cleared. Following
+    on, we define a shadow size for the bottom and right edges of our window.
+    Bit 0 of this byte enables or disables the ability to move the pointer
+    using the cursor keys.
+
+\begin{note}
+The ability to disable/enable cursor key pointer movement is only
+      mentioned, briefly, in the QPTR\program{QPTR Toolkit} manual under the section on the Working
+      Definition.
+
+Disabling the cursor key movement \emph{also}       disables the ability to select items in an application sub-{}window menu
+      using the space bar or enter keys. This \emph{could} be a
+      bug!
+\end{note}
+
+Remembering back to our initial forays into the raw Pointer
+    Environment, you may remember that we could have a different shadow depth
+    on both of those sides, using WMAN\program{WMAN}, it appears that the shadow must be the
+    same down each side. Oh well!
+
+\begin{note}
+The documentation says that \emph{for sub-{}windows the shadow
+      depth should be zero.} Best we stick to that advice. Remember,
+      a sub-{}window is one `embedded' within the main window. See application
+      sub-{}windows or information sub-{}windows above.
+\end{note}
+
+Next, and finally for the main window, we have the definition of
+    where the default pointer sprite for the window is to be found.
+
+\begin{lstlisting}[firstnumber=last,caption={Main Window - Default Pointer}]
+           dc.w  0                 ; use default pointer
+\end{lstlisting}
+
+This is one of my changes. In a need to reduce the amount of code in
+    the magazine and also, to reduce your typing, I've modified Oliver's
+    definition to use the default arrow pointer in the main window and in the
+    application sub-{}window which will be defined below. Oliver had a custom
+    sprite for the main window and another for the application sub-{}window.
+    Both have been removed. The original file had this definition (don't type
+    this in!) and a chunk of code to define the sprite to be used.
+
+\begin{lstlisting}[firstnumber=1,caption={Do Not Type This In!}]
+           ; DO NOT TYPE THIS IN!
+           dc.w  sprt-*            ; pointer to pointer sprite
+\end{lstlisting}
+
+You should be aware that all pointers in a window definition are
+ \emph{word} sized and \emph{relative} to their
+    own position in the definition block.
+
+Now, that implies that all object lists must be within plus or minus
+    16KB of the pointer position, which might be a problem when there are a
+    lot of objects and so on to define. To this end, if bit zero is set -{} an
+    odd address -{} then that offset is used as a pointer to a long word which
+    itself is a relative pointer to the object in question. Obviously, the
+    word length odd pointer obviously has to be made even first, this is done
+    simply by clearing bit zero.
+
+In the above, if the Pointer Sprite above was defined a long long
+    way away, we would see something like this:
+
+\begin{lstlisting}[firstnumber=1,caption={Do Not Type This In Either!}]
+...
+           dc.w  sprt-*+1          ; ODD Pointer to long pointer to
+;                                  ; our window's pointer sprite
+           ...
+sprt       dc.l  Real_sprt-*       ; Long pointer to pointer sprite
+           ...
+Real_sprt  ....                    ; Pointer sprite definition
+\end{lstlisting}
+
+If any pointer is to something we don't need, then simply set it to
+    zero. So, for example, instead of using Oliver's original `?' sprite
+    (shaped like a question mark) we have defined this word pointer as zero
+    and get the default arrow sprite instead. In this case, zero means `use
+    the default' but in other places, it means `not used'.
+
+Next to be defined are the attributes for all the loose items we
+    will be using in the window. Starting with the easy bits:
+
+\begin{lstlisting}[firstnumber=14,caption={Main Window - Current Loose Item - Border Attributes} ]
+; menu item attributes
+           dc.w  1                 ; Current item border width  
+           dc.w  0                 ; Border colour (black)
+\end{lstlisting}
+
+As before, it is simple. We define a black border 1 pixel in width.
+    When the pointer is over any of our loose items, this border will be drawn
+    around it to indicate that `you can do something here'.
+
+Following the border, we have the attributes for the loose items
+    that are unavailable, available and selected. These attributes require 8
+    bytes each and define paper and ink (for text objects contained within
+    them) and also blobs and patterns for the other object types. We are only
+    using the paper and ink attributes, but the others must be there. We use
+    zero to indicate `not in use'.
+
+\begin{lstlisting}[firstnumber=last,caption={Main Window - Loose Item Attributes}]
+; Menu item unavailable
+           dc.w  30                ; Paper - green/white stipple
+           dc.w  30                ; Ink - green/white stipple 
+           dc.w  0                 ; Pointer to blob for pattern
+           dc.w  0                 ; Pointer to pattern for blob
+
+; Menu item available
+           dc.w  7                 ; Paper - white
+           dc.w  0                 ; Ink - black
+           dc.w  0                 ; Pointer to blob for pattern
+           dc.w  0                 ; Pointer to pattern for blob
+
+; Menu item selected
+           dc.w  4                 ; Paper - green
+           dc.w  0                 ; Ink - black
+           dc.w  0                 ; Pointer to blob for pattern
+           dc.w  0                 ; Pointer to pattern for blob
+\end{lstlisting}
+
+In this example program, the loose items are never anything except
+    available (and very briefly, selected) so the unavailable attributes are
+    never used, but they still have to be defined. Oliver has chosen to use a
+    paper and ink colour of 30 for unavailable loose items. That value gives a
+    pleasant green/white stipple. Don't worry about it because you will never
+    see it!
+
+Following the loose item attributes, we have a relative pointer to
+    the help window. In this program, we are not using one, so that pointer
+    gets the value of zero.
+
+\begin{lstlisting}[firstnumber=last,caption={Main Window - Help Window Details}]
+           dc.w  0                 ; Pointer to help window
+\end{lstlisting}
+
+That is the end of the fixed part of the window definition. So far
+    so good, there has been nothing too difficult yet. I wonder what is
+    coming?
+
+The rest of the definition block defines the \emph{repeating
+    parts} of the window definition. What exactly does that
+    mean?
+
+The documentation has this to say about the repeating parts:
+
+\emph{``To allow for a variety of different layouts within the
+    window as the size of the window varies, part of the window definition may
+    be repeated several times. The definition should be made in order of
+    decreasing window size. The last definition which defines the smallest
+    allowable window, should be followed by a word containing -{}1. If the top
+    nibble of a layout size word is zero, then the layout may not be scaled.
+    If it is \%0100 then it may [be scaled].''}
+
+\begin{note}
+This actually shows up what I think is a contradiction in the
+      documentation. There are other values that can be used in the top
+      nibble, not only \%0000 and \%0100. More on scaling later in the
+      series.
+\end{note}
+
+So there you have it. The fixed part of the window defines the
+    default layout for the window. That layout and all other possible ones
+    allowed, need to be defined in the repeating part of the window
+    definition.
+
+A window can be scaled by WMAN\program{WMAN} if the definition allows for it. The
+    scaling flag is the top nibble (4 bits) of the size words for the window
+    layout. If the top nibble is \%0000 then it cannot be scaled and if it is
+    \%0100 then it may be scaled.
+
+Scaling applies separately to the width and to the height of the
+    different layouts. You don't have to scale vertically and horizontally,
+    you can pick one, the other or both as desired.
+
+For simplicity, and because I have not investigated scaling yet,
+    Oliver and I will be sticking to non-{}scaled windows for now. Scaling will
+    be a subject for a future article.
+
+The following is the repeating parts for our single, non-{}scaling
+    layout in our small program.
+
+\begin{lstlisting}[firstnumber=last,caption={Main Window - Repeating Part}]
+; Base of repeated part of window definition 
+           dc.w  160               ; Width for this layout
+           dc.w  84                ; Height for this layout
+
+; Pointers to definition lists
+           dc.w  il-*              ; Information sub-windows 
+           dc.w  ll-*              ; Loose menu items
+           dc.w  al-*              ; Application sub-windows
+\end{lstlisting}
+
+The above would be repeated for each and every different allowable
+    layout for the window, from the biggest to the smallest. Following on from the very last layout, the smallest allowed, we have the terminating word.
+
+\begin{lstlisting}[firstnumber=last,caption={Main Window - Repeating Part - End Flag}]
+           dc.w  -1                ; End flag
+\end{lstlisting}
+
+So we allow one and only one layout, which just happens to be
+    exactly the same size as the default one defined in the fixed part of the
+    definition block. It has three pointers at the end for the information
+    sub-{}windows, the loose items and any application sub-{}windows that are
+    required in this layout. Each layout will have its own list and they need
+    not be the same for each different layout.
+
+We shall pause for breath at this point and discuss these lists in
+    the next article. Hopefully, the above was not too taxing and I've
+    explained it better that I ever had it explained to me!
+
+\section{Coming Up...}
+\label{ch22-the-end}%\hyperlabel{ch22-the-end}%
+
+The next chapter continues our look at the window definition by looking
+    into the lists of objects attached to our window.
+

@@ -1,0 +1,774 @@
+\chapter{Dataspace Problems}
+
+\section{Introduction}
+\label{ch15-intro}%hyperlabel{ch15-intro}%
+
+There has been much correspondence recently (today is the 3rd of
+    April 2006\footnote{Actually, today is the 15th November 2014!})\footnote{No it isn't! It's \emph{much} later than that!} on the ql-{}users email list since Dilwyn posted a messages
+    about the seeming "Catch-{} 22" problems where someone downloads a QL
+    application from the internet and has to extract the zip file on a Windows
+    PC. The files thus extracted are then read into QPC\program{QPC} (or similar) and
+    subsequently, any executable files fail to work.
+
+The problem is caused by the need for QL files to have a correct
+    file header which has the file type byte set to be EXECable and a valid
+    value in the data space part of the header.
+
+Getting hold of a QL specific version of Zip/Unzip is quite simple,
+    but it arrives in a zip file so we have a recursive problem here. Dilwyn's
+    advice is quite simple, load the program into memory and SEXEC it with the
+    correct data space. This is indeed a simple solution, but I wouldn't be
+    writing this article if I didn't have an alternative would I?
+
+Actually, there is a version of Zip for the QL which has been
+    converted to run as an EXECable file that will extract itself, so this is
+    the easiest solution overall. However, the utility I describe below can be
+    used to make any file executable and to provide a data space value without
+    having to read the file off disc, delete it and then SEXEC a new copy back
+    to the disc -{} what happens if you have a crash just after the
+    delete?
+
+The code below is based on a utility I wrote many years ago (1991
+    actually) that was supplied with WinBack\program{WinBack} when it was still a commercial
+    program. I have only had to make a slight change to it for this
+    version.
+
+In the old days, the utility checked to make sure that the file was
+    already executable and failed if not, this version doesn't fail, it simply
+    changes the file to be executable.
+
+When you EXEC the dataspace\_bin\program{dataspace\_bin} file, you will be prompted for a
+    filename. Type one in and if it is not an executable already, the program
+    will advise you of this -{} then convert it to an EXEC file.
+
+Next you will be shown the current data space and asked for a new
+    value. The value you type should be numeric (or numeric with a `k' at the
+    end) and even. If not even it will be rounded up to the next even
+    number.
+
+If the value you type is less than the minimum the program allows
+    (default is 1024 bytes), then your value will be rounded up to the minimum
+    value. If you don't like this, then set minimum to zero in the source code
+    and it will be ignored.
+
+To finish the program, simply press ENTER when prompted for a
+    filename.
+
+\section{The Code}
+\label{ch15-code}%hyperlabel{ch15-code}%
+
+We shall begin the typing with the usual set of equates and
+    constants, type the following into a file -{} I suggest you name it
+    dataspace\_asm, but this is not mandatory.
+
+\begin{lstlisting}[firstnumber=1,caption={Dataspace Program - Equates etc}]
+*=====================================================================*
+* DATASPACE version 1.10                                              *
+*                                                                     *
+* Copyright Norman Dunbar February 1991/2006                          *
+*                                                                     *
+* Changes a task file's dataspace.                                    *
+*=====================================================================*
+*                                                                     *
+* AMENDMENTS                                                          *
+*                                                                     *
+* 03/04/2006 - makes files executable if not and doesn't complain.    *
+*=====================================================================*
+
+*---------------------------------------------------------------------*
+* EQUATES  General                                                    *
+*---------------------------------------------------------------------*
+ftyp       equ     $05                 Offset to file type
+fdat       equ     $06                 Offset to file dataspace
+exec_file  equ     $01                 Indicator file can be EXEC'd
+minimum    equ     1024                Minimum dataspace allowed
+
+me         equ    -$01                 This job
+linefeed   equ     $0A                 Ascii line feed
+timeout    equ    -$01                 Infinite timeout
+black      equ     $00                 Black ink/paper code
+red        equ     $02                 Red ditto
+green      equ     $04                 Green ditto
+white      equ     $07                 White ditto
+\end{lstlisting}
+
+Following on from the above, we have the standard QDOSMSQ job
+    header. From the code that follows below, you can see the header with the
+    job name and version in the usual format for a QDOSMSQ job.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 1 - Initialisation}]
+*=====================================================================*
+* The code starts here with a standard QDOS job header.               *
+*=====================================================================*
+start      bra.s   dataspace           Jump over header
+           dc.l    0                   Make sure $4AFB is at offset 6
+           dc.w    $4AFB               ID word
+
+name       dc.w    22                  Length of name
+           dc.b    'Dataspace Version 1.10'
+
+*---------------------------------------------------------------------*
+* Open a console window                                               *
+*---------------------------------------------------------------------*
+dataspace  move.w  ut_con,a2
+           lea     con_def,a1          Console definition block
+           jsr     (a2)                Open a CON_ channel
+           tst.l   d0                  Check for errors
+           bne     job_end             And bale out if found
+           move.l  a0,d7               Store console id
+
+*---------------------------------------------------------------------*
+* Console is open, sign on                                            *
+*---------------------------------------------------------------------*
+sign_on    lea     name,a1             Job name
+           bsr     write_text          Print job name
+           lea     copyright,a1        Copyright message
+           bsr     write_text          And copyright message
+\end{lstlisting}
+
+After the job header, the first part of the program performs all the
+    initialisation that is required. The job opens a new console channel and
+    saves the channel number in D7.L. D7.L is not corrupted by any of the code
+    that follows, so it is a good place to save the channel number. It will be
+    used each time we pass through the main loop.
+
+It is slightly more efficient to move data between two registers
+    than it is to fetch from a memory location. In this utility, that's hardly
+    going to be needed, but we might as well use all the registers before we
+    have to start saving data in memory.
+
+Once the main console channel is open, we print a small sign on
+    message showing the job name (extracted from the standard job header area)
+    and a copyright message and then drop into the main processing
+    loop.
+
+Please note that although this code is copyright, you have my
+    express permission to use and abuse it as you see fit. If the code can be
+    useful in programs that you write in future, please feel free to copy it
+    directly with my blessings!
+
+You will note that much of this program is written as simple
+    subroutine calls. Once again, reusing existing and working code is always
+    a good idea in my book.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 2 - Get Filename}]
+*---------------------------------------------------------------------*
+* Main loop, keep asking for a filename until ENTER only pressed      *
+*                                                                     *
+* First prompt for filename                                           *
+*---------------------------------------------------------------------*
+main_loop  move.l  d7,a0               Console id
+           lea     mess_1,a1
+           bsr     write_text          Enter filename message
+           bsr     get_text            Get filename
+\end{lstlisting}
+
+The main loop starts off by getting the console channel number into
+    A1 which is where most (if not all) the channel handling routines expect
+    it to be. D7 is never corrupted by the code below so makes a good place to
+    save it.
+
+The user is prompted to `enter a filename or press ENTER only to
+    quit', the program waits for a response from the user and if the user
+    simply pressed ENTER, the program will skip off to the code at label
+    `any\_key' to terminate the program.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 3 - Open the File}]
+*---------------------------------------------------------------------*
+* Then check if it was only ENTER and if so exit the job              *
+*---------------------------------------------------------------------*
+check_end  tst.w   d1                  Finished?
+           beq     any_key             Yes
+
+*---------------------------------------------------------------------*
+* Otherwise attempt to open the file                                  *
+*---------------------------------------------------------------------*
+open_file  moveq   #io_open,d0         Open file
+           moveq   #me,d1              For this job
+           moveq   #0,d3               For input
+           move.l  a1,a0               File name is in buffer
+           trap    #2
+           tst.l   d0                  Check errors
+           beq.s   read_head           Open was ok
+
+*---------------------------------------------------------------------*
+* Cannot open the file, print its name and the error message          *
+*---------------------------------------------------------------------*
+cant_open  move.l  d0,-(a7)            Store error code
+           lea     mess_2,a1           Cannot open message
+           bsr     write_text          Print it
+           lea     input,a1            File name
+           bsr     write_text          Print filename
+           lea     mess_6,a1           A colon
+           bsr     write_text          Print it
+           move.l  (a7)+,d0            Get error code
+           move.w  ut_err,a2
+           jsr     (a2)                Print error message
+
+*---------------------------------------------------------------------*
+* Note, D0 is preserved by UT_ERR, so cannot check for errors         *
+*---------------------------------------------------------------------*
+
+           bra.s   main_loop
+\end{lstlisting}
+
+Assuming that we got a response back from the user, we assume that
+    it is a filename which the user wishes to either make executable, or
+    adjust the data space. The code at `open\_file' above attempts to open the
+    filename supplied by the user for input. This means that it must already
+    exist on a device somewhere.
+
+If the file opened ok, the program skips to the code below which
+    attempts to read the file header, otherwise the user is presented with a
+    message detailing why the file couldn't be opened, and we skip back to the
+    start of the main loop where we prompt for another filename.
+
+You will note my comment that \vector{UT\_ERR} preserves the error code passed
+    to it in D0, so we cannot make any checks to determine whether the error
+    code in D0 is the one we passed in, or one generated by UT\_ERR. Don't
+    worry about it:o)
+
+A quick tangent is required now, before we proceed. On a directory
+    device such as `flp1\_', `mdv1\_' and so on, all files have two parts to
+    them. First of all there is the file header -{} a 64 byte section of data
+    which is stored in the directory (and allegedly at the start of each file
+    too -{} you just can't get at it!) -{} and the contents of the file
+    proper.
+
+This header holds details of the file size, its type, data space,
+    various dates giving details of when the file was last changed, backed up
+    etc. We are interested in only two parts of the header in this utility -{}
+    the file type ( byte) and the file's data space (long).
+
+We defined a couple of equates way back at the start of the code -{}
+    the `ftyp' equate points at byte 5 of the 64 byte buffer and the `fdat'
+    points at the long word starting at byte 6 of the header. These are the
+    two places we need to get data from and write data to.
+
+On with the real code again. The following reads a file header and
+    processes errors as required.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 4 - Read File Header}]
+*---------------------------------------------------------------------*
+* File has been opened ok, read the file header                       *
+*---------------------------------------------------------------------*
+read_head  move.l  a0,d6               Store file id
+           moveq   #fs_headr,d0
+           moveq   #64,d2              Size of buffer
+           moveq   #timeout,d3         Timeout
+           lea     buffer,a1           Put header here
+           move.l  a1,a5               Store buffer
+           trap    #3                  Go get the file header
+           tst.l   d0                  Check for errors
+           beq.s   check_exec          none
+
+*---------------------------------------------------------------------*
+* Cannot read file header, say so and print the error message         *
+*---------------------------------------------------------------------*
+cant_read  lea     mess_3,a1           Cannot read header message
+           move.l  d0,-(a7)            Store error code
+           bsr     write_text          Print message
+           move.l  (a7)+,d0            Get error code
+           move.w  ut_err,a2
+           jsr     (a2)                Print error message
+           bra     main_end            Skip the rest of the loop
+\end{lstlisting}
+
+The code above tries to read the 64 byte file header into a buffer -{}
+    which must be big enough to hold all 64 bytes -{} and if an error is
+    detected in the attempt, the user is told about the problem and the file
+    is closed prior to the main loop starting all over again.
+
+The buffer start address is saved in register A5.L for later use
+    prior to the attempt to read the file header -{} this is because the real
+    buffer address register, A1.L will be corrupted by the trap call.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 5 - Exec Check}]
+*---------------------------------------------------------------------*
+* Header has been read ok, check if the file is EXECable              *
+*---------------------------------------------------------------------*
+check_exec cmpi.b  #exec_file,ftyp(a5) Check file is EXECable
+           beq.s   current             It is
+
+*---------------------------------------------------------------------*
+* File is not EXECable, print a warning message and convert it        *
+*---------------------------------------------------------------------*
+not_exec   lea     input,a1            Filename
+           bsr     write_text          Print filename
+           lea     mess_4,a1           Not an EXECable file message
+           bsr     write_text          Print the message
+           move.b  #exec_file,ftyp(a5) Make file EXECable
+
+*---------------------------------------------------------------------*
+* File is EXECable, print its current dataspace                       *
+*---------------------------------------------------------------------*
+current    lea     mess_5,a1           Current dataspace is message
+           bsr     write_text          Print it
+\end{lstlisting}
+
+The file is now open, its header has been read into our buffer. The
+    code now checks to see if this file is executable already. If it is,
+    nothing is said or done, however, if the file is not executable -{} and this
+    will be the case for a file extracted by a Windows version of Zip -{} we
+    display a warning message to the user and convert the file to be
+    EXECable.
+
+In either case, we print a message which will eventually inform the
+    user how big the file's dataspace is at the moment. The first part of the
+    message is easy -{} it is simple text but we also need to print out the
+    current value. This is done by the code below.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 6 - Print Current Dataspace}]
+*---------------------------------------------------------------------*
+* Now get the current dataspace & convert it to ASCII                 *
+*---------------------------------------------------------------------*
+           move.l  fdat(a5),d3         D3.L is dataspace
+           lea     input+2,a1          A1.L is output buffer
+           lea     tens_table,a2       Powers of 10
+           moveq   #0,d1               D1.W is digit counter
+
+next_digit move.l  (a2)+,d2            D2.L is current power of 10
+           beq.s   all_done            But zero is end of table
+           clr.b   d0                  D0.B is current digit
+
+digit_loop sub.l   d2,d3               Subtract the current power of 10
+           blt.s   buff_digit          Too far
+           addq.b  #1,d0               Increase current digit
+           bra.s   digit_loop          And try again
+
+buff_digit add.l   d2,d3               Correct for the overflow
+           tst.b   d0                  Is this a zero?
+           bne.s   not_a_zero          No
+           tst.w   d1                  Yes, is it a leading zero?
+           beq.s   next_digit          Yes, ignore it
+
+not_a_zero addi.b  #'0',d0             Convert to ASCII
+           move.b  d0,(a1)+            Store in buffer
+           addq.w  #1,d1               Increment total digits
+           bra.s   next_digit          And do the rest
+
+*---------------------------------------------------------------------*
+* Check for a result of zero. In this case force a '0' to be printed  *
+*---------------------------------------------------------------------*
+all_done   tst.w   d1                  Any digits found?
+           bne.s   not_zero            yes
+           move.b  #'0',(a1)           Store a zero
+           moveq   #1,d1               And set the count
+
+not_zero   lea     input,a1            The buffer
+           move.w  d1,(a1)             Store character count
+
+*---------------------------------------------------------------------*
+* Dataspace is converted, print it out                                *
+*---------------------------------------------------------------------*
+
+           bsr     write_text          Print old dataspace
+\end{lstlisting}
+
+The code above begins by reading the long word representing the file
+    data space requirements from the file header into register D3.L.
+
+D3.L is then converted to text read for printing by the fairly
+    simple method of repeatedly subtracting assorted powers of 10 from the
+    value until we get an overflow (underflow?) and saving the number of times
+    we managed to successfully subtract the current power of 10. This count is
+    our current digit and is held in D0.B as it cannot be greater than
+    9.
+
+If the counter is non-{}zero, we convert it to ASCII by adding the
+    ASCII code for `0' (zero) to the count and save it in the buffer located
+    at A1. We only print out the full number when we have decoded it -{} we
+    don't print each digit individually as we go along.
+
+If the dataspace is still zero, even after processing all the
+    digits, we simply print a zero.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 7 - Get New Dataspace}]
+*---------------------------------------------------------------------*
+* Now prompt for, and read in the required new dataspace              *
+*---------------------------------------------------------------------*
+new        lea     mess_8,a1           New dataspace message
+           bsr     write_text          Print it
+           bsr     get_text            Get new dataspace
+           tst.w   d1                  No text?
+           beq.s   new                 Try again
+           move.w  d1,d0               Get text length
+           subq.w  #1,d0               Adjust for dbra
+           addq.l  #2,a1               Adjust A1 past the word counter
+\end{lstlisting}
+
+Having printed out the current data space for the file in question,
+    we next prompt the user to enter a new value. If the user simply presses
+    ENTER without entering a value, the program detects this, and simply loops
+    around to ask for the new data space value again. To get out of this loop
+    a valid numeric value must be entered.
+
+The utility accepts pure digits or a number of digits suffixed by a
+    `K' (in upper or lower case) and this is used to specify a data space in
+    Kilobytes rather than bytes. If there are spaces in the user input, they
+    will simply be skipped.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 8 - ASCII Conversion}]
+*--------------------------------------------------------------------*
+* Convert from ASCII into binary, ignore leading (any) spaces & stop *
+* if a 'K' or 'k' is detected. Reject all other non-digit characters *
+*--------------------------------------------------------------------*
+convert    moveq   #0,d4               Needs to be a long word
+           move.l  d4,d5               D5 is total so far
+
+conv_next  move.b  (a1)+,d4            Get a byte
+           cmpi.b  #' ',d4             Is it a space?
+           beq.s   try_next            Yes, ignore it
+           cmpi.b  #'k',d4             Is it 'k'
+           bne.s   try_K               no
+
+mul_1024   asl.l   #2,d5               Yes, multiply by 1024
+           asl.l   #8,d5               Can't do it in one go
+           bra.s   make_even           And exit
+
+try_K      cmpi.b  #'K',d4             Try uppercase
+           beq.s   mul_1024            Yes
+
+           cmpi.b  #'0',d4             Is it a digit?
+           bcs.s   invalid             No
+           cmpi.b  #'9',d4             But it might be
+           bls.s   mul_10              Yes it is
+
+*---------------------------------------------------------------------*
+* An invalid digit has been detected, print error message & try again *
+*---------------------------------------------------------------------*
+invalid    lea     mess_10,a1          Invalid digit message
+           bsr.s   write_text          Print it
+           bra.s   new                 try again
+\end{lstlisting}
+
+As we scan through the input supplied by the user we ignore any
+    spaces. I could have written the code to detect when the first digit had
+    been detected and processed spaces after that as errors, but I was
+    obviously too lazy to do so back in 1991. (Not much has changed in 2006\footnote{2006? Have I been writing Assembly articles that long? It's 2014 at the moment and 2015 is rapidly approaching. I'll be getting a bus pass pretty soon at this rate!}\footnote{Ahem!} then!)
+
+Each character is checked and if it is a `K' (in any letter case) it
+    indicates the end of the input and the current value is multiplied by 1024
+    to get the correct number of bytes.
+
+If an invalid character is detected, an error message is printed and
+    the user restarts the inner loop of the program where s/he is prompted to
+    type in a new data space value.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 9 - Multiply by 10}]
+*---------------------------------------------------------------------*
+* Multiply D5.L by 10 and add in the digit just read                  *
+*---------------------------------------------------------------------*
+mul_10     asl.l   #1,d5               D5 = D5 * 2
+           move.l  d5,d3               Store for now
+           asl.l   #2,d5               Now D5 = D5 * 8
+           add.l   d3,d5               And finally D5 = D5 * 10
+           subi.b  #'0',d4             Convert byte to (long) binary
+           add.l   d4,d5               Total = (total * 10) + digit
+
+try_next   dbra    d0,conv_next        Do rest of digits
+\end{lstlisting}
+
+If we get to the code above, then the current character in the user
+    input must be a digit. We multiply the running total so far by 10, convert
+    the latest digit from an ASCII character down to a numeric value and add
+    it to the running total in D5.L before skipping back to continue scanning
+    the input area for another digit.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 10 - Final Checks}]
+*---------------------------------------------------------------------*
+* When finished, the value must be even                               *
+*---------------------------------------------------------------------*
+make_even  addq.l  #1,d5               Prepare to make even
+           bclr    #0,d5               Make dataspace even
+
+*---------------------------------------------------------------------*
+* And, not less than minimum allowed                                  *
+*---------------------------------------------------------------------*
+           cmpi.l  #minimum,d5         Check new size
+           bcc.s   set_head            It's ok.
+           move.l  #minimum,d5         Make sure it is = minimum size
+\end{lstlisting}
+
+Eventually, we exit from the loop scanning the user's input and
+    arrive at the code above. This is a short but very important piece of
+    code. The data space for a file must be even. If it is odd, then any
+    attempt to EXEX (EX etc) the code will result in an address exception with
+    the usual resulting lock up. Just say no to odd addresses!
+
+The running total in D5.L is rounded up to the next even number, or
+    left alone if it is already even.
+
+If the running total is less than our minimum allowed value, it is
+    set to that value.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 11 - Write Header}]
+*---------------------------------------------------------------------*
+* Now load the header with the new dataspace and set it               *
+*---------------------------------------------------------------------*
+set_head   move.l  d5,fdat(a5)         Store in the header
+           moveq   #fs_heads,d0        Set the file header
+           moveq   #timeout,d3         Timeout
+           move.l  d6,a0               File id
+           move.l  a5,a1               File header
+           trap    #3                  Go set it
+           tst.l   d0                  Any errors?
+           bne.s   not_set             Yes
+\end{lstlisting}
+
+As we now have a new data space value in D5.L, we save it in the
+    file header buffer in the correct location and call the QDOSMSQ trap call
+    to write the file header back to the device. If this works ok, we drop
+    into the following code to flush the changes to the device.
+
+QDOSMSQ is happy to save changes in the file slave area until it has
+    a moment to write them out. This is ok in most cases, but if a user wishes
+    to remove a floppy disc, for example, that we must make sure that all
+    changes are written down to the disc. The following code does that task,
+    closes the file and starts the main loop all over again.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 12 - Flush Buffers}]
+*---------------------------------------------------------------------*
+* Now flush out the file buffers, so that if I change discs I have    *
+* written the header to the current disc. Can't detect the QDOS error *
+* READ/WRITE failed (try removing the disc and it won't fail or       *
+* produce an error code). It might print a message if it can find an  *
+* open command channel which is not in use. I got it when testing via *
+* a monitor but not while running on its own.                         *
+*---------------------------------------------------------------------*
+flush      moveq   #fs_flush,d0        Prepare to flush the buffer
+           moveq   #timeout,d3         This could take all day
+           trap    #3                  But do it anyway
+           tst.l   d0                  And check for errors
+           beq.s   main_end            None, do the next file
+\end{lstlisting}
+
+If the file header failed to be written, the following code will
+    inform the user that there is a problem and display the QDOSMSQ error
+    message.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 13 - Error Handling}]
+*---------------------------------------------------------------------*
+* Header not set or flush failed, print error message                 *
+*---------------------------------------------------------------------*
+not_set    move.l  d0,-(a7)            Store error code
+           lea     mess_7,a1           Cannot set header message
+           bsr.s   write_text          Print it
+           move.l  (a7)+,d0            Get error code
+           move.w  ut_err,a2
+           jsr     (a2)                Print error message
+
+*---------------------------------------------------------------------*
+* Can't trap errors in UT_ERR as D0 is preserved.                     *
+* Close the file & loop to the start                                  *
+*---------------------------------------------------------------------*
+main_end   move.l  d6,a0               File id for close
+           moveq   #io_close,d0
+           trap    #2                  Close the file
+           bra     main_loop           And see if more to be done
+\end{lstlisting}
+
+We have now reached the end of the main loop. The code above
+    retrieves the file's channel number from register D6.L, closes the file
+    and skips back to the start of the main loop ready for the next file to be
+    processed.
+
+The code below is a collection of simple subroutines, some you will
+    have seen before, which carry out various useful parts of the program. The
+    comments above each should be sufficient to explain what is going
+    on.
+
+Also included below are some data input and header buffer
+    areas.
+
+\begin{lstlisting}[firstnumber=last,caption={Dataspace Program - Part 14 - Various Subroutines}]
+*---------------------------------------------------------------------*
+* Subroutine to print text to screen                                  *
+*                                                                     *
+* ENTRY                                                               *
+*                                                                     *
+* D7.L = Channel id                                                   *
+* A1.L = Pointer to text to print (Word then bytes)                   *
+*                                                                     *
+* EXIT                                                                *
+*                                                                     *
+* A0.L = channel id                                                   *
+*---------------------------------------------------------------------*
+write_text move.w  ut_mtext,a2         Print text vector
+           move.l  d7,a0               Channel id
+           jsr     (a2)                Print it
+           tst.l   d0                  Check errors
+           bne.s   job_error           Oops kill job
+           rts                         Otherwise exit
+
+*---------------------------------------------------------------------*
+* A fatal error has occurred, print it, wait for any key and kill job *
+* wait for key allows WMAN & PTR_GEN users to see the message before  *
+* WMAN restores the screen.                                           *
+*---------------------------------------------------------------------*
+job_error  move.l  d7,a0               Get console id
+           move.w  ut_err0,a2          Print error text vector
+           jsr     (a2)                Print to #0
+
+any_key    move.l  d7,a0               In case entry is here
+           lea     mess_12,a1          Press any key message
+           move.w  ut_mtext,a2         Don't use WRITE_TEXT
+           jsr     (a2)                Print it
+           moveq   #io_fbyte,d0        Fetch one byte
+           moveq   #timeout,d3         Take all day if you like
+           trap    #3                  Go get it
+           moveq   #io_close,d0
+           trap    #2                  Close console channel
+
+*---------------------------------------------------------------------*
+* This job will self destruct in no time at all                       *
+*---------------------------------------------------------------------*
+job_end    moveq   #mt_frjob,d0        Job is about to die
+           moveq   #me,d1              And it is this job
+           trap    #1                  RIP (there is not return)
+
+*---------------------------------------------------------------------*
+* Subroutine to get some text from the user                           *
+*                                                                     *
+* ENTRY                                                               *
+*                                                                     *
+* D7.L = channel id                                                   *
+*                                                                     *
+* EXIT                                                                *
+*                                                                     *
+* D1.W = number of bytes read                                         *
+* A0.L = channel id                                                   *
+* A1.L = start of buffer (word then bytes)                            *
+*---------------------------------------------------------------------*
+get_text   lea     input,a1            Buffer for the text
+           move.l  a1,-(a7)            Store it
+           addq.l  #2,a1               Leave room for the length word
+           moveq   #io_fline,d0
+           moveq   #42,d2              Maximum buffer size
+           moveq   #timeout,d3         Take as long as you like
+           trap    #3                  Get some text
+           tst.l   d0                  Check for errors
+           bne.s   job_error           Bale out (stack will be ok)
+           move.l  (a7)+,a1            Get buffer start
+           subq.w  #1,d1               Remove the line feed
+           move.w  d1,(a1)             Store text length
+           rts                         Exit
+
+*---------------------------------------------------------------------*
+* Definition block for my console channel                             *
+*---------------------------------------------------------------------*
+con_def    dc.b    black               Border colour
+           dc.b    $01                 Border width
+           dc.b    white               Paper & strip colour
+           dc.b    black               Ink colour
+           dc.w    $01C0               Width = 448
+           dc.w    $0064               Height = 100
+           dc.w    $0020               X position = 32
+           dc.w    $0010               Y position = 16
+
+*---------------------------------------------------------------------*
+* Copyright message, so the world knows my name                       *
+*---------------------------------------------------------------------*
+copyright  dc.w    copy_end-copyright-2
+           dc.b    linefeed
+           dc.b    'Copyright Norman Dunbar, Jan 1991/April 2006.'
+           dc.b    linefeed
+copy_end   equ     *
+
+*---------------------------------------------------------------------*
+* Various prompts & error messages                                    *
+*---------------------------------------------------------------------*
+mess_1     dc.w    end_1-mess_1-2
+           dc.b    linefeed
+           dc.b    'Enter filename'
+           dc.b    linefeed
+           dc.b    'or ENTER only to finish: '
+end_1      equ     *
+
+mess_2     dc.w    end_2-mess_2-2
+           dc.b    'Cannot open '
+end_2      equ     *
+
+mess_3     dc.w    end_3-mess_3-2
+           dc.b    'Cannot read file header: '
+end_3      equ     *
+
+mess_4     dc.w    end_4-mess_4-2
+           dc.b    ' is being converted to an EXECable file'
+           dc.b    linefeed
+end_4      equ     *
+
+mess_5     dc.w    end_5-mess_5-2
+           dc.b    'Current dataspace is: '
+end_5      equ     *
+
+mess_6     dc.w    end_6-mess_6-2
+           dc.b    ': '
+end_6      equ     *
+
+mess_7     dc.w    end_7-mess_7-2
+           dc.b    'Cannot set file header: '
+end_7      equ     *
+
+mess_8     dc.w    end_8-mess_8-2
+           dc.b    linefeed
+           dc.b    'Enter new dataspace in bytes, or'
+           dc.b    linefeed
+           dc.b    'end with "K" for kilobytes: '
+end_8      equ     *
+
+mess_9     dc.w    end_9-mess_9-2
+           dc.b    ' bytes'
+           dc.b    linefeed
+end_9      equ     *
+
+mess_10    dc.w    end_10-mess_10-2
+           dc.b    'Invalid digit found in input'
+           dc.b    linefeed
+end_10     equ     *
+
+mess_11    dc.w    end_11-mess_11-2
+           dc.b    'Dataspace set.'
+           dc.b    linefeed
+end_11     equ     *
+
+mess_12    dc.w    end_12-mess_12-2
+           dc.b    linefeed
+           dc.b    'Goodbye, press any key to kill job.....'
+end_12     equ     *
+
+*---------------------------------------------------------------------*
+* Two buffer areas, one for the file header & one for user input      *
+* note how sneaky I have been, by using DS.W I have forced them both  *
+* to be word aligned. If I had used DC.B they might not have been, &  *
+* I would be bound to get an address exception sometime. (it happened)*
+*---------------------------------------------------------------------*
+
+buffer     ds.w    32                  Buffer is 64 bytes maximum
+input      ds.w    22                  Size = 41 + ENTER + word count
+
+*---------------------------------------------------------------------*
+* A table of all powers of ten, from 9 to 0. This corresponds to the  *
+* values used when converting an UNSIGNED long word to ASCII.         *
+* 2^31 = 2,147,483,648                                                *
+* 10^9 = 1,000,000,000 so is a big enough 'highest' power to use      *
+*---------------------------------------------------------------------*
+tens_table dc.l    1000000000          10 ^ 9
+           dc.l    100000000           10 ^ 8
+           dc.l    10000000            10 ^ 7
+           dc.l    1000000             10 ^ 6
+           dc.l    100000              10 ^ 5
+           dc.l    10000               10 ^ 4
+           dc.l    1000                10 ^ 3
+           dc.l    100                 10 ^ 2
+           dc.l    10                  10 ^ 1
+           dc.l    1                   10 ^ 0
+           dc.l    0                   Table end marker
+\end{lstlisting}
+
+\section{Coming Up...}
+\label{ch15-the-end}%hyperlabel{ch15-the-end}%
+
+The next chapter takes a look at the maths package supplied deep in the bowels of
+QDOSMSQ and shows a couple of examples of creating your own routines to perform lots of
+complicated arithmetic routines.

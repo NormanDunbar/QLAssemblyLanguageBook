@@ -1,0 +1,329 @@
+\chapter{Ascii To Long Converter}
+
+\section{Introduction}
+\label{ch18-intro}%hyperlabel{ch18-intro}%
+
+In the last exciting instalment of the series, I mentioned that I would be looking
+into the bowels of QDOSMSQ to see if I can find a useful sub-{}routine to convert a string
+of ASCII characters into a long value in a register. This was suggested by comments from
+George Gwilt when he mentioned that he was surprised that I didn't have a reusable routine
+to do this conversion. This chapter is a result of that enquiry.
+
+\section{How QDOSMSQ Does It}
+\label{ch18-conversion}%hyperlabel{ch18-conversion}%
+
+As ever, I like to take the lazy approach to writing code. If someone else has
+done it for me, that's a bonus. Inside QDOSMSQ there is a vectored routine
+called \vector{CN\_DTOF} which reads a string of characters and converts those to a
+floating point value on the maths stack. This routine can be entered with D7.L
+holding the address of the first byte of memory \emph{after} the final character of
+the string, or with D7 set to zero.
+
+In the latter case, the \vector{CN\_DTOF} routine simply keeps reading until it comes
+across any character which is not a valid digit, decimal point or `e' in the
+buffer. In the former case, the routine stops when it reaches the address in
+register D7.L or if it hits an invalid character before then.
+
+On exit, the buffer pointer is pointing at the character after the buffer or at
+the invalid character, unless an error occurred, in which case A0.L and A1.L are
+restored to their values on entry.
+
+So far so good, we have a floating point value on the maths stack at 0(A6,A1.L)
+but we wanted a long value from our routine. This too is easy. Thinking back to
+the article on using the arithmetic package, we can use the \opcode{RI\_NLINT} operation
+to convert a floating point value down to a long word. Once this is done, it is
+a simple job to copy it off the maths stack into our data register and we are
+done.
+
+All conversion `problems' for the character data have been dealt with by
+QDOSMSQ as have problems of overflow and so on when we convert from FP to LONG.
+How easy can it get?
+
+\section{Rules And Regulations}
+\label{ch18-rules}%hyperlabel{ch18-rules}%
+
+Obviously, we might have problems. Isn't the maths stack
+provided for use by SuperBasic routines only? Well, the code in this article
+shows that this is not the case, provided a couple of simple rules are followed.
+\begin{itemize}[itemsep=0pt]
+
+\item{}Rule number one is that A1.L has to point at the byte just above the top of the
+maths stack -{} at the highest address in other words.
+
+\item{}Rule number two is that you must have enough space on the maths stack for the
+operation(s) to be carried out. It is possible that some routines will need
+working space on the maths stack. This must be catered for or you may find that
+the maths operations corrupt data below your maths stack.
+
+\end{itemize}
+
+\begin{note}
+According to Dickens, the \vector{CN\_DTOF} vector uses about 30 bytes of space on the
+maths stack. So, for this conversion routine to work, you should set up a maths
+stack with \emph{at least} 30 bytes -{} although it wouldn't break the system to use a
+bit more for safety. I'm using 15 long words, which should be ample.
+\end{note}
+
+The maths stack, while looking special, has to be considered for what it is, it
+is just a chunk of memory somewhere in the system, relative to A6 of course.
+
+\section{The Code}
+\label{ch18-code}%hyperlabel{ch18-code}%
+
+The following is our conversion routine in all its glory. As you can see,
+there is not much to it.
+
+\begin{lstlisting}[firstnumber=1,caption={ASCII to LONG Converter - Part 1}]
+*----------------------------------------------------------------------
+; Useful routine to convert an ASCII string to a LONG word.
+;
+; Entry Registers:
+;
+; A0.L - Pointer to first character in buffer (not the size word).
+; A1.L - Pointer to an area of AT LEAST 30 bytes for a maths stack.
+;
+; Exit Registers:
+;
+; D0.L - Error code, or zero if no errors. (Z flag set for no errors).
+; D1.L - Value of converted ASCII string.
+; A0.L - Updated pointer. First char after all valid numerics (and 'e')
+;        or first character after end of input in nothing was invalid.
+; Rest preserved
+;
+; Error Exit Registers:
+;
+; D0.L - Error code, or zero if no errors. (Z flag set for no errors).
+; D1.L - unknown.
+; A0 - Preserved = pointer of start of buffer on entry.
+; Rest preserver.
+*----------------------------------------------------------------------
+ri_nlint equ        6              ; Code to convert FP to LONG
+
+convert  movem.l   d2/d7/a1-a3,-(a7)   ; Save workers
+         suba.l    a6,a0           ; Relativise buffer address
+         suba.l    a6,a1           ; And the maths stack
+         moveq     #0,d0           ; Assume no errors
+         moveq     #0,d1           ; Zero result
+         moveq     #0,d7           ; For CN_DTOF
+         move.w    cn_dtof,a2      ; Convert ASCII to an FP number
+         jsr       (a2)            ; Do conversion
+         tst.l     d0              ; OK?
+         bne.s     restore         ; No, bale out.
+\end{lstlisting}
+
+The entry point to our routine is at the `convert' label above. We start off by
+saving all the registers that we are going to use, or that will be trashed by
+the various QDOSMSQ code. 
+
+Once that has been done, we subtract the current value of A6 from the two
+pointer registers as these addresses have to be A6 relative for the maths
+package code to work.
+
+Next, and the most complicated part of the code is to convert our buffer load
+of characters into a floating point number on the maths stack. If there were
+conversion errors then we abandon ship and bale out.
+
+Conversion errors occur when there are illegal characters in the buffer -{} more
+than one decimal point, two or more `e' characters etc. Note however, that
+conversion will stop when a non-{}valid (but non-{}error causing) character is
+found. So `1024K' will result in the value 1024 being created and then
+conversion would stop.
+
+\begin{lstlisting}[firstnumber=last,caption={ASCII to LONG Converter - Part 2}]
+*----------------------------------------------------------------------
+; We now have a floating point value on the maths stack at 0(a6,a1.l).
+; Convert that down to a long word.
+*----------------------------------------------------------------------
+
+         moveq     #ri_nlint,d0    ; FP to LONG
+         moveq     #0,d7           ; For maths package
+         move.w    ri_exec,a2      ; Execute one maths operation
+         jsr       (a2)            ; Do it.
+         tst.l     d0              ; OK?
+         bne.s     restore         ; No, bale out
+\end{lstlisting}
+
+The second part of the code above, is where we convert the floating point value
+on the maths stack into a long integer. This uses the afore mentioned maths
+package to do the conversion. Any errors such as overflow will be trapped and
+returned in D0. We test for this on return from the \vector{RI\_EXEC} and if we have a
+problem in conversion, we bale out.
+
+\begin{lstlisting}[firstnumber=last,caption={ASCII to LONG Converter - Part 3}]
+*----------------------------------------------------------------------
+; We now have a long word on the maths stack 0(a6,a1.l).
+*----------------------------------------------------------------------
+
+         move.l    (a6,a1.l),d1    ; This is our value
+         adda.l    #4,a1           ; Tidy maths stack pointer
+
+restore  movem.l   (a7)+,d2/d7/a1-a3   ; Restore workers
+         adda.l    a6,a0           ; Unrelative the buffer again
+         tst.l     d0              ; Set flags
+         rts
+\end{lstlisting}
+
+The above simply copies the long word from the maths stack into the D1 register
+ready to return it to the caller, tidies up the stack and restores the working
+registers. We exit with the Z flag set if no errors occurred and unset otherwise.
+
+On exit, the address in A0.L points at the first character after the string of
+digits that were converted -{} in an input buffer, for example, this would be the
+linefeed.
+
+The QDOSMSQ routines to convert the ASCII into an FP number have `interesting'
+register settings on exit. If no errors occurred then we exit with A0.L set to
+point at the character after the end of the buffer, or, at the invalid
+character that caused conversion to end. If there was a conversion error, the
+value in A0.L is reset to that on entry -{} the pointer to the first character in
+the buffer.
+
+My code exits with the registers set as described in the code header above.
+
+As a quick example of testing the above, and just to prove that it does work,
+here is a small test harness. Save the following as a new file named `test\_asm'.
+
+\begin{lstlisting}[firstnumber=1,caption={ASCII to LONG Converter - Test Harness}]
+test     bra.s     test2
+
+result   ds.l      1               ; One long word for the result
+         ds.b      1               ; One byte for the terminator
+
+fp       dc.b      '1234567.89x'   ; The fp number in Ascii plus
+*                                  ; an invalid character
+         dc.l      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0    ; 15 Long words
+msp      equ       *               ; STACK TOP for the maths stack
+
+test2    lea       fp,a0           ; Buffer holding Ascii
+         lea       msp,a1          ; Top of maths stack
+         bsr.s     convert         ; Convert from ascii to long
+         lea       result,a1
+         move.l    d1,(a1)+        ; Save result
+         move.b    (a0),(a1)       ; Terminator
+         rts
+         
+         in win1_source_convert_asm   ; Load in the utility code
+\end{lstlisting}
+
+Save the file and assemble it. To test it all out, the following is all that is
+required:
+
+\begin{lstlisting}[firstnumber=1,language={}]
+ADDR = alchp(1024)
+LBYTES win1_source_test_bin,addr
+CALL ADDR
+PRINT 'Result = '; PEEK_L(ADDR+2)
+PRINT 'Terminator = '; CHR$(PEEK(ADDR+6))
+\end{lstlisting}
+
+Which in my case gives me a nice long value of 1234568 for Result and a
+terminator of `x'. In the event of an illegal FP number being converted, say one
+with two decimal points or two `e' characters or whatever, an invalid number
+error will result. If the FP value cannot be converted to a LONG without
+overflowing, an overflow error will result.
+
+So, there is is, a small piece of code (around 156 bytes in my `test\_bin' file)
+to convert a string of ASCII characters into a LONG word. How easy was that
+then?
+
+\section{Code Improvements}
+\label{ch18-more-code}%hyperlabel{ch18-more-code}%
+
+In the code above, the `convert' routine assumes that a buffer, pointed
+to by A0.L, holds a string of ASCII characters \emph{without} a leading QDOS
+string's length word. Unfortunately, most of QDOS relies on there being a length word at
+the start, so we really should allow for this in the convert code as well.
+
+Well, I've been thinking (a rare thing for me -{} ask my wife!) and I realised
+that, internally, QDOSMSQ allows D7.L to be zero or the address of the first
+byte in memory AFTER the last character of the ASCII to be converted to a
+floating point value. We can use this in our favour. The conversion stops when
+the address in D7 is reached as QDOSMSQ loops around converting each character
+from the buffer.
+
+With a slight modification the the code, we can cater for both formats of
+buffers -{} one without a leading size, and one with. The changes required are
+simple.
+
+Add the following code just before the code at convert, line 26 in my source file:
+
+\begin{lstlisting}[firstnumber=26,caption={Better ASCII to LONG Converter - Converq}]
+convertq move.w   (a0)+,d7         ; Get the length word
+         ext.l     d7              ; Sign extend to a long word
+         add.l    a0,d7            ; D7.L correctly set, A0 also.
+\end{lstlisting}
+
+Then, remove the following line from near the start of the convert code, it's
+just above the call to \vector{CN\_DTOF} which is at line 31 in my file:
+
+\begin{lstlisting}[firstnumber=31,]
+         moveq     #0,d7           ; For CN_DTOF
+\end{lstlisting}
+
+So, your codefile should now look like this:
+
+\begin{lstlisting}[firstnumber=26,caption={Better ASCII to LONG Converter - Part 1}]
+convertq move.w    (a0)+,d7        ; Get the length word
+         ext.l     d7              ; Sign extend to a long word
+         add.l     a0,d7           ; D7.L correctly set, A0 also.
+
+convert  movem.l   d2/d7/a1-a3,-(a7)   ; Save workers
+         suba.l    a6,a0           ; Relativise buffer address
+         suba.l    a6,a1           ; And the maths stack
+         moveq     #0,d0           ; Assume no errors
+         moveq     #0,d1           ; Zero result
+         move.w    cn_dtof,a2      ; Convert ASCII to an FP number
+         jsr       (a2)            ; Do conversion
+         tst.l     d0              ; OK?
+         bne.s     restore         ; No, bale out.
+\end{lstlisting}
+
+And that's all there is to it. You can now call the `convert' code with A0.L
+pointing at a buffer of ASCII characters and no QDOS length word as long as the
+buffer has an `invalid' digit at the end, a linefeed perhaps, or, you can point
+A0.L at a proper QDOSMSQ string's length word and call the code at `convertq'
+instead - with D7 set to zero first of course.
+
+A small test harness for the new version would be as follows:
+
+\begin{lstlisting}[firstnumber=1,caption={Better ASCII to LONG Converter - Test Harness}]
+test     bra.s     test2
+
+result   ds.l      1               ; One long word for the result
+         ds.b      1               ; One byte for the terminator
+
+fp       dc.w       10             ; How long is the text?
+         dc.b      '1234567.89'    ; The fp number in Ascii plus 
+*                                  ; an invalid character
+         dc.l      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0    ; 15 Long words 
+msp      equ       *               ; STACK TOP for the maths stack
+
+test2    lea       fp,a0           ; Buffer holding Ascii
+         lea       msp,a1          ; Top of maths stack
+         bsr.s     convertq        ; Convert from ascii to long
+         lea       result,a1
+         move.l    d1,(a1)+        ; Save result
+         move.b    (a0),(a1)       ; Terminator
+         rts
+
+         in win1_source_convert_asm   ; Load in the utility code
+\end{lstlisting}
+
+The above is remarkably similar to the test harness I provided above. The only difference
+is that the ASCII buffer at label `fp' has been converted to a properly formatted QDOSMSQ
+string with a leading length word added and the `x' has been removed from the end of the
+original ASCII buffer.
+
+Note the call to `convertq' rather than `convert'.
+
+\section{Coming Up...}
+\label{ch18-the-end}%hyperlabel{ch18-the-end}%
+
+Now, just this week\footnote{Ahem, that was written 8 years ago, in what must have been 2007. We are still in the `new' house though - we haven't moved again, yet.....} I have sold my house and so my wife Alison and I are in the
+process of looking for a new home. This means that I might not have email etc
+for much longer so I cannot guarantee whether I shall be writing in the next
+issue or not. Hopefully I will be, but just in case, I apologise in advance for
+my absence!
+
+See you soon for more exciting code!
+

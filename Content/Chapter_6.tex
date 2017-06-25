@@ -1,0 +1,638 @@
+\chapter{6800x Exceptions And Exception Handling}\index{Exceptions}
+
+\section{Introduction}
+\label{ch6-introduction}%\hyperlabel{ch6-introduction}%
+
+In this chapter, we are going to get stuck into a fairly complex
+    part of the 6800x processor's workings -{} exception processing.
+
+\section{Exceptions}
+\label{ch6-exceptions}%\hyperlabel{ch6-exceptions}%
+
+As mentioned in the instruction summary in past articles, the QL
+    processor runs in two modes -{} user and supervisor -{} and some instructions
+    cannot be run in user mode without causing an exception to be generated. I
+    promised to explain what these exceptions are, so here goes ....
+
+An exception is an event or happening that causes the processor to
+    deviate from its normal course of action and to jump to a predetermined
+    place in the operating system where it starts executing a piece of code
+    that handles such events. In QDOS (the QL's operating system) many of
+    these routines have been `botched' in an effort to save on memory and
+    others simply do nothing. This is unfortunate, however, all is not
+    lost.
+
+All 68000 series processors have an area of memory set aside to hold
+    the exception table. This table is 1024 bytes long and holds a full set of
+    exception vectors -{} basically a long word holding the address of the
+    sub-{}routine that handles the appropriate exception. In QDOS this table is
+    only partially there as will become clear. There are 256 vectors normally,
+    each one being 4 bytes long. Vector zero is at address zero in the memory
+    map and vector 255 is at address \$3FC.
+
+The vector table \emph{should} look like Table~\ref{tab:MC6800xExceptionTable}.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l} % Set this correctly ...
+\toprule
+\textbf{Vector} & \textbf{Address} & \textbf{Purpose}\\
+\midrule
+%
+000 & 0000 & Reset -{} SSP value \\
+001 & 0004 & Reset -{} USP value \\
+002 & 0008 & Bus Error \\
+003 & 000C & Address Error \\
+004 & 0010 & ILLEGAL Instruction \\
+005 & 0014 & Divide by zero \\
+006 & 0018 & CHK instruction \\
+007 & 001C & TRAPV instruction \\
+008 & 0020 & Privilege violation \\
+009 & 0024 & Trace \\
+010 & 0028 & Line 1010 emulator \\
+011 & 002C & Line 1111 emulator \\
+012 & 0030 & Reserved for Motorola \\
+013 & 0034 & Reserved for Motorola \\
+014 & 0038 & Reserved for Motorola \\
+015 & 003C & Uninitialised Interrupt \\
+016 & 0040 & Reserved for Motorola \\
+... & ... & ... \\
+024 & 0060 & Spurious interrupt \\
+025 & 0064 & Interrupt level 1 \\
+026 & 0068 & Interrupt level 2 \\
+027 & 006C & Interrupt level 3 \\
+028 & 0070 & Interrupt level 4 \\
+029 & 0074 & Interrupt level 5 \\
+030 & 0078 & Interrupt level 6 \\
+031 & 007C & Interrupt level 7 \\
+032 & 0080 & TRAP \#0 \\
+033 & 0084 & TRAP \#1 \\
+034 & 0088 & TRAP \#2 \\
+035 & 008C & TRAP \#3 \\
+036 & 0090 & TRAP \#4 \\
+037 & 0094 & TRAP \#5 \\
+038 & 0098 & TRAP \#6 \\
+039 & 009C & TRAP \#7 \\
+040 & 00A0 & TRAP \#8 \\
+041 & 00A4 & TRAP \#9 \\
+042 & 00A8 & TRAP \#10 \\
+043 & 00AC & TRAP \#11 \\
+044 & 00B0 & TRAP \#12 \\
+045 & 00B4 & TRAP \#13 \\
+046 & 00B8 & TRAP \#14 \\
+047 & 00BC & TRAP \#15 \\
+048 & 00C0 & Reserved for Motorola \\
+... & ... & ... \\
+064 & 0100 & User vector 1 \\
+... & ... & ... \\
+255 & 03FF & User vector 192 \\
+%
+\bottomrule
+\end{tabular}
+\caption{MC6800x Exception Table}
+\label{tab:MC6800xExceptionTable}
+\end{table}
+
+It can be seen that a huge number of the vectors are reserved for
+    Motorola to use in future processors. The User vectors look interesting,
+    but have been obliterated by some of the code in QDOS and cannot be
+    used.
+
+On the QL, the vectors are actually as per Table~\ref{tab:QDOSExceptionTable}.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l l} % Set this correctly ...
+\toprule
+\textbf{Vector} & \textbf{Address} & \textbf{Purpose} & \textbf{Comment}\\
+\midrule
+%
+000 & 0000 & Reset & SSP value \\
+001 & 0004 & Reset & USP value \\
+002 & 0008 & Bus Error & Ignored by QDOS \\
+003 & 000C & Address Error & May be redefined \\
+004 & 0010 & ILLEGAL Instruction & May be redefined \\
+005 & 0014 & Divide by zero & May be redefined \\
+006 & 0018 & CHK instruction & May be redefined \\
+007 & 001C & TRAPV instruction & May be redefined \\
+008 & 0020 & Privilege violation & May be redefined \\
+009 & 0024 & Trace & May be redefined \\
+010 & 0028 & Line 1010 emulator & Unusable \\
+011 & 002C & Line 1111 emulator & Unusable \\
+012 & 0030 & Reserved for Motorola & Unusable \\
+013 & 0034 & Reserved for Motorola & Unusable \\
+014 & 0038 & Reserved for Motorola & Unusable \\
+015 & 003C & Uninitialised Interrupt & Unusable \\
+016 & 0040 & Reserved for Motorola & Unusable \\
+... & ... & ... & {} \\
+024 & 0060 & Spurious interrupt & Ignored by QDOS \\
+025 & 0064 & Interrupt level 1 & Ignored by QDOS \\
+026 & 0068 & Interrupt level 2 & QL System interrupt \\
+027 & 006C & Interrupt level 3 & Ignored by QDOS \\
+028 & 0070 & Interrupt level 4 & Ignored by QDOS \\
+029 & 0074 & Interrupt level 5 & Ignored by QDOS \\
+030 & 0078 & Interrupt level 6 & Ignored by QDOS \\
+031 & 007C & Interrupt level 7 & Hangs the QL -{} May be redefined \\
+032 & 0080 & TRAP \#0 & Make a call to QDOS \\
+033 & 0084 & TRAP \#1 & Make a call to QDOS \\
+034 & 0088 & TRAP \#2 & Make a call to QDOS \\
+035 & 008C & TRAP \#3 & Make a call to QDOS \\
+036 & 0090 & TRAP \#4 & Make a call to QDOS \\
+037 & 0094 & TRAP \#5 & Ignored by QDOS -{} May be redefined \\
+038 & 0098 & TRAP \#6 & Ignored by QDOS -{} May be redefined \\
+039 & 009C & TRAP \#7 & Ignored by QDOS -{} May be redefined \\
+040 & 00A0 & TRAP \#8 & Ignored by QDOS -{} May be redefined \\
+041 & 00A4 & TRAP \#9 & Ignored by QDOS -{} May be redefined \\
+042 & 00A8 & TRAP \#10 & Ignored by QDOS -{} May be redefined \\
+043 & 00AC & TRAP \#11 & Ignored by QDOS -{} May be redefined \\
+044 & 00B0 & TRAP \#12 & Ignored by QDOS -{} May be redefined \\
+045 & 00B4 & TRAP \#13 & Ignored by QDOS -{} May be redefined \\
+046 & 00B8 & TRAP \#14 & Ignored by QDOS -{} May be redefined \\
+047 & 00BC & TRAP \#15 & Ignored by QDOS -{} May be redefined \\
+048 & 00C0 & Reserved for Motorola & Unusable \\
+... & ... & ... & {}\\
+064 & 0100 & User vector 1 & Unusable \\
+... & ... & ... & {}\\
+255 & 03FF & User vector 192 & Unusable \\
+%
+\bottomrule
+\end{tabular}
+\caption{QDOS Exception Table}
+\label{tab:QDOSExceptionTable}
+\end{table}
+
+\begin{note}
+All vectors marked ``Unusable'' have been botched in the ROM and
+      have bits of code in place of the vectors. So you can see not much is
+      left. The designers of QDOS didn't have enough room in the early ROMs to
+      fit all the code in. Some early QLs came with a ROM `dongle' hanging out of
+      the external ROM slot so that all the code could fit. 
+
+Later versions got rid of the ROM dongle, but the exception vector table had then been
+      `redesigned' to make the code fit. Luckily the developers did allow a number of
+      the exceptions to be redefined so that programmers could write their own
+      routines to handle these exceptions.
+\end{note}
+
+\section{Working QDOS Exceptions}
+\label{ch6-qdos-exceptions}%\hyperlabel{ch6-qdos-exceptions}%
+
+
+\begin{description}
+
+\item[RESET] -{} vectors 0 and 1 -{} these two vectors are simply the values that
+    are put into the SSP and USP on system power up. Vector 0 gives the value
+    for the stack pointer for supervisor mode and vector 1 gives the stack
+    pointer for user mode.
+
+\item[ADDRESS ERROR] -{} this occurs whenever the processor tries to do a
+    word or long sized operation or access at an odd address. For example, the
+    following code fragment will cause an address error:\footnote{Well, it will on a standard QL's MC68008 processor. With QPC's emulation of an MC68020 however, it will work quite happily.}
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVEA.L   #1,A1
+          MOVE.W   (A1),D0
+\end{lstlisting}
+
+On a normal QL this will usually cause the system to hang, but as
+    the vector can be redefined, we can use it to point to an address that can
+    correctly handle this error. More on this later.
+
+\item[ILLEGAL INSTRUCTION] -{} this occurs when an instruction is executed
+    that is not a valid instruction for the processor, or when the \opcode{ILLEGAL}
+    instruction is executed. Illegal usually crashes the QL, but can be
+    handled by our own routines.
+
+\item[DIVIDE BY ZERO] -{} This should be obvious. This is ignored on the QL,
+    but can be redefined for our own use.
+
+\item[CHK INSTRUCTION] -{} Called when the \opcode{CHK} instruction is used and the
+    value in a data register is out of bounds, Ignored on the QL but
+    redefinable.
+
+\item[TRAPV INSTRUCTION] -{} Called when the \opcode{TRAPV} instruction is executed
+    and the V flag is set. Ignored by the QL but, once again, is
+    redefinable.
+
+\item[PRIVILEGE VIOLATION] -{} When a program running in user mode attempts
+    to execute an instruction that is privileged, this exception is raised.
+    Ignored by the QL, but redefinable.
+
+\item[TRACE] -{} If the trace (T) bit is set in the Status Register, this
+    execption is generated after each instruction. Can be redefined to call
+    code in a machine code monitor program, but usually ignored by the
+    QL.
+
+\item[INTERRUPT LEVEL 2] -{} there are 7 levels of interrupt on a normal
+    68000 series processor, but only one is used on the QL. The level 2
+    interrupt is generated by the internal electronics and causes the keyboard
+    to be scanned, the scheduler to switch tasks etc. Levels 1 and 3 to 6 are
+    ignored on the QL.
+
+\item[INTERRUPT LEVEL 7] -{} Level 7 is the non-{}maskable interrupt and is
+    raised when you press CTRL ALT 7 together. When the QL hardware was being
+    built and debugged, some external equipment was `bolted on' and this
+    combination of keys caused a level 7 interrupt which activated the
+    debugging equipment. Unfortunately, when the QL went into production, the
+    code was left in and pressing these keys together is a pretty good way to
+    trash the system. May be redefined for our own use -{} this could be fun
+   !
+
+\item[TRAP \#0] -{} Switch the QL into supervisor mode and cause the SSP
+    version of A7 to be used.
+
+\item[TRAP \#1] -{} this is the QDOS manager trap and is used to control
+    resources in the QL such as baud rates, jobs, memory allocation and
+    deallocation etc.
+
+\item[TRAP \#2] -{} this is the QL's I/O manager trap and is used to open
+    \& close channels as well as formatting discs and deleting
+    files.
+
+\item[TRAP \#3] -{} This allows QDOS to read data from channels, queues, set
+    colours etc.
+
+\item[TRAP \#4] -{} Used by the SuperBasic interpreter to switch between A6
+    relative and Absolute addresses when calling various routines.
+
+\item[TRAP \#5] to \textbf{TRAP \#15} -{} these are unused on the QL but can be
+    redefined.
+
+\end{description}
+
+\section{What Happens When an Exception Occurs?}
+\label{ch6-exception-processing}%\hyperlabel{ch6-exception-processing}%
+
+When an exception occurs, some data is put onto the stack prior to
+    the exception being processed. Remember, the stack pointer is the SSP and
+    not the normal USP variant of the A7 register.
+
+For most exceptions, the data put onto the stack is simply the
+    program counter and the status register as follows:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none,language={}]
+High address -> PC low word 
+                PC high word 
+SSP ----------> Status register word
+\end{lstlisting}
+
+so when the exception handler is running, the stack pointer holds
+    the address of the SR at the time the exception was caused and 4(A7) holds
+    the program counter where the exception was caused.
+
+The above is true for all exceptions apart from BUS ERROR, ADDRESS
+    ERROR or RESET. These three have a different stack frame:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none,language={}]
+High address -> PC low word 
+                PC high word 
+                Status register word 
+                Instruction register word 
+                Access address low word 
+                Access address high word 
+SSP ----------> Access type and function code (one word)
+\end{lstlisting}
+
+This additional data includes a copy of the first word of the
+    instruction that was being processed when the exception was caused, the
+    address that was being accessed when the exception was caused and a word
+    describing what the processor was trying to do at the time.
+
+\begin{warning}
+Note that the value in the program counter on the stack is not
+      always the \emph{actual} address of the start of the
+      instruction -{} it could be anything from the next word or even the
+      address 10 bytes on from the actual address of the instruction -{}
+      beware.
+\end{warning}
+
+At the end of an exception processing routine an \opcode{RTE} instruction is
+    used to restore the status register and the program counter from the
+    stack. It follows then that in the case of an ADDRESS or BUS exception
+    that this is going to fail unless the additional data is first cleared
+    from the stack -{} or a 68020 used instead!
+
+\section{Building an Exception Handler.}
+\label{ch6-exception-handler}%\hyperlabel{ch6-exception-handler}%
+
+I suppose we need to built an exception handler now! In the QL you
+    build a table of vectors for the following exceptions:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none,language={}]
+Address error 
+Illegal 
+Divide by zero 
+CHK 
+TRAPV 
+Privilege 
+Trace 
+Interrupt level 7 
+Trap #5 
+Trap #6 
+Trap #7 
+Trap #8 
+Trap #9 
+Trap #10 
+Trap #11 
+Trap #12 
+Trap #13 
+Trap #14 
+Trap #15
+\end{lstlisting}
+
+And then tell QDOS to use this table for your job. Any exceptions
+    that are generated and that are mentioned above will be handled by your
+    own routine. Of all of these, the address error needs to have special
+    treatment because it has the extra data on the stack.
+
+The problem being that if your instruction caused an error, what
+    happens when you handle the exception and \opcode{RTE} -{} does the program fail
+    again because it tried to execute the same instruction again? Sometimes
+    is the only answer.
+
+The following code will be very useful when you first start writing
+    assembler as it will trap the exceptions mentioned above and attempt to
+    allow you to carry on. This example should be run on a 68000 or 68008
+    ONLY. I do not have the data for exception handling on a 68020 or above so
+    Gold Cards, Super Gold Cards etc may cause problems. I don't know.
+
+\section{The Exception Handler Code.}
+\label{ch6-handler-code}%\hyperlabel{ch6-handler-code}%
+\program{QL Exception Handler}
+
+\begin{lstlisting}[firstnumber=1,caption={Exception Handler for the QL},label={lst:ExceptionHandlerQL}]
+*================================================================
+* This code adds a `protective barrier' to the QL so that silly 
+* programming errors can be intercepted and hopefully handled 
+* before the QL crashes out.
+*
+* This code should only be run on a 68000 or 68008 as the 
+* exception stack frame is (probably) different on 68010 and 
+* above.
+*
+* Copyright (c) Norman Dunbar 1999 but permission for unlimited 
+* use and abuse is given!
+*================================================================
+
+start       lea exceptions,a1       ; Table of exceptions - empty
+            lea x_address,a2        ; Address exceptions
+            move.l a2,(a1)+         ; Save in table
+
+            lea x_illegal,a2        ; Illegal exceptions
+            move.l a2,(a1)+         ; Save in table
+
+            lea x_divide,a2         ; Divide by zero
+            move.l a2,(a1)+         ; Save in table
+
+            lea x_check,a2          ; CHK instruction
+            move.l a2,(a1)+         ; Save in table
+
+            lea x_trapv,a2          ; TRAPV instruction
+            move.l a2,(a1)+         ; Save in table
+
+            lea x_priv,a2           ; Privilege violation
+            move.l a2,(a1)+         ; Save in table
+
+            lea x_trace,a2          ; Trace exception
+            move.l a2,(a1)+         ; Save in table
+
+            lea x_int_7,a2          ; Interrupt level 7
+            move.l a2,(a1)+         ; Save in table
+
+            lea x_trap,a2           ; TRAP #5 to TRAP #15
+            moveq #10,d0            ; 11 entries to fill
+
+trap_loop   move.l a2,(a1)+         ; Save one in table
+            dbra d0,trap_loop       ; Then do the rest
+
+            lea exceptions,a1       ; Exceptions table, now full
+            moveq #-1,d1            ; Job id = 'this job'
+            moveq #mt_trapv,d0      ; Set exception table
+            trap #1                 ; And do it
+            rts                     ; Exit to SuperBasic
+
+*================================================================
+* Now the actual exception handlers themselves. Apart from the 
+* ADDRESS exception, all have 3 words on the stack when called. 
+*================================================================
+
+x_address   lea t_address,a1    ; Message to print
+            bsr message_0       ; Print the message
+            addq.l #8,A7        ; Tidy extra data off the stack
+            rte                 ; Attempt to continue
+
+t_address   dc.w 15
+            dc.b 'ADDRESS error.'
+            dc.b 10
+
+x_illegal   lea t_illegal,a1    ; Message to print
+            bsr message_0       ; Print the message
+            addq.l #2,2(a7)     ; Don't do the instruction again!
+            rte                 ; Attempt the next instruction
+
+t_illegal   dc.w 21
+            dc.b 'ILLEGAL instruction.'
+            dc.b 10
+
+
+x_divide    lea t_divide,a1     ; Message to print
+            bsr message_0       ; Print the message
+            rte                 ; Attempt to carry on
+
+t_divide    dc.w 16
+            dc.b 'DIVIDE BY ZERO.'
+            dc.b 10
+
+
+x_check     lea t_check,a1      ; Message to print
+            bsr message_0       ; Print the message
+            rte                 ; Attempt to carry on
+
+t_check     dc.w 17
+            dc.b 'CHK instruction.'
+            dc.b 10
+
+
+x_trapv     lea t_trapv,a1      ; Message to print
+            bsr message_0       ; Print the message
+            rte                 ; Attempt to carry on
+
+t_trapv     dc.w 19
+            dc.b 'TRAPV instruction.'
+            dc.b 10
+
+
+x_priv      lea t_priv,a1       ; Message to print
+            bsr message_0       ; Print the message
+            rte                 ; Attempt to carry on
+
+t_priv      dc.w 21
+            dc.b 'PRIVILEGE VIOLATION.'
+            dc.b 10
+
+
+x_trace lea t_trace,a1          ; Message to print
+            bsr message_0       ; Print the message
+            rte                 ; Attempt to carry on
+
+t_trace     dc.w 25
+            dc.b 'TRACE - not implemented.'
+            dc.b 10
+
+
+x_int_7 lea t_int_7,a1          ; Message to print
+            bsr message_0       ; Print the message
+            rte                 ; Attempt to carry on
+
+t_int_7     dc.w 26
+            dc.b 'DO NOT PRESS CTRL ALT 7!'
+            dc.b 10
+
+
+x_trap      lea t_trap,a1       ; Message to print
+            bsr message_0       ; Print the message
+            rte                 ; Attempt to carry on
+
+t_trap      dc.w 39
+            dc.b 'TRAP #5 to TRAP #15 - not implemented.'
+            dc.b 10
+
+
+*================================================================
+* This routine prints a message to channel 0. The message is at 
+* 0(A1) in the usual QDOS format of a size word followed by the 
+* text. The UT_ERR0 routine expects an error code in D0 -or- the 
+* address of a user defined error message in D0 with bit 31 set 
+* to show that it is user defined.
+*================================================================
+message_0   move.l a1,d0        ; User defined message address
+            bset #31,d0         ; Mark it as such
+            move.w ut_err0,a2   ; Vectored routine
+            jsr (a2)            ; Print the exception message
+            moveq #0,d0         ; Ignore any errors
+            rts
+
+exceptions  ds.l    19          ; Space for 19 exception handlers
+
+*================================================================
+* HERE ENDETH THE CODE.
+*================================================================
+\end{lstlisting}
+
+\section{How it Works.}
+\label{ch6-how-it-works}%\hyperlabel{ch6-how-it-works}%
+
+Now that you have typed the above code into a file, I shall explain
+    what is happening. The code begins at the label `start' and sets A1 to the
+    address of the label `exceptions' within the program. This is where the
+    \opcode{LEA} instruction is useful -{} when writing position independent programs.
+    These are programs that can be run at any address and are a requirement if
+    you want to write good QDOS programs.
+
+The `exceptions' label identifies the start of the 19 long words of
+    data that hold the addresses of the 19 redefined exception vectors as
+    detailed above. At the moment the table contains random garbage and needs
+    to be initialised \emph{before} we tell QDOS to use the new vectors.
+
+The address of the routine to handle address exceptions,
+    `x\_address', is loaded into A2 -{} again using position independent methods,
+    and then placed in the table at the first location. You will note that
+    `address register with post-{}increment' addressing is used here. This means
+    that A1 is automatically incremented by the correct amount -{} 4 in the case
+    of the long sized move -{} ready for the next vector to be loaded.
+
+This process is repeated for the illegal, divide by zero, \opcode{CHK},
+    \opcode{TRAPV}, privilege violation, trace and interrupt level 7 vectors.
+
+There are 11 vectors left in the table for \opcode{TRAP \#5} through to \opcode{TRAP
+    \#15}. Rather than give each of these an individual handler, we point them all to
+    the same one as we intend to ignore these instructions when they occur. To
+    set these 11 vectors up, we run through a small loop which counts D0 down
+    from 10 to -{}1 setting the vector for each of the 11 TRAP exceptions to be
+    the single routine at address x\_trap.
+
+Our exceptions table has now been defined and all we have to do is
+    tell QDOS that we want to use it. Once again, A1 is set to the start
+    address of the exceptions table as required by QDOS, D1 is then set to -{}1
+    which implies `the current job' to QDOS. This is used in many of the QDOS
+    routines which require a job ID, passing -{}1 means `me'. As we are
+    executing this code directly from SuperBasic, that is what the current job
+    will be. Once the vectors have been set up for any job, all other jobs
+    created by it will use the same vector table.
+
+This means that as the initiating job is SuperBasic, and as most
+    other jobs are created by SuperBasic, this means that we have effectively
+    created a protection mechanism for every job in the system created \emph{from this point onwards}! If this is the first code loaded on your system, then
+    every single job created will be protected by this code.
+
+Trap \#1 is called with D0 set to the value \trap{MT\_TRAPV} -{} a fancy way of
+    saying 7 -{} and we return to SuperBasic with any error codes that may
+    arise. As there appears to be only `invalid job' returned, it is unlikely
+    that there will be any as we are using the current job's own id.
+
+Now that the initialisation has been carried out, the exception
+    handlers will just sit there until such time as they are activated.
+
+Most of the handler code is the same -{} we simply trap the exception,
+    print a warning message to channel \#0 and attempt to carry on -{} but the
+    Address and illegal exception handlers do additional processing.
+
+In the case of an address error, there is an extra 8 bytes of data
+    on the stack on top of the `standard' stack frame as discussed above.
+    These need to be cleared off before we execute the \opcode{RTE} instruction.
+
+\begin{warning}
+this is only true of a QL with 128K or a Trump Card etc. If you
+      use QXL or some other card with an upgraded processor, then the stack is
+      different and this code won't work properly.
+\end{warning}
+
+An Illegal instruction also manipulates the stack, but this time, it
+    adds 2 to the address of the failed instruction. This prevents it from
+    trying to execute it again when we exit the routine. Of course this may
+    not always be successful and can cause further errors along the way -{} if
+    the instruction was followed by a word of data for example. Trying to
+    execute the data could lead to another exception and so on. What would you
+    rather have, a message telling you about it or a lock up with no
+    indications?
+
+The messages are defined in the standard QDOS manner of a size word
+    followed by the bytes of the message. The appropriate message has its
+    address loaded into A1 by the exception handler, and a branch is made to
+    the sub-{}routine MESSAGE\_0 which will attempt to display a message to
+    channel \#0. If this fails, it will try \#1 before giving up.
+
+If you have a QDOS manual and you look up \vector{UT\_ERR0} (that's a zero by
+    the way!) you will see that it takes an error code in D0 as its only
+    parameter. We are using it slightly differently as we are defining our own
+    messages and not using the Sinclair defined ones such as `invalid channel
+    id' or `bad parameter' etc.In order to do this, we load D0 with the
+    address of the message but set bit 31 of D0 so that QDOS knows that it is
+    an address and not an error code.
+
+The UT\_ERR0 routine lives in the ROM somewhere, I don't know where
+    it lives in all ROMs as it could have been moved between ROM releases.
+    Because of this, there is a vector table in the ROM at a standard
+    position. To get the address of the routine, we simply read the contents
+    of the vector table into an address register and \opcode{JSR} to that address.
+    (This will be explained later in the series when I cover QDOS).
+
+So now that we have assembled the code all we do is LRESPR it (or
+    RESPR(512), LBYTES and then CALL) and that is it. Whenever any exceptions
+    occur, the above code will handle them and, most importantly, tell you
+    what has happened. Your QL may still be hung -{} but at least you should
+    know why!
+
+\section{Coming Up...}
+\label{ch6-the-end}%\hyperlabel{ch6-the-end}%
+
+The is the end of quite a complex section on exceptions and their
+    handling. If you have stuck with me this far, the rest should be quite a
+    lot simpler -{} well, at least until we get to the graphics stuff that is
+   :o)
+
+However, the next chapter delves into the features of QDOS that
+    allow the humble programmer the ability to write their own assembly
+    language procedures and functions to extend the workings of SuperBasic.
+    Along the way, the very important maths stack will be examined in quite a
+    lot of detail

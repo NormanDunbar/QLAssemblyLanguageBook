@@ -1,0 +1,460 @@
+\chapter{Much Ado About Previous Chapters}
+
+\section{Introduction}
+\label{ch17-intro}%hyperlabel{ch17-intro}%
+
+George Gwilt, my faithful reader, has brought me to task on my last
+    two articles. Part 15 where I wrote (ok, updated a very old 1991 utility
+    which I had written) and again after Part 16 where I delved into the
+    Arithmetic Package in QDOSMSQ.
+
+I shall attempt to answer Georges concerns in this chapter.
+
+\section{Chapter 15 -{} Dataspace Utility Problems}
+\label{ch17-dataspace}%hyperlabel{ch17-dataspace}%
+
+George makes a number of interesting points about this article and
+    all I can say is, `he is absolutely correct'.
+
+As for my small routine to convert an ASCII string into a number in
+    a long word, George asks why it is not itself a sub-{}routine when I make
+    such a `fuss' (my word) of reusable code.
+
+I can only plead guilty as charged and state, for the record, that
+    this is the only time I've ever written anything in assembly language
+    which required me to do that conversion. To that end, and nothing else,
+    the code was in-{}lined in 1991 and remained so in 2006.
+
+However, I'm sure a general purpose ASCII-{}>{}Long could be easily
+    written as a subroutine. I'm certain that there is one lurking somewhere
+    inside QDOSMSQ which correctly (I hope) handles invalid characters,
+    errors, overflow and so on.
+
+I shall be creating just such a beast in the next chapter.
+
+I feel rather unable to comment on George's own conversion routine -{}
+    I never did very well at maths at school and I'm not sure exactly how
+    George's code works (yet!).
+
+\section{Chapter 16 -{} Artithmetic Package Problems}
+\label{ch17-arithmetic}%hyperlabel{ch17-arithmetic}%
+
+Shortly after that article appeared, George contacted me with a
+    whole host of problems. I shall attempt to answer George's concerns below, although George
+    and I have conversed in an email exchange on this subject, I think it is
+    proper to publicise the results especially as they concern my previous
+    chapter. Corrections are due!
+
+{\bf George} 
+... I have only one comment on
+    ROOT\program{ROOT}. It is that, as explained by Dickens (QL Advanced User Guide), you do
+    not need to test D0 for errors after a call to a vector since the
+    condition codes are set on return. Indeed Norman does not make the test
+    after calling the vector \vector{BP\_INIT} near the top of page 21. The two later
+    tests on that page can thus be deleted.
+
+
+
+{\bf Norman} 
+I agree, however, it has been my
+    observation in the past that only sometimes are the condition codes
+    actually set on exit from QDOSMSQ. To this end I tend to always test D0 on
+    exit from a QDOSMSQ call -{} just to be safe. This does mean that where I
+    neglected to do this after the call to \vector{BP\_INIT} (on page 21) is where \emph{my} error was. I should have had a test there.
+
+
+George points out that I don't need the two tests later on that same
+    page. While technically correct, I would be inclined to leave them present
+    and add in the one I missed out rather than removing the latter two. I
+    like to make sure that the condition codes are correctly set by testing
+    them explicitly as this saves me trying to remember which calls do set
+    them and which calls don't.
+
+{\bf George} 
+ANYROOT\program{ANYROOT} is more interesting as
+    it uses \vector{RI\_EXECB} to perform a string of operations. Once again the testing
+    of D0 in do\_it and do\_more is not really needed. Also, I should point out
+    that the three lines of op\_codes should not be between got\_ok and do\_it
+    otherwise do\_it will never be done.
+
+
+
+{\bf Norman} 
+This is absolutely correct. I
+    have no idea what went on here, but the code should be as follows\footnote{And, if you read it again, it actually is now.}:
+
+
+
+\begin{lstlisting}[firstnumber=53,caption={Corrections to ANYROOT Code in Previous chapter}]
+got_ok      cmpi.w  #2,d3          ; One parameter?
+            bne.s   bad_param      ; Oops!
+            bra.s   do_it          ; skip over the op-codes.
+\end{lstlisting}
+
+With a short branch over the op-{}codes added. I suspect that I have
+    inadvertently fixed the code while running under QPC but forgotten to save
+    the corrected version back to one of my DOS\_ drives prior to importing the
+    code into the article. Quite honestly, the original code without the
+    branch would most likely have hung the system.
+
+I have checked my source code system and found that the same
+    `broken' version is present there too, so it does look like I forgot to
+    save a change back to DOS. `Mea Culpa' as they say.
+
+{\bf George} 
+Also I wonder how Norman expects
+    it to work given that the address in A3, set in do\_more, is not relative
+    to A6 as he suggests is necessary in his definition of \vector{RI\_EXECB} on page
+    26. (But see later.)
+
+
+
+{\bf Norman} 
+I'm afraid that this was a `copy and paste' error. I copied the A1 line above it and pasted it in. While I
+    remembered to change the A1 to an A3, I neglected to remove the part about
+    it being relative to A6. That is incorrect as A3.L is the pointer to the
+    string of bytes and is not relative to A6 at all.
+
+
+
+{\bf George} 
+It is annoying that immediately
+    after the first operation the operands are in the wrong order on the
+    stack. Norman has produced swap\_tos to switch the order. The code works
+    well, but, since I started my programming life on machines with limited
+    space and slow speed, I always try to compress and speed up any program. I
+    might suggest here that you eliminate the two occurrences of \lstinline{exg d6,d7}
+    \footnote{Consider them eliminated.}and instead swap the d7 and d6 in the following two lines in both
+    cases.
+
+
+
+{\bf Norman} 
+I started on a ZX-{}81 with 1KB of RAM and I'm mostly self-{}taught -{} hence all the errors!
+
+
+
+George suggests changing my code at SWAP\_TOS from this:
+
+\begin{lstlisting}[firstnumber=93,caption={ANYROOT - Swap\_Tos - Original Code}]
+swap_tos    move.l  0(a6,a1.l),d7   ; Get a long word
+            move.l  6(a6,a1.l),d6   ; And another
+            exg     d6,d7           ; Swap them around
+            move.l  d7,0(a6,a1.l)   ; Store
+            move.l  d6,6(a6,a1.l)   ; Store
+            move.w  4(a6,a1.l),d7
+            move.w  10(a6,a1.l),d6
+            exg     d6,d7           ; Swap again
+            move.w  d7,4(a6,a1.l)
+            move.w  d6,10(a6,a1.l)  ; Now we have N and LN(M) swapped
+\end{lstlisting}
+
+to the following to save a couple of instructions and hence,
+    valuable time and space:
+
+\begin{lstlisting}[firstnumber=93,caption={ANYROOT - Swap\_Tos - Original Code}]
+swap_tos    move.l  0(a6,a1.l),d7   ; Get a long word
+            move.l  6(a6,a1.l),d6   ; And another
+            move.l  d6,0(a6,a1.l)   ; Store
+            move.l  d7,6(a6,a1.l)   ; Store
+            move.w  4(a6,a1.l),d7
+            move.w  10(a6,a1.l),d6
+            move.w  d6,4(a6,a1.l)
+            move.w  d7,10(a6,a1.l)  ; Now we have N and LN(M) swapped
+\end{lstlisting}
+
+Once again, George is correct -{} I must have run out of caffeine at
+    that point. The two \opcode{EXG} instructions are completely unnecessary when
+    written as above.
+
+{\bf George} 
+I have, however, a more radical
+    suggestion. It is that you eliminate both do\_it and swap\_tos and increase
+    the size of op\_codes so that the whole procedure is carried out with just
+    one set of operations using \vector{RI\_EXECB}. The easy way of doing this is
+    possible if you have SMSQ or Minerva both of which have additional
+    operations one of which swaps TOS and NOS. The code is \$17.
+
+
+
+{\bf Norman} 
+I try to keep things as close to
+    the original QL as possible so this option may not have been available to
+    some of my other readers. I was, however, completely unaware of it until
+    George sent me his email. I am completely surprised in finding myself to
+    be the first person since QDOS was originally written to need a
+    SWAP\_TOS\_NOS routine :o)
+
+
+
+When I wrote the code originally, I was almost certain that I could
+    do it an one single \vector{RI\_EXECB} operation. That was when I discovered the
+    need for a swap operation and hence the break up into a single RI\_EXEC,
+    manual swap and the \vector{RI\_EXECB} call. Not as elegant as I would have
+    liked.
+
+{\bf George} 
+The second method is to go
+    through the business of copying TOS and NOS somewhere and then returning
+    them to NOS and TOS. The codes for this are in the group referred to by
+    Norman as \$FF31 to \$FFFF. The place I would use for temporary storage is
+    the Basic buffer. First, op\_codes would become:
+
+
+
+\begin{lstlisting}[firstnumber=60,caption={ANYROOT - Swap\_Tos - Suggested Op Codes}]
+op_codes dc.b      RI_LN,-5,-11,-6,-12,RI_DIV,RI_EXP,RI_END
+\end{lstlisting}
+
+do\_it and swap\_tos would be deleted and do\_more would have added to
+    it:
+
+\begin{lstlisting}[firstnumber=1,]
+        movea.l   bv_bfbas(a6),a4
+        lea       12(a4),a4        ; point to the end of 12 bytes
+\end{lstlisting}
+
+If you really think that there may not be as much as 12 bytes
+    available in the Basic buffer you can add:
+
+\begin{lstlisting}[firstnumber=1,]
+        cmpa.l    bv_tkbas(a6),a4  ; A4 beyond end of buffer?
+        bhi       bufful           ; oops
+\end{lstlisting}
+
+bv\_bfbas is 0 and bv\_tkbas is 8.
+
+The codes -{}5 and -{}6 save and load 6 bytes to and from -{}6(A6,A4.L)
+    and the codes -{}11 and -{}12 do the same with address -{}12(A6,A4.L).
+
+{\bf Norman} 
+Again, when I wrote the article,
+    I was having a few difficulties with the save and load op-{}codes and was
+    enjoying much discussion on the QL-{}USERS email list at the time. I avoided
+    them until I could better understand them. As it turned out, the
+    explanations simply confused the matter (for me) and I decided to leave
+    them alone and simply document them at the end of my article.
+
+
+
+Interestingly, George raises something that I was always confused by
+    when Simon N Goodwin was writing in the old QL World assembly language
+    series, using the Basic Buffer as a workspace. I'm sure that there could
+    be a couple of pages for an article here on this very subject -{} if someone
+    who knows it was prepared to write one (hint hint). :o)
+
+{\bf George} 
+... However, I do have severe
+    objections to the later part of the article. This mainly relates to the op
+    codes, especially those used for loading and saving numbers onto and from
+    the stack. The table at the top of page 26 lists the op codes. If used in
+    \vector{RI\_EXECB} these must fit into bytes. It is thus plain wrong to list the
+    codes other than those from 0 to \$30 as \$FF31-{}\$FFFF. But why should Norman
+    do this?
+
+
+
+{\bf Norman} 
+To answer the last question, I
+    did it because I was advised by Marcel Kilgus, in an email, that \emph{I
+    differed from the documentation} and that the load and save op-{}codes were
+    indeed negative words and not bytes. And indeed, I quote:
+
+
+
+" ... the opcodes \$FF31 to \$FFFF are for load/save, not \$32 to \$FF.
+    Yes, the latter DO work, but it seems that's more an undocumented
+    side-{}effect."
+
+I took the advice of the man who wrote QPC and probably has
+    forgotten more about Assembly Language programming that I have ever
+    known!
+
+{\bf George} 
+To find out I examined the
+    definitions of \vector{RI\_EXEC}/\vector{RI\_EXECB} in five different publications:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l}
+\toprule
+\textbf{Title} & \textbf{Author} & \textbf{Errors} \\
+\midrule
+%
+QL Technical Guide          & David Karlin \& Tony Tebby & A and B \\
+QL Advanced User Guide      & Adrian Dickens & C \\
+The Sinclair QDOS Companion & Andrew Pennell & None \\
+QDOS Reference Manual       & Jochen Merz    & A \\
+%
+\bottomrule
+\end{tabular}
+\caption{QDOS Documentation and RI\_EXEC/RI\_EXECB Errors}
+\label{tab:RIEXECErrors}
+\end{table}
+
+
+{\bf Norman} 
+
+George has given a pretty thorough explanation of the differences
+    between the above 5 sets of documentation and the code in a JS ROM and
+    SMSQ/E -{} I can only state that I wish I had stuck with Pennell rather than
+    trying to find out more! See table~\ref{tab:RIEXECErrors}.
+
+I now skip directly to George's closing points.
+
+{\bf George} 
+... Having explained how the
+    operations codes are used by \vector{RI\_EXEC} and \vector{RI\_EXECB} I return to Norman's
+    article on page 26\footnote{In the original QL Today publication.}.
+
+
+
+1. In the description of the OpCodes he lists \$FF31 to \$FFFF as the
+    `save' and `load' bytes. Clearly these should be \$31 to \$FF (or 49 to
+    255).
+
+{\bf Norman} 
+This is correct. Obviously, had
+    I been paying more attention in class, I would have questioned Marcel's
+ \emph{word} information as the \vector{RI\_EXECB} call executes a string of \emph{bytes}. Setting
+    a \emph{word} in amongst the bytes would have resulted in an \$FF op-{}code being
+    carried out followed by a separate and incorrect byte code, rather than a
+    store or load operation.
+
+
+
+Basically, when I say `a negative word' I really mean `a negative
+    byte'.
+
+{\bf George} 
+2. In the definition of \vector{RI\_EXEC}
+    it is bits 8 to 15 of D0 which should be zero and not the high word, which
+    can in fact be anything.
+
+
+
+{\bf Norman} 
+Correct. \vector{RI\_EXEC} expects a byte sized op-{}code.
+
+
+
+{\bf George} 
+3. In the definition of \vector{RI\_EXECB}
+    A3.L is the absolute pointer to the list of op codes. It is not relative
+    to A6 as stated. (So ANYROOT\program{ANYROOT} will work after all.)
+
+
+
+{\bf Norman} 
+Yes, as admitted above, this was
+    a type on my part. A3.L is an non-{} relative address.
+
+
+
+{\bf George} 
+4.1 The byte op codes from \$33
+    to \$FF can be used to save and load numbers. The effect of codes \$31 and
+    \$32 depend on the operating system. JS ROM and SMSQ differ here. Both
+    operating systems contain oddities. In the JS ROM \$ 31 will be treated as
+    a save to -{}208(A4,A6.L). However, \$30 will be treated as the operation
+    NOS\^{}TOS so that you can't bring back the saved item!
+
+
+
+SMSQE has a different, though similar quirk. The code \$31 gives a
+    "not implemented" error. Code \$32 puts PI on the stack. Code \$33 saves the
+    number on the stack to -{}206(A4,A6.L). As with the JS ROM this number
+    cannot be reloaded, since the code to do so just puts PI on the
+    stack!
+
+4.2 Norman mentions calling "this routine with \$FF33". This is of
+    course impossible with \vector{RI\_EXECB}, the op code is just \$33. You can call
+    \vector{RI\_EXEC} with D0.W equal to \$FF33, or \$1C33, or \$0033 and each will have
+    the same effect. He then says that the actual address used for storage
+    is: $$A6.L + A4.L + (D0.W \text{ AND } \$FFFE)$$
+
+Again, I'm afraid this is not quite true. The address is
+    actually: $$((op code \text{ AND } 254) - 256)(A4,A6.L)$$
+
+{\bf Norman} 
+I agree with George's point 4.1.
+    As for 4.2, the address calculation I gave is the one I found in Jochen's
+    QDOS Documentation.
+
+
+
+{\bf George} 
+4.3 Pennell is not wrong in the
+    way Norman suggests in his first WARNING on page 28. First, as I have
+    tried to explain, the op codes are really and truly byte sized numbers (2
+    to 255). Second, Pennell gives the range for loading (not saving) a
+    number. His range of offsets, -{}206 to -{}2 is absolutely correct for QDOS.
+    It is when Pennell says that the op codes with odd values \$31 to \$FF give
+    the same range he is wrong. That range is -{}208 to -{}2, but the value -{}208
+    is effectively useless. I don't think this very minor error will bother
+    anyone and it certainly does not warrant a WARNING.
+
+
+
+{\bf Norman} 
+I'm not doing very well am I? Once again, I stand corrected.
+
+
+
+{\bf George} 
+4.4 Norman suggests that in fact
+    you can use a byte for the codes \$31 to \$FF when using \vector{RI\_EXEC}, but that
+    it is an undocumented feature. This is not true since Pennell (page 133)
+    does document it.
+
+
+
+{\bf Norman} 
+I blame Marcel, it's all his
+    fault. (Only kidding.) As I mentioned above, I was basing my article on
+    the latest information that I had been given as a result of asking for
+    clarification on the QL-{}USERS mailing list.
+
+
+
+{\bf George} 
+4.5 I would like to add real
+    WARNING. It is that you can crash the program by using an odd op code
+    below 50 in QDOS. This is because the code is used directly as an index
+    into the programs performing the operations.
+
+
+
+{\bf Norman} 
+This is indeed true.
+
+
+
+{\bf George} 
+I hope Norman will forgive me
+    for attempting to set so many things straight. The errors are not wholly
+    his fault!
+
+
+
+{\bf Norman} 
+Phew, I'm glad that's over. I
+    took a severe beating at the hands of George and I promise to do better in
+    future!
+
+
+
+Seriously, I'm always happy to be corrected in anything I say or
+    write -{} so, if you spot anything that you disagree with, let me
+    know.
+
+And as for forgiveness, I have no problems there either.
+
+\section{Coming Up...}
+\label{ch17-the-end}%hyperlabel{ch17-the-end}%
+
+So, that's a slightly different article this time. I hope to be back
+    in deepest, darkest code again next time, especially as I have promised to
+    provide a useful ASCII to long word conversion routine. I think I know
+    just where I can find one.....
+

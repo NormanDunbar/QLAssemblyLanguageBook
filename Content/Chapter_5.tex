@@ -1,0 +1,775 @@
+\chapter{The 6800x Instruction Set -{} continued}
+
+\section{Introduction.}
+\label{ch5-intro}%\hyperlabel{ch5-intro}%
+
+In this chapter we'll take a look at the remaining instructions
+    which we have yet to cover. There are not many left now -{} you'll be glad
+    to hear.
+
+\subsection{A Few Quickies!}
+\label{ch5-quickies}%\hyperlabel{ch5-quickies}%
+
+This section deals with a few instructions that the QL programmers
+      rarely, if ever, use. These instructions are:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+CHK
+ILLEGAL
+RESET
+RTE
+RTR
+STOP
+TRAPV
+\end{lstlisting}
+\mc6800x{CHK}
+The \opcode{CHK} instruction has the format:
+
+\begin{lstlisting}[firstnumber=1,]
+          CHK <ea>,Dn
+\end{lstlisting}
+
+and causes an exception to be generated if the value in Dn.W is
+      less than 0 or greater than the value in the effective address. On a
+      normal QL this is totally ignored -{} the exception that is -{} however,
+      with a bit of deft QDOS programming, this can be redirected to your own
+      routine. I have never seen this done in any programs -{} yet! By the way,
+      the value in the effective address is a two's compliment signed number.
+      The flags affected are:
+\begin{itemize}[itemsep=0pt]
+
+\item{}N -{} set if Dn.W is less than zero, cleared is Dn.W is greater
+          than the effective address value. Otherwise it is undefined.
+
+
+\item{}Z -{} undefined.
+
+
+\item{}V -{} undefined.
+
+
+\item{}C -{} undefined.
+
+
+\item{}X -{} unaffected.
+
+\end{itemize}
+\mc6800x{ILLEGAL}
+The format of the \opcode{ILLEGAL} instruction is quite simply:
+
+\begin{lstlisting}[firstnumber=1,]
+          ILLEGAL
+\end{lstlisting}
+
+and all it does, by default, is to crash the QL! It can however
+      be redefined to do something useful as with the \opcode{CHK} instruction. (We may
+      get around to covering QDOS stuff in a much later episode.) This
+      instruction also causes an exception to be generated. No condition codes
+      are affected.
+\mc6800x{RESET}
+The \opcode{RESET} instruction has the format:
+
+\begin{lstlisting}[firstnumber=1,]
+          RESET
+\end{lstlisting}
+
+and causes the `reset' line to be `asserted' causing all external
+      equipment interfaced to the processor to be reset. On the QL, it
+      actually causes a system reset -{} similar to you pressing the reset
+      switch. This instruction will only be executed if the processor is
+      running in supervisor mode, in user mode, all that happens is that the
+      program counter is incremented by 2 to skip over this instruction. No
+      flags are affected.
+
+It should be pointed out, however, that when using the \program{Qpc2}QPC2 emulator, any program executing the \opcode{RESET} instruction will \emph{stick} at that instruction. You can, however, use QMON to jump past the offending instruction and allow the program to continue.
+
+\mc6800x{RTE}
+\opcode{RTE} has the format:
+
+\begin{lstlisting}[firstnumber=1,]
+          RTE
+\end{lstlisting}
+
+This instruction is used in supervisor mode to return from an exception, so if you are writing exception handlers, you must exit from them with this instruction. The various \opcode{TRAP \#n} instructions used in QDOS and SMSQ/E to perform certain operating system utilities are ended by an \opcode{RTE} also, traps are themselves exceptions.
+
+The flags are set according to the word on the stack, which usually means that they are returned unchanged.
+
+\mc6800x{RTR}
+\opcode{RTR} has the format:
+
+\begin{lstlisting}[firstnumber=1,]
+          RTR
+\end{lstlisting}
+
+and is actually equivalent to the following two instructions:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVE (A7)+,SR
+          RTS
+\end{lstlisting}
+
+However, the MOVE (A7)+,SR instruction is privileged on the 68000
+      so can only be run in supervisor mode. Using \opcode{RTR} is not privileged so
+      the two instructions can be combined as one. This is a useful
+      instruction for subroutines where the status register is saved on the
+      stack on top of the return address. The following code is an
+      example.
+
+\begin{lstlisting}[firstnumber=1,caption={RTR Example},label={lst:RtrExample}]
+start   BSR example
+        ; more code here
+
+example MOVE SR,-(A7)       ; Stack the status register etc
+        ; do some code here
+
+        RTR                 ; Unstack the status code
+\end{lstlisting}
+
+What happens when a subroutine is called is that the return
+      address is placed on the stack and then the subroutine jumped to. In
+      this example the status register is placed on the stack as well. This is
+      a word sized SR on top of a long sized Program Counter.
+
+The subroutine carries out various bits of processing -{} probably
+      trashing the status codes etc as it does so. At the end, the old SR is
+      put back into the SR and the return address placed in the PC by the \opcode{RTR}
+      instruction.
+
+It is a quirk of the 68000 that the instructions to move data from
+      the SR are not privileged while those that move data into the SR are
+      privileged. This is a handy way around this restriction.
+
+Obviously, the various flags in the SR are changed according to
+      the word removed from the stack \emph{except for the supervisor bit
+      which is unchanged.}
+
+\mc6800x{STOP}
+The \opcode{STOP} instruction has the format:
+
+\begin{lstlisting}[firstnumber=1,]
+          STOP #data
+\end{lstlisting}
+
+and causes the processor to put the word of data into the SR,
+      increment the PC to point at the instruction following this one, and
+      then the processor just stops -{} until any trace, interrupt or reset
+      exceptions are generated. The interrupt must be higher that the current
+      processor interrupt level to have any effect. The flags are set
+      according to the data word in the instruction. This is another
+      privileged instruction and is the processor is in user mode, and a
+      privilege violation exception will be generated.
+
+\mc6800x{TRAPV}
+The \opcode{TRAPV} instruction has the format:
+
+\begin{lstlisting}[firstnumber=1,]
+          TRAPV
+\end{lstlisting}
+
+and is used to cause an exception if the V flag is set. (Overflow
+      flag). Normally this is ignored on a QL but can be redirected with the
+      afore mentioned QDOS jiggery pokery to do something useful. No flags are
+      affected.
+
+\subsection{A Few Little Bits}\mc6800x{BTST}\mc6800x{BCHG}\mc6800x{BSET}\mc6800x{BCLR}
+\label{ch5-bits}%\hyperlabel{ch5-bits}%
+
+This section deals with instructions that check, change, set or
+      otherwise fiddle about with the individual bits in a register or memory
+      address. All of these instructions have a similar format, which is:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Bxxx Dn,<effective address>
+Bxxx #data,<effective address>
+\end{lstlisting}
+
+They all TEST the bit about to be fiddled with \emph{before} fiddling
+      with it. The flags are set according to the state of the bit \emph{before} the
+      fiddling was done. Remember this important fact. The bit number is
+      either supplied in a data register or as immediate data.
+
+When the bit number is being processed the 68000 makes sure that
+      it is in range for the actual data being operated on. If the effective
+      address is a data register (you cannot use these instructions on address
+      registers) then the actual bit number is bit number MOD 32.
+
+If a memory address is being manipulated, the range is adjusted to
+      be 0 to 8 using bit number MOD 8.
+
+The flags are all unaffected except for the Z flag which takes the
+      state of the `previous' value of the bit being manipulated.
+
+The instructions are:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l}
+\toprule
+\textbf{Instruction} & \textbf{What it does} &  \textbf{Description}\\
+\midrule
+BCHG & Bit CHanGe & Changes the specified bit from a 1 to a zero or from a zero to a 1. \\
+BCLR & Bit CLeaR & Puts a 0 into the specified bit.\\
+BSET & Bit SET  & Puts a 1 into the specified bit.\\
+BTST & Bit TeST & Sets the Z flag to the value of bit specified.\\
+\bottomrule
+\end{tabular}
+\caption{Bit Twiddling instructions.}
+\label{tab:BitTwiddlingInstructions}
+\end{table}
+
+
+This family of instructions are very useful when using a byte,
+      word or long to hold 8, 16 or 32 different flags in a program as each
+      one can be tested, set or reset individually and this takes place within
+      QDOS in a number of places.
+
+As a small example, imagine you were writing a program and you
+      needed to check when the user typed an UPPERCASE character. Rather than
+      checking every one for `A' and `Z' (which only apply to the English
+      language remember, you could set up a bitmap table of 256 bytes and have
+      a single bit represent uppercase, another could be for numeric, another
+      for control/unprintable characters etc etc. As each character was read,
+      index into the table on that character code and check the appropriate
+      bit.
+
+\begin{lstlisting}[firstnumber=1,caption={Uppercase Check Example},label={lst:Uppercase Check Example}]
+;
+; Some code above to get a character from the user/file etc
+; Assume D1.B holds the character code.
+; Assume that bit 0 is the uppercase/lowercase flag bit.
+;
+
+checkUC LEA bitmap,A1       ; A1 is address of the bitmap table
+        EXT.W D1            ; Ensure D1.W is the character code
+        BTST #0,(A1,D1.W)   ; Is it uppercase?
+        BEQ.S upper         ; Yes, if bit zero is set
+
+lower   ; process lowercase here
+
+upper   ; process uppercase here
+
+bitmap  ; 256 bytes go here, one for every character.
+\end{lstlisting}
+
+The bitmap table has a single byte for each available character 0
+      to 255 and sets the bits in each one according to the character type. In
+      this example we use bit 0 for upper/lower case only so wastes 7 bits of
+      each byte, but remember, these extra bits could be used to define
+      control characters, digits, hex digits, alphabetic, alpha-{}numeric,
+      punctuation etc.
+
+The advantage to this method is that different tables can be
+      loaded for different languages. The disadvantage is that the program
+      will be slightly longer because of the need to store the table.
+
+\subsection{Testing, Testing}\mc6800x{TST}
+\label{ch5-testing}%\hyperlabel{ch5-testing}%
+
+In QLTdis\program{QLTdis}\footnote{QLTdis is a long abandoned project for this Assembly Language tutorial. It fell victim to a lack of planning, foresight and most likely, ability, on my part. When I say \emph{abandoned} it hasn't been lost for good ....}, I have used the \opcode{TST} instruction to compare a value
+      against zero. This is a useful instruction and replaces CMPI.size \#0,Dn.
+      The format is:
+
+\begin{lstlisting}[firstnumber=1,]
+        TST.size <effective address>
+\end{lstlisting}
+
+The flags are set differently from \opcode{CMPI} as well as the V and C
+      flags are always cleared to zero. \opcode{CMPI} doesn't do this. The flags are:
+\begin{itemize}[itemsep=0pt]
+
+\item{}N is set if the operand is negative, reset if positive.
+
+
+\item{}Z is set if the operand is zero, reset otherwise.
+
+
+\item{}V is always cleared.
+
+
+\item{}C is always cleared.
+
+
+\item{}X is not affected.
+
+\end{itemize}
+
+Why use \opcode{TST} when \opcode{CMPI} will do as good a job? Well it is all down
+      to three things really:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Do you want to use \opcode{TST} or \opcode{CMPI \#0}?
+
+
+\item{}Do you need to preserve the V and C flags?
+
+\end{itemize}
+
+\opcode{TST} is quicker. \opcode{TST} takes 8 clock cycles while \opcode{CMPI} takes 16, 24
+      or 26 depending on the operation. Both take the same time to work out the
+      effective address calculation, but \opcode{TST} also needs fewer read cycles -{} 2
+      -{} while \opcode{CMPI} needs 4 or 6.
+
+\mc6800x{TAS}
+\opcode{TAS} is another testing instruction, which actually does two
+      separate operations in one single \emph{atomic}\footnote{An atomic instruction is one that cannot be split, like the atoms in Chemistry \emph{used} to be considered. The \opcode{TAS} instruction effectively carries out a \opcode{BTST} and then a \opcode{BSET} instruction. While the two instructions could be usurped by the scheduler the single \opcode{TAS} cannot. So rogue and intermittent problems cannot occur. \opcode{TAS} is useful when using semaphores in your code. But that's a whole different ball game!} step. The format is:
+
+\begin{lstlisting}[firstnumber=1,]
+        TAS <effective address>
+\end{lstlisting}
+
+The size is always byte and need not be specified. The flags
+      affected are:
+\begin{itemize}[itemsep=0pt]
+
+\item{}N is set if bit 7 of the operand was set, otherwise
+          cleared.
+
+
+\item{}Z is set of the operand was zero, Reset otherwise.
+
+
+\item{}V is always cleared.
+
+
+\item{}C is always cleared.
+
+
+\item{}X is not affected.
+
+\end{itemize}
+
+The instruction reads the byte at \emph{effective address},
+      checks bit 7, sets the flags and then sets bit 7. The modified byte is
+      written back to the effective address. It is similar to the following
+      code:
+
+\begin{lstlisting}[firstnumber=1,]
+        BTST    #7,<effective address>
+        BSET    #7,<effective address>
+\end{lstlisting}
+
+Obviously there are two instructions here which alter the flags,
+      however, \opcode{TAS} does it in one. The main point about \opcode{TAS} is that it is a
+      single instruction which cannot be interrupted once it has started. This
+      makes it useful for multi tasking or multi processor systems where any
+      sequence of instructions can be interrupted.
+
+In the above example, the system could be interrupted by a floppy
+      disc I/O request between the end of the \opcode{BTST} and the start of the \opcode{BSET}.
+      This could result in a new value being placed into \emph{effective
+      address} by the interrupting routine. The \opcode{BSET} would then possibly
+      give the wrong results after it executed.
+
+This will not ever happen with the \opcode{TAS} instruction. If the above
+      code was being used in a multi processor system to synchronise access to
+      some system resource, the two instructions could lead to
+      mis-{}synchronisation. Using TAS would not allow this to happen.
+
+\mc6800x{Scc}Finally in this section, although not quite a testing instruction,
+      is the `set according to condition code' instructions. These have the
+      format:
+
+\begin{lstlisting}[firstnumber=1,]
+        Scc <effective address>
+\end{lstlisting}
+
+The size is always byte and is not specified in the instruction.
+      What happens is that the condition code is tested, and if found to be
+      true, the byte in \emph{effective address} is changed to be all ones
+      otherwise it is changed to be all zeros. The condition codes are as for
+      \opcode{Bcc} and \opcode{DBcc}.
+
+This sets a memory address or a byte in a register to 255 or 0 for
+      true or false. On QDOS systems we tend to use 1 for true and 0 for
+      false. How can we quickly change from 255 and zero to 1 and zero?
+
+The answer is quite simple, 255 is an unsigned number but if it
+      was signed, it would be -{}1. Simply follow the \opcode{Scc} instruction with \opcode{NEG.B} as follows:
+
+\begin{lstlisting}[firstnumber=1,]
+                  ; Do some code here to set condition flags.
+SMI     D1        ; Set D1.B to $FF if `something' was minus
+NEG.B   D1        ; D1.B now is $01 or $00 which is what we want!
+\end{lstlisting}
+
+\subsection{And Finally?}
+\label{ch5-finally}%\hyperlabel{ch5-finally}%
+
+I think we are just about finished covering all those boring
+      instructions, but we still have a couple to do yet. These don't really
+      fall under any of the headings I have used up until now, so I simply add
+      them on at the end!
+
+On the QL, assembly language programs must be written so that they
+      are `relocatable'. All this means is that you must not assume that your
+      code will always run from a specific address but that it could run from
+      ANY address.
+
+\mc6800x{LEA}
+The \opcode{LEA} instruction which has been used quite a lot in QLTdis
+      already allows just this to happen. This has the format:
+
+\begin{lstlisting}[firstnumber=1,]
+        LEA <effective address>,An.
+\end{lstlisting}
+
+None of the flags are affected. So, a quick bit of revision, what
+      is the difference between the following two instructions?
+
+\begin{lstlisting}[firstnumber=1,]
+        MOVE <effective address>,A1
+        LEA <effective address>,A1
+\end{lstlisting}
+
+\opcode{MOVE} calculates the effective address and reads its contents into
+      A1 while \opcode{LEA} calculates the effective address and puts that into A1, not
+      its contents.
+
+This allows position independent code to be written and is a very
+      much used instruction in QDOS programs. It also helps get around the
+      fact that PC relative mode addressing is forbidden as the destination in
+      a \opcode{MOVE} instruction. The following code will not assemble:
+
+\begin{lstlisting}[firstnumber=1,]
+        MOVE.L  D0,buffer(PC)
+\end{lstlisting}
+
+But this will, and does what is required:
+
+\begin{lstlisting}[firstnumber=1,]
+        LEA     buffer,A1
+        MOVE.L  D0,(A1)
+\end{lstlisting}
+
+There is a similar instruction called Push Effective Address and\mc6800x{PEA}
+      this has the format:
+
+\begin{lstlisting}[firstnumber=1,]
+        PEA <effective address>
+\end{lstlisting}
+
+and simply calculates the effective address and puts it onto the
+      stack. The stack pointer is pre-decremented and none of the flags are
+      affected. All this is very similar to the following:
+
+\begin{lstlisting}[firstnumber=1,]
+        LEA     some_code,A1    ; Get the address of some_code
+        MOVE.L  A1,-(A7)        ; Stack it
+\end{lstlisting}
+
+But why would you use \opcode{PEA} to do this rather that the above, and
+      what use is it afterwards? Apart from it being shorter to code -{} one
+      instruction instead of two -{} it doesn't require a register to be used.
+      The address is on the stack, so what next?
+
+Think about these instructions:
+
+\begin{lstlisting}[firstnumber=1,]
+        PEA     some_code,A1    ; Get the address of some_code
+        RTS
+\end{lstlisting}
+
+What has just happened? The address of the routine at `some\_code'
+      has been placed on the stack, then when \opcode{RTS} is executed, it returns
+      control to the address \emph{which is on the stack}. So this is another way of
+      doing this:
+
+\begin{lstlisting}[firstnumber=1,]
+        LEA     some_code,A1
+        JSR     (A1)
+\end{lstlisting}
+
+Why would you use this? I have absolutely no idea! But it is
+      important to note that the first method will \emph{never} return to the address
+      after the \opcode{RTS} because there is no return address on the stack. The
+    second and `normal' method will return to the address after the \lstinline{JSR (A1)}
+      as the \opcode{JSR} stacks its return address.
+
+\mc6800x{LINK}\mc6800x{UNLK}
+The next and final two instructions are seldom used in normal
+      assembler programs on the QL -{} at least, I have never seen one in all my
+      years of reading \& writing code.\footnote{And now, after all these intervening years, I've actually written an article on their very use after George pointed out that he uses them, frequently, in GWASL and GWASS etc.} They are probably used most by the
+      code generated by various compilers that exists for the QL so that
+      `stack frames' can be built and parameters passed to sub-{}routines
+      created by the compiler. The two instructions are \opcode{LINK} and \opcode{UNLK} and they
+      do not affect any flags.
+
+The \opcode{LINK} instruction has the format:
+
+\begin{lstlisting}[firstnumber=1,]
+        LINK An,#displacement
+\end{lstlisting}
+
+and carries out the following actions:
+\begin{itemize}[itemsep=0pt]
+
+\item{}First the stack pointer is decremented by 4.
+
+
+\item{}Then, the current contents of An are copied onto the
+          stack.
+
+
+\item{}Then the stack pointer is copied to An.
+
+
+\item{}Finally, the stack pointer has the displacement ADDED to
+          it.
+
+\end{itemize}
+
+\opcode{UNLK} has the format:
+
+\begin{lstlisting}[firstnumber=1,]
+        UNLK An
+\end{lstlisting}
+
+and carries out the reverse of the \opcode{LINK} instruction in that the
+      stack pointer is reloaded from An, then An is reloaded from the value on
+      the stack and the stack pointer is incremented by 4.
+
+Assuming that A7 is currently holding value \$20000 and A4 is
+      holding \$00123456 the the sequence of instructions:
+
+\begin{lstlisting}[firstnumber=1,]
+        LINK A4,-$10
+                        ; do something here ...
+        UNLK A4
+\end{lstlisting}
+
+will result in the following:
+\begin{itemize}[itemsep=0pt]
+
+\item{}A7 will be decremented by 4 to \$1fffc
+
+
+\item{}A4 will be stored at this address (\$1fffc)
+
+
+\item{}A4 will then have \$1fffc loaded into it
+
+
+\item{}A7 will have \$10 subtracted (because we supplied a negative
+          displacement) to give \$1ffec.
+
+\end{itemize}
+
+This means that the code between the \opcode{LINK} and \opcode{UNLK} instructions
+      can use the free space between (a7) and -{}4(A4) for working space. There
+      are 16 bytes available for use between these addresses and they can be
+      accessed using A4 as a `stack frame pointer' and using negative
+      offsets. Any stacked valued set up prior to the \opcode{LINK} instruction can be accessed using positive offsets from A4.
+
+Once the \opcode{UNLK} instruction is reached, we must not have changed the
+      value in A4 or all hell will break loose!
+\begin{itemize}[itemsep=0pt]
+
+\item{}A7 is set to the value in A4 which should be \$1fffc.
+
+
+\item{}A4 will be set to the long word at 0(a7) which is where its
+          original value of \$00123456 was stored by the \opcode{LINK}
+          instruction.
+
+
+\item{}A7 will have 4 added to it giving the original \$20000 that we
+          had when the \opcode{LINK} was executed.
+
+\end{itemize}
+
+\subsection{So Here We Are!}
+\label{ch5-summary}%\hyperlabel{ch5-summary}%
+
+Well, that is the end of the most boring part of this series. I
+      apologise for the dreary nature of the previous few chapters but I can't
+      think of any other way to make a micro-{}processor's instruction set
+      interesting reading!
+
+We have now covered all the 68008 instructions and the time has
+      come to start putting the information into practice. However, when I was
+      learning all about 68000 assembly language, there were a few concepts
+      that gave me troubles -{} and I still have to look them up even today!
+
+To make things a bit easier for you, here are my bug-{}bears and an
+      explanation of how to get around them.
+
+\subsubsection{Comparing Things}\index{Comparing Things}
+\label{ch5-comparing}%\hyperlabel{ch5-comparing}%
+
+Comparing registers or registers and values etc always gives me
+        problems. I can never remember which flags are set or which ones to
+        check when using signed or unsigned values. The following should
+        hopefully make life easier.
+
+Remember, when using the \opcode{CMP} instruction, you should read it as
+        `if destination condition source'.
+
+\paragraph{Equality checks -{} signed and unsigned are the same.}
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L   D0,D1
+          BEQ.S   equal       ; if d1 = d0 goto equal.
+\end{lstlisting}
+
+or
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPI.L  #10,D1
+          BEQ.S   equal       ; if d1 = 10 goto equal.
+\end{lstlisting}
+
+\paragraph{Non-{}equality checks -{} signed and unsigned are the
+          same.}
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L   D0,D1
+          BNE.S   not_equal   ; if d1 <> d0 goto not_equal.
+\end{lstlisting}
+
+or
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPI.L  #10,D1
+          BNE.S   not_equal   ; if d1 <> 10 goto not_equal.
+\end{lstlisting}
+
+\paragraph{Greater than -{} unsigned only.}
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L   D0,D1
+          BHI.S   greater     ; if D1 > D0 goto greater.
+\end{lstlisting}
+
+or
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPI.L  #10,D1
+          BHI.S   greater     ; if D1 > 10 goto greater.
+\end{lstlisting}
+
+\paragraph{Greater than -{} signed only.}
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L   D0,D1
+          BGT.S   greater     ; if D1 > D0 goto greater.
+\end{lstlisting}
+
+or
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L   #-5,D1
+          BGT.S   greater     ; if D1 > -5 goto greater.
+\end{lstlisting}
+
+\paragraph{Greater Than or Equal -{} unsigned only.}
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L   D0,D1
+          BCC.S   greater_eq  ; if (D1 >= D0) goto greater_eq
+\end{lstlisting}
+
+or
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPI.L  #5,D1
+          BCC.S   greater_eq  ; if (D1 >= 5) goto greater_eq
+\end{lstlisting}
+
+\paragraph{Greater Than or Equal -{} signed only.}
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L   D0,D1
+          BGE.S   greater_eq  ; if (D1 >= D0) goto greater_eq
+\end{lstlisting}
+
+or
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPI.L  #-5,D1
+          BGE.S   greater_eq  ; if (D1 >= -5) goto greater_eq
+\end{lstlisting}
+
+\paragraph{Less than -{} unsigned only.}
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L   D0,D1
+          BCS.S   less        ; if D1 < D0 goto less
+\end{lstlisting}
+
+or
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPI.L  #5,D1
+          BCS.S   less        ; if D1 < 5 goto less
+\end{lstlisting}
+
+\paragraph{Less than -{} signed only.}
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L   D0,D1
+          BLT.S   less        ; if D1 < D0 goto less
+\end{lstlisting}
+
+or
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPI.L  #-5,D1
+          BLT.S   less        ; if D1 < -5 goto less
+\end{lstlisting}
+
+\paragraph{Less than or equal -{} unsigned only.}
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L   D0,D1
+          BLS.S   less_eq        ; if D1 <= D0 goto less_eq
+\end{lstlisting}
+
+or
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPI.L  #10,D1
+          BLS.S   less_eq        ; if D1 <= 10 goto less_eq
+\end{lstlisting}
+
+\paragraph{Less than or equal -{} signed only.}
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L   D0,D1
+          BLE.S   less_eq        ; if D1 <= D0 goto less_eq
+\end{lstlisting}
+
+or
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPI.L  #10,D1
+          BLE.S   less_eq        ; if D1 <= 10 goto less_eq
+\end{lstlisting}
+
+\subsubsection{Signed Numbers being MOVEd}
+\label{ch5-signed-moves}%\hyperlabel{ch5-signed-moves}%
+
+Remember also that flags and conditions are set when data is
+        \opcode{MOVE}d into data registers, or after arithmetic etc, so the following
+        are valid as well. Obviously, the following code will not work
+        correctly if you find this in a real program -{} don't use it!
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVE    D1,D0               ; Copy D1 to D0 & set 
+                                      ; the flags accordingly
+          BEQ.S   D1_is_zero          ; D1 is now 0
+          BNE.S   D1_is_not_zero      ; D1 is not 0
+          BGE.S   D1_is_0_or_more     ; D1 is now 0 or greater
+          BPL.S   D1_is_0_or_more     ; D1 is now 0 or greater
+          BGT.S   D1_is_1_or_more     ; D1 is now greater than 0
+          BLE.S   D1_is_0_or_less     ; D1 is now less then 0
+          BLT.S   D1_is_negative      ; D1 is now less than 0
+          BMI.S   D1_is_negative      ; D1 is now less than 0
+\end{lstlisting}
+
+\section{Coming Up...}
+\label{ch5-the-end}%\hyperlabel{ch5-the-end}%
+
+That's it, there are no more instructions to learn. In the next
+    chapter, we will investigate the various exceptions that can occur when
+    things go wrong, and what if anything, we can do on the QL to prevent and
+    handle them.

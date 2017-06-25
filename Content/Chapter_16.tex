@@ -1,0 +1,630 @@
+\chapter{Using the Maths Package}
+
+\section{Introduction}
+\label{ch16-intro}%hyperlabel{ch16-intro}%
+
+Don't worry, it's not as bad as it sounds. What I'm talking about is
+    the internal package of routines, provided by the operating system, to
+    allow various mathematical operations to be carried out. For example,
+    multiplying two floating point numbers together, or finding the square
+    root of a number and so on.
+
+\section{The Maths Package}
+\label{ch16-the-package}%hyperlabel{ch16-the-package}%
+
+The two entry points to this useful set of routines is known (in old
+    QDOS format) as \vector{RI\_EXEC} -{} which carries out a single operation -{} and
+    \vector{RI\_EXECB} -{} which carries out a stream of operations. For SMSQE users the
+    names are \vector{QA\_OP} and \vector{QA\_MOP} respectively.
+
+These are vectored routines which simply means that you can find
+    where they are by loading the contents of a word in memory. If the actual
+    location of the code moves around between versions of SMSQE (As QDOS is
+    not being updated) then the vectors remain in the same place.
+
+To call a vectored routine is quite simple. All you do is set up the
+    entry registers as per the QDOSMSQ documentation, load an address register
+    with the vector and \lstinline{JSR (An)} as follows:
+
+\begin{lstlisting}[firstnumber=1,caption={Example Code, Calling a Vectored Routine}]
+move.w  ca_gtfp,a2          ; Fetch floating point parameter(s)
+jsr     (a2)                ; Do it
+\end{lstlisting}
+
+On return, D0 will be set to an error code or zero -{} with the Z flag
+    set accordingly -{} if it all worked ok. All current vectors are WORD sized
+    by the way.
+
+Without any further hesitation, lets jump straight in with some
+    example code. The following short routine shows the \vector{RI\_EXEC} entry point to
+    the maths package in use. It is a simple demonstration and creates a new
+    function names ROOT\program{ROOT} which simply returns the square root of its single
+    parameter.
+
+\begin{lstlisting}[firstnumber=1,caption={The Maths Package - Calculate Square Roots},label={lst:MathsPackageRoot}]
+*----------------------------------------------------------------------
+* Equates as required.
+*----------------------------------------------------------------------
+err_bp      equ     -15                 ; Bad parameter error
+bv_rip      equ     $58                 ; Maths stack pointer
+ri_sqrt     equ     $28                 ; Op code for square root
+
+*----------------------------------------------------------------------
+* Usual start block for PROCedure and FuNction extensions.
+*----------------------------------------------------------------------
+start       lea     define,a1           ; Pointer to definition table
+            move.w  BP_INIT,a2          ; 
+            jsr     (a2)                ; Call BP_INIT
+            rts                         ; Exit to SuperBasic
+
+*----------------------------------------------------------------------
+* Definition block for our new function.
+*----------------------------------------------------------------------
+define      dc.w    0                   ; 0 new procedures
+            dc.w    0                   ; End of procedures
+
+            dc.w    1                   ; There is 1 function
+
+            dc.w    root-*              ; First function
+            dc.b    4,'ROOT'
+
+            dc.w    0                   ; End of functions
+
+*----------------------------------------------------------------------
+* The actual start of the ROOT code is next.
+*----------------------------------------------------------------------
+root        move.l  a5,d7               ; End of parameters
+            sub.l   a3,d7               ; Minus start of parameters
+            cmpi.w  #8,d7               ; One parameter?
+            beq.s   get_1               ; Yes
+bad_param   moveq   #err_bp,d0          ; Bad Parameter error
+quit        rts                         ; Exit
+
+*----------------------------------------------------------------------
+* The single floating point parameter is fetched next.
+*----------------------------------------------------------------------
+get_1       move.w  ca_gtfp,a2          ; We want a float variable
+            jsr     (a2)                ; Fetch it
+            beq.s   got_ok              ; Yes it did
+            rts                         ; Bale out with error
+
+*----------------------------------------------------------------------
+* Check that it all worked.
+*----------------------------------------------------------------------
+got_ok      cmpi.w  #1,d3               ; One parameter?
+            bne.s   bad_param           ; Oops!
+
+*----------------------------------------------------------------------
+* The value on the arithmetic stack is ready to be SQRTed.
+*----------------------------------------------------------------------
+do_it       moveq   #ri_sqrt,d0         ; Take square root
+            moveq   #0,d7               ; Must be zero or crash!
+            move.w  RI_EXEC,a2          ; Get vector
+            jsr     (a2)                ; Do it
+            bne.s   quit                ; Oops!
+
+*----------------------------------------------------------------------
+* If all went well, return the new value on the maths stack as a float.
+*----------------------------------------------------------------------
+ret_fp      moveq   #2,d4               ; Return FP number
+            rts                         ; Exit with result
+\end{lstlisting}
+
+\begin{note}
+You will see in the next chapter a conversation between George
+      Gwilt and myself. The code above has been corrected from that in the
+      original article according to George's comments.
+\end{note}
+
+Save the above code to a file (mine is called square\_root\_asm) and
+    assemble it. Once done, LRESPR the resulting bin file (square\_root\_bin)
+    and try it out as follows:
+
+\begin{lstlisting}[firstnumber=1,language={}]
+PRINT ROOT(9)
+PRINT ROOT(100)
+PRINT ROOT(25)
+\end{lstlisting}
+
+You can make sure that it is working properly by
+    comparing the result from ROOT with the corresponding result for
+    SQRT.
+
+There is nothing complicated in the code. Most of the above is
+    checking that we expect a single parameter and checking that everything
+    worked on and so on. It is the last 8 lines of code that do the actual
+    work and return the result to SuperBasic.
+
+The example above shows how a single operation is carried out. What
+    do you have to do if the mathematical operation you want to perform takes
+    more than a single step?
+
+The answer is simple, you build a list of steps as byte values and
+    terminate them with a zero byte, then call \vector{RI\_EXECB} to execute the steps
+    in order.
+
+Here is another example which uses a relatively simple set of
+    commands to work out the Nth root of any number. Sounds complicated but it
+    is quite simply done using about the only bit of maths `trickery' that I
+    can remember from my time at school.
+
+The following simple SuperBasic code will demonstrate:
+
+\begin{lstlisting}[firstnumber=1,language={}]
+1000 DEFine FuNction AnyRoot(m, n)
+1010:
+1020 REMark Returns the Nth root of the number M
+1030:
+1040 LOCal ln_m
+1050:
+1060 ln_m = LN(m)
+1070 ln_m = ln_m / n
+1080 RETurn EXP(ln_m)
+1090 END DEFine
+\end{lstlisting}
+
+If you type the above into SuperBasic and call it as follows, you
+    can calculate all the roots you want:
+
+\begin{lstlisting}[firstnumber=1,language={}]
+PRINT AnyRoot(100, 3): REMark calculate the cube root of 100
+\end{lstlisting}
+
+And so on. The code works and works quite well, however, as this is
+    an Assembly Language tutorial series, I can't let you off the hook that
+    easily! Here's the Assembly version.\program{ANYROOT}
+
+\begin{lstlisting}[firstnumber=1,caption={The Maths Package - Calculate Any Root},label={lst:MathsPackageAnyRoot}]
+*----------------------------------------------------------------------
+* Equates as required.
+*----------------------------------------------------------------------
+err_bp      equ     -15                 ; Bad parameter error
+bv_rip      equ     $58                 ; Maths stack pointer
+ri_ln       equ     $2a                 ; Take LN of a number
+ri_div      equ     $10                 ; Divide TOS into NOS
+ri_exp      equ     $2e                 ; EXP of a number
+ri_end      equ     $00                 ; End of opcodes list
+
+*----------------------------------------------------------------------
+* Usual start block for PROCedure and FuNction extensions.
+*----------------------------------------------------------------------
+start       lea     define,a1           ; Definition table
+            move.w  BP_INIT,a2          ; 
+            jsr     (a2)                ; Call BP_INIT
+            rts                         ; Back to SuperBasic
+
+*----------------------------------------------------------------------
+* Definition block for our new function.
+*----------------------------------------------------------------------
+define      dc.w    0                   ; 0 new procedures
+            dc.w    0                   ; End of procedures
+
+            dc.w    1                   ; There is 1 function
+
+            dc.w    anyroot-*           ; First function
+            dc.b    7,'ANYROOT'
+
+            dc.w    0                   ; End of functions
+
+*----------------------------------------------------------------------
+* The actual start of the ANYROOT code is next.
+*----------------------------------------------------------------------
+anyroot     move.l  a5,d7               ; End of parameters
+            sub.l   a3,d7               ; Minus start of parameters
+            cmpi.w  #16,d7              ; Do we have two parameters?
+            beq.s   get_2               ; Yes
+bad_param   moveq   #err_bp,d0          ; Bad Parameter error
+quit        rts                         ; Exit
+
+*----------------------------------------------------------------------
+* The two floating point parameters are fetched next.
+*----------------------------------------------------------------------
+get_2       move.w  ca_gtfp,a2          ; We want float variables
+            jsr     (a2)                ; Fetch
+            beq.s   got_ok              ; All ok
+            rts                         ; Bale out on error
+
+*----------------------------------------------------------------------
+* Check that it all worked.
+*----------------------------------------------------------------------
+got_ok      cmpi.w  #2,d3               ; Two parameters?
+            bne.s   bad_param           ; Oops!
+            bra.s   do_it               ; skip over the op-codes
+
+*----------------------------------------------------------------------
+* A list of op codes to calculate the Nth root of M.
+*----------------------------------------------------------------------
+op_codes    dc.b    ri_div               ; Divide TOS into NOS
+            dc.b    ri_exp               ; Take EXP of TOS
+            dc.b    ri_end               ; End of op codes
+
+*----------------------------------------------------------------------
+* At this point there are two values on the stack:
+*
+* 0(A6,A1.L) = M = Big value
+* 6(A6,A1.l) = N = Root to find
+*
+* To work out our Nth root of M, we need to do the following:
+*
+* Take the LN of M.
+* Divide it by N.
+* Take the EXP of the result.
+* Return it to SuperBasic.
+*
+* Of course, it's never as easy as it seems!
+*----------------------------------------------------------------------
+do_it       moveq   #ri_ln,d0           ; LN op code
+            moveq   #0,d7               ; Must be zero or crash!
+            move.w  RI_EXEC,a2          ; Get vector for one op
+            jsr     (a2)                ; Do it
+            bne.s   quit                ; Oops!
+
+*----------------------------------------------------------------------
+* Now the stack is holding the following:
+*
+* 0(A6,A1.L) = LN(M)
+* 6(A6,A1.L) = N = Root to find.
+*
+* They are the wrong way around :o(
+*----------------------------------------------------------------------
+swap_tos    move.l  0(a6,a1.l),d7       ; Get a long word
+            move.l  6(a6,a1.l),d6       ; And another
+            move.l  d6,0(a6,a1.l)       ; Store
+            move.l  d7,6(a6,a1.l)       ; Store
+            move.w  4(a6,a1.l),d7
+            move.w  10(a6,a1.l),d6
+            move.w  d6,4(a6,a1.l)
+            move.w  d7,10(a6,a1.l)      ; Now we have N and LN(M) swapped
+
+*----------------------------------------------------------------------
+* The stack is how we want it to be, so we can continue.
+*----------------------------------------------------------------------
+do_more     moveq   #0,d7               ; Or a crash will probably result
+            move.w  RI_EXECB,a2         ; Perform lots of ops
+            lea     op_codes,a3         ; Op codes to perform
+            jsr     (a2)                ; Do the op list
+            bne.s   exit                ; Oops!
+
+*----------------------------------------------------------------------
+* If all went well, return the result on the arithmetic stack as float.
+* Note that the maths stack is 6 bytes shorter now, so we have to save
+*  the top in BV_RIP before we exit.
+*----------------------------------------------------------------------
+ret_fp      move.l  a1,bv_rip(a6)       ; Make sure maths stack is set
+            moveq   #2,d4               ; Return FP number
+exit        rts                         ; Exit with result
+\end{lstlisting}
+
+\begin{note}
+The code above has been corrected from that in the original
+      article according to George's comments that can be read in the next
+      chapter.
+\end{note}
+
+Save the above code to a file (mine is called any\_root\_asm) and
+    assemble it. Once done, LRESPR the resulting bin file (any\_root\_bin) and
+    try it out as follows:
+
+\begin{lstlisting}[firstnumber=1,language={}]
+PRINT ANYROOT(9, 2)
+PRINT ANYROOT(100, 3)
+PRINT ANYROOT(25, 4)
+\end{lstlisting}
+
+There's not much of real interest in the above code. As ever we
+    validate our parameters to make sure we only expect two then fetch them as
+    floating point values onto the maths stack. After a check to see that we
+    really did get two parameters, we have the values $M$ and $N$ on the stack
+    with $M$ being at the `top' (TOS = top of stack) and $N$ being underneath it
+    (NOS = next on stack).
+
+We start by running a single op code to calculate $\ln(M)$ which
+    leaves the stack with a new TOS which is simply $\ln(M)$.
+
+We next want to divide $\ln(M)$ by $N$ but unfortunately, they are the
+    wrong way around so we swap over the 6 bytes at 0(A6,A1.L) with the 6
+    bytes at 6(A6,A1.L) and then run a sequence of op codes to:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Divide $\ln(M)$ by $N$ leaving the result as the TOS.
+
+
+\item{}Calculate $\exp(\ln(M))$ as the new TOS
+
+\end{itemize}
+
+Once this has been done, we store the new value of A1 at BV\_RIP(A6)
+    as required, set the result to be a floating point number and exit to
+    SuperBasic with the result.
+
+As you may have noticed, the text above mentions that the math stack
+    pointer (A1.L) can be changed by the various op codes that we execute. The
+    following table gives you details on what op codes are available and how
+    they manipulate the maths stack.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l l}
+\toprule
+\textbf{Value} & \textbf{OpCode} & \textbf{A1.L} & \textbf{Description} \\
+\midrule
+%
+\$00 & RI\_END   &  = & End of op code list (RI\_EXECB) \\
+\$02 & RI\_NINT  & +4 & Convert FP to Word INT \\
+\$04 & RI\_INT   & +4 & Truncate FP to Word INT \\
+\$06 & RI\_NLINT & +2 & Convert FP to Long INT \\
+\$08 & RI\_FLOAT & -4 & Convert Word INT to FP \\
+\$0A & RI\_ADD   & +6 & Add TOS to NOS, remove TOS from stack \\
+\$0C & RI\_SUB   & +6 & Subtract TOS from NOS, remove TOS from stack \\
+\$0E & RI\_MULT  & +6 & Multiply NOS by TOS, remove TOS from stack \\
+\$10 & RI\_DIV   & +6 & Divide TOS into NOS, remove TOS from stack \\
+\$12 & RI\_ABS   &  = & Make TOS positive \\
+\$14 & RI\_NEG   &  = & Negate TOS \\
+\$16 & RI\_DUP   & -6 & Copy TOS and create a new TOS above current TOS \\
+\$17 & ??       &  = & Swap TOS and NOS. Available in Minerva ROMs and SMSQ only. \\
+\$18 & RI\_COS   &  = & Cosine of TOS \\
+\$1A & RI\_SIN   &  = & Sine of TOS \\
+\$1C & RI\_TAN   &  = & Tangent of TOS \\
+\$1E & RI\_COT   &  = & Cotangent of TOS \\
+\$20 & RI\_ASIN  &  = & Arcsine of TOS \\
+\$22 & RI\_ACOS  &  = & ArcCosine of TOS \\
+\$24 & RI\_ATAN  &  = & ArcTangent of TOS \\
+\$26 & RI\_ACOT  &  = & ArcCotangent of TOS \\
+\$28 & RI\_SQRT  &  = & Sqare root of TOS \\
+\$2A & RI\_LN    &  = & Natural log of TOS \\
+\$2C & RI\_LOG10 &  = & Log base 10 of TOS \\
+\$2E & RI\_EXP   &  = & Exponential of TOS \\
+\$30 & RI\_POWFP & +6 & Raise NOS to power TOS, remove TOS from stack \\
+\$32 & RI\_PI    & -6 & Put PI on the stack as the new TOS (SMSQ/E) \\
+\$31-\$FF & & & Are the ’save’ and ’load’ op codes \\
+%
+\bottomrule
+\end{tabular}
+\caption{Arithmetic Package Operations}
+\label{tab:ArithmeticPackageOperations}
+\end{table}
+
+So, there you have it, a pile of ingredients all set for you to make
+    up your own numerical recipes. Have fun.
+
+Now, one thing that I have not mentioned above, or even used in the
+    code examples is temporary storage. However, before I delve into that,
+    it's best if you familiarise yourself with Tables~\ref{tab:RIEXECEntryRegisters},~ \ref{tab:RIEXECExitRegisters},~\ref{tab:RIEXECBEntryRegisters}~and~ \ref{tab:RIEXECBExitRegisters} which detail exactly which input and output registers are
+    required for the \vector{RI\_EXEC} and \vector{RI\_ECXECB} vector calls.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l}
+\toprule
+\textbf{Register} & \textbf{Usage} \\
+\midrule
+%
+D0.B & Op code. The high word of D0 should be zero \\
+D7.L & Should be zero \\
+A1.L & Arithmetic stack pointer (relative to A6) \\
+A4.L & Pointer to variable storage (relative to A6) \\
+%
+\bottomrule
+\end{tabular}
+\caption{RI\_EXEC Entry Registers}
+\label{tab:RIEXECEntryRegisters}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l}
+\toprule
+\textbf{Register} & \textbf{Usage} \\
+\midrule
+%
+D0    & Error code \\
+D1-D3 & Preserved \\
+A0    & Preserved \\
+A1.L  & Updated to new arithmetic stack pointer \\
+A2-A4 & Preserved \\
+%
+\bottomrule
+\end{tabular}
+\caption{RI\_EXEC Exit Registers}
+\label{tab:RIEXECExitRegisters}
+\end{table}
+
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l}
+\toprule
+\textbf{Register} & \textbf{Usage} \\
+\midrule
+%
+D0.B & Not used \\
+D7.L & Should be zero \\
+A1.L & Arithmetic stack pointer (relative to A6) \\
+A3.L & Pointer to list of op codes.(NOT relative to A6) \\
+A4.L & Pointer to variable storage (relative to A6) \\
+%
+\bottomrule
+\end{tabular}
+\caption{RI\_EXECB Entry Registers}
+\label{tab:RIEXECBEntryRegisters}
+\end{table}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l}
+\toprule
+\textbf{Register} & \textbf{Usage} \\
+\midrule
+%
+D0    & Error code \\
+D1-D3 & Preserved \\
+A0    & Preserved \\
+A1.L  & Updated to new arithmetic stack pointer \\
+A2-A4 & Preserved \\
+%
+\bottomrule
+\end{tabular}
+\caption{RI\_EXECB Exit Registers}
+\label{tab:RIEXECBExitRegisters}
+\end{table}
+
+You will notice that A4 was never used in my two examples. This is a
+    pointer to the top of an area of memory where you wish to save floating
+    point values to, and load them back from. A4 is relative to A6 (as
+    ever).
+
+The op codes from \$31 through \$FF can be used to save and load 6
+    byte floating point values from the stack to and from the variables
+    area.
+
+Op codes that are even allow numbers to be loaded from storage onto
+    the stack creating a new TOS and setting A1 to A1-{}6.
+
+Op codes that are odd cause the number at TOS to be removed from the
+    stack and saved in the variables area. This causes A1 to change to A1+6.
+    The corresponding load routine is the op code minus 1. (If I call this
+    routine with \$33 then the opposite routine is \$32 and so on.)
+
+The actual start address of the variables area where your number
+    will be stored is calculated as:$$A6.L + A4.L + ((D0.B \text{ AND } \$FE) -\$100)$$ or, in another way: $$((D0.B \text{ AND } \$FE) -\$100)(A6,A4.L)$$
+
+Each load or save operation uses 6 bytes starting at the above
+    address and working UP in memory. This means that you cannot use all of
+    the load/save op codes for the following reason.
+
+Assume you want to save two numbers from the stack. You might be
+    tempted (as I was) to assume that you could save the first using \$FF and
+    the second using \$FD. OK, try it out. Remember saves are odd, loads are
+    even.
+
+Assume also that the absolute address (ie $A6 + A4$) of your variables
+    area is \$1000 0000.
+
+So, where do our two values end up at?
+
+For \$FF it works out as:
+$$
+\begin{array}{l}
+  \$1000 0000 + (\$FF \text{ AND } \$FE) \\
+= \$1000 0000 + \$FE \\ 
+= \$1000 00FE \\
+\end{array}
+$$
+
+For \$FD it is: 
+$$
+\begin{array}{l}
+  \$1000 0000 + (\$FD \text{ AND } \$FE) \\
+= \$1000 0000 + \$FC \\
+= \$1000 00FC
+\end{array}
+$$
+
+
+Because each save uses 6 bytes, the ranges covered are:
+\begin{itemize}[itemsep=0pt]
+
+\item{}For code \$FF, we use the bytes from \$1000 00FE to \$1000 0103
+
+\item{}For code \$FD, we use the bytes from \$1000 00FC to \$1000 0101
+
+\end{itemize}
+
+This has two pretty major problems in my opinion. The first is that
+    we have overwritten some bytes above the top of our variables area and the
+    second is that we have managed to overwrite a few bytes of our first saved
+    number with the second one!
+
+The maximum range of bytes available for saving data to and loading
+    it back from is between -{}208(A6,A4.L) for op code \$31 to -{}2(A6,A4.L) for
+    op code \$FF, however, it seems that you are best to use only certain
+    values (see below) to avoid trashing your saved values and avoid using the
+    top two values \$FF and \$FD for saves and loads or you will partially
+    overwrite other data above your variables area.
+
+I would advise using the save codes as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}\$FB (-{}5) as the absolute minimum value; then
+
+
+\item{}\$F5 (-{}11)
+
+
+\item{}\$EF (-{}17)
+
+
+\item{}\$E9 (-{}23)
+
+
+\item{}\$E3 (-{}29)
+
+
+\item{}\$DD (-{}35)
+
+
+\item{}\$D7 (-{}41)
+
+
+\item{}...
+
+\end{itemize}
+
+And so on subtracting 6 from the op code each time. To load these
+    values back onto the arithmetic stack, use the following codes:
+\begin{itemize}[itemsep=0pt]
+
+\item{}\$FA (-{}6) as the absolute minimum value; then
+
+
+\item{}\$F4 (-{}12)
+
+
+\item{}\$EE (-{}18)
+
+
+\item{}\$E8 (-{}24)
+
+
+\item{}\$E2 (-{}30)
+
+
+\item{}\$DC (-{}36)
+
+
+\item{}\$D6 (-{}42)
+
+
+\item{}...
+
+\end{itemize}
+
+George has documented the values and offsets to use in saving and loading floating point values on my Wiki at \url{http://www.qdosmsq.dunbar-it.co.uk/doku.php?id=qdosmsq:vectors:op} where there is an example of saving and reloading floating point variables from the maths stack into a programmer defined variables storage area.
+
+Having said that, George has commented that:
+
+\begin{note}
+In the maths package, the storing of numbers in an area to which (A4,A6) points is tricky, to say the least. I thought it would be nice if you could get and put items from and to this area easily by means of labels instead of actual byte numbers.
+
+To do this, I produced a macro which allows an item to be put to the dataspace by the code \opcode{nm\_p} and taken from the dataspace by \opcode{nm\_g}, where the name of the item is \opcode{nm}.
+
+The other restriction in this area is that only 34 items can be stored in the data area. To overcome this the macro also defines a code to be used after each \opcode{nm\_p} or \opcode{nm\_g}, which has a value of 0, 1 etc for each of the 34 item areas, also set up by the macro.
+
+Having produced this macro, I would never again use the crude $\$E2$ etc numbers.
+\end{note}
+
+
+\section{Coming Up...}
+\label{ch16-the-end}%hyperlabel{ch16-the-end}%
+
+Well, just when I thought everything was ok, George Gwilt hammered
+    me silly by email (in the nicest possible way of course) about this current chapter and
+    the previous one. 
+    
+In the next chapter, George and I have a conversation
+    about what I did wrong or could have done better.
+
+Much of the code above has been changed to match George's comments.
+    Some of his explanations are hinted at in the above, but have not yet been
+    changed. Read on for the full, gory details!
+

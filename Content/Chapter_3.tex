@@ -1,0 +1,750 @@
+\chapter{The 6800x Instruction Set -{} continued}
+
+\section{Introduction}
+\label{ch3-intro}%\hyperlabel{ch3-intro}%
+
+The preceding chapter started off our great expedition into the
+    various instructions used by the 6800x processor. In this chapter we
+    continue in the same vein. There are still quite a few instructions to
+    cover.
+
+\section{More Branches.}
+\label{ch3-more-branches}%\hyperlabel{ch3-more-branches}%
+
+At the end of part 2, I left you with a promise that the \opcode{DBcc}
+    instructions would be explained in this part, but just before we do that,
+    there is the \opcode{BSR}\mc6800x{BSR} instruction. This means `Branch to Sub-{}Routine' and acts
+    very much like GOSUB in SuperBasic (an instruction I have never used in
+    SuperBasic, but use almost in every program in assembler -{} strange
+    that.)
+
+\opcode{BSR} comes in 2 sizes -{} byte and word. The format is:
+
+\begin{lstlisting}[firstnumber=1,]
+          BSR.S    label
+\end{lstlisting}
+
+or
+
+\begin{lstlisting}[firstnumber=1,]
+          BSR      label
+\end{lstlisting}
+
+Label is the destination of the subroutine to be executed. \opcode{BSR} is a
+    PC relative instruction in that the destination is relative to the program
+    counter -{} although it does not really look it.
+
+The size of the instruction, byte or word, defines the size of the displacement from
+the PC of the \emph{following instruction} to the address of label. This
+displacement is added to the PC and the next instruction executed is the one at that
+address (or PC + displacement). As the displacement is signed, the byte sized \opcode{BSR} can
+`gosub' -{}128 to +127 bytes from the PC while the word sized \opcode{BSR} can `gosub' -{}32,768 to
++32,767 bytes from the PC. Although the resulting address must, of course, be even.
+
+At this point, a small example will maybe make things a bit clearer.
+    Consider this chunk of (useless) code. It serves no useful purpose apart
+    from showing the use of \opcode{BSR} (and a few of the other instructions we have
+    already discussed.).
+
+Read through the following code and at the end I shall explain what
+    it is doing. The only instruction not yet explained is \opcode{RTS} which for now
+    simply means `Return To Sender' -{} similar to RETURN or END DEF (sort of)
+    in SuperBasic.
+
+\begin{lstlisting}[firstnumber=1,caption={BSR Example}]
+Start     MOVEQ     #0,D1
+
+Again     BSR.S     Addon
+          CMPI.L    #10,D1
+          BNE.S     Again
+          MOVEQ     #0,D0
+          RTS
+
+Addon     ADDQ.L    #1,D1
+          RTS
+\end{lstlisting}
+
+The code starts by setting D1 to zero in all 32 bits -{} it is a long
+    sized move. The label `Start' simply identifies the start of the code
+    fragment and need not be called start -{} it could be called fred. It acts
+    like a line number in SuperBasic.
+
+The second line of code calls a sub-{}routine called `addon' which
+    lives only a few bytes further on -{} for this reason the byte sized variant
+    of \opcode{BSR} is used and this makes the program smaller and slightly quicker -{}
+    as explained later. Had the distance to the sub-{}routine been more than 127
+    bytes (or less than -{}128) then the assembler would have complained and the
+    source would have had to have been amended to remove the `.s' from the
+    instruction.
+
+The second line also has a label -{} `Again'. Labels are used in
+    assembler programs to mark significant places in the code. In SuperBasic
+    every line must have a number -{} in assembler only those referenced in the
+    code need have one, but there is no problem putting labels where it makes
+    the code more readable.
+
+Following on, there is a check to see if the value in D1.L is 10
+    (decimal) followed by a branch if not equal zero (\opcode{BNE.S}) to the label
+    `Again'. If the value in D1 is not 10 the Zero flag will not have been set
+    and so the code will start executing from the label `Again'. If D1.L does
+    equal 10 then the branch to `Again' will be ignored.
+
+The next line sets D0.L to zero. This is because any code that runs
+    on a QL either as a result of a CALL address or EXECing\footnote{Actually, only CALL and EXEC\_W take any notice of the error code in D0 when returning to SuperBasic. Jobs executed with EXEC have no effect when they exit with D0 set to a non-zero value. More on this later in the series.} a file returns any
+    error codes to QDOS in D0.L and zero shows that no error has taken place.
+    All this will be explained in a later article.
+
+The \opcode{RTS} instruction ends a subroutine and means return to where you
+    came from (almost). If the above code -{} beginning at `Start' was called
+    from SuperBasic, the \opcode{RTS} would return us to SuperBasic. If it was called
+    from some other part of the assembler program, it would return us to the
+    next instruction in that program.
+
+The subroutine called from the second line begins at the label
+    `Addon'. It is very simply and adds 1 to the value in D1.L before the \opcode{RTS}
+    returns to the place where it was called from.
+
+Put simply. The code above loops around adding 1 to D1.L until such
+    time as D1.L equals 10. At this point the code returns to wherever it was
+    called from.
+
+This is not quite true. The \opcode{RTS} instruction returns back to the
+    instruction that follows the \opcode{BSR} one. So the above code returns to execute
+    the \lstinline{CMPI.L \#10,D1} instruction after running the code in the `Addon'
+    subroutine.
+
+Now that we have a few more instructions under our belts, there will
+    be more bits of code appearing in the rest of the series. This allows the
+    reader to alleviate the boredom of these articles and allows me to
+    illustrate some examples of what I am trying to say!
+
+\begin{lstlisting}[firstnumber=1,]
+For D0 = 10 to -1 step -1 ...
+\end{lstlisting}
+
+Looks a bit like SuperBasic that, but you can do the very same in
+    assembler as well. The above code illustrating the \opcode{BSR} instruction can be
+    rewritten to use the \opcode{DBcc}\mc6800x{DBcc} or `Decrement and Branch' instructions. These
+    are very similar to the \opcode{Bcc} instructions from part 2 of the series but
+    they have an additional purpose. They allow a loop to be executed a set
+    number of times and also can cause an exit from the loop if a certain
+    condition occurs while executing the loop.
+
+It might be better if these instructions were called DBUcc as in
+    `Decrement and Branch \emph{Until} condition' because that is actually what they
+    do. The full set of \opcode{DBcc} instructions is described in Table~\ref{tab:DecrementAndBranchInstructions}.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l}
+\toprule
+\textbf{Mnemonic} & \textbf{Branch Until Condition}\\
+\midrule
+DBCC & Carry clear\\
+DBCS & Carry set\\
+DBEQ & Zero flag set\\
+DBF (or DBRA) & Branch false or always\\
+DBGE & Greater or equal\\
+DBGT & Greater than\\
+DBHI & Higher\\
+DBLE & Less or equal\\
+DBLS & Lower or same\\
+DBLT & Less than\\
+DBMI & Minus\\
+DBNE & Not equal (zero flag not set)\\
+DBPL & Plus\\
+DBT & True. Very strange instruction, see below\\
+DBVC & Overflow clear\\
+DBVS & Overflow set\\
+\bottomrule
+\end{tabular}
+\caption{Decrement and branch instructions.}
+\label{tab:DecrementAndBranchInstructions}
+\end{table}
+
+The format of the instruction is:
+
+\begin{lstlisting}[firstnumber=1,]
+          DBcc      Dn,label
+\end{lstlisting}
+
+The counter is always a data register, D0 to D7, and only the lowest
+    word is affected. The label is specified as a 16 bit displacement from the
+    PC to the next instruction to be executed. The displacement is, as usual,
+    signed allowing branches of between -{}32,767 and +32,768 bytes.
+
+This instruction does not affect the condition codes. They remain
+    the same as they were before the instruction.
+
+The operation of the instruction is in three parts:
+
+\begin{itemize}
+
+\item First, the condition is tested to determine if the termination
+    condition of the loop has been detected. This is the cc part. So a \opcode{DBCS}
+    checks to see if carry is set. If the condition is detected, no branch
+    will be performed and no decrement of the data register will be carried
+    out either.
+
+\item Second, if the condition is not detected, the lower 16 bits of the
+    data register is decremented by 1. If this results in a value of -{}1, then
+    the loop is terminated and no branch takes place.
+
+\item Third, the branch is taken to the label specified. (PC
+    relative).
+
+\end{itemize}
+
+Another example:
+
+\begin{lstlisting}[firstnumber=1,caption={DBNE Example}]
+Start     MOVE.W    #1000,D1
+          MOVEQ     #0,D2
+Loop      ADDQ.L    #1,D2
+          CMPI.L    #100,D2
+          DBEQ      D1,Loop
+
+More      ; More code here ...
+\end{lstlisting}
+
+D1.L is initialised with 1,000 and D2.L is set to zero. Then the
+    start of the loop (at label `Loop') where 1 is added to D2.L. Following
+    the addition, D2 is checked to see if it equals 100. The \opcode{DBEQ} instruction
+    checks the zero flag and if not set -{} therefore D2 is not equal 100 -{}
+    subtracts 1 from D1 and if this does not result in D1 becoming -{}1,
+    branches to the label `Loop' to go round again.
+
+At the label `More' how can you tell which of the two cases ended
+    the loop? As you know, the loop is ended when the condition is detected
+    or the counter reaches -{}1 As the \opcode{DBcc} instructions do not change the flags
+    you can make a simple check on the Zero flag or test D1 to see if it is -{}1
+    or not. So the code that goes in at label `More' will be this:
+
+\begin{lstlisting}[firstnumber=1,]
+More      BEQ.S     Got_100
+Not_100  ;          Process D1 = -1 here
+         ;
+Got_100  ;          Process D1 = 100 here
+         ;
+\end{lstlisting}
+
+Obviously, if we run a loop 1001 times where D1 goes from 1000 to
+    -{}1, adding 1 to D2 then at some point D2 must equal 100 and that will be
+    the only termination of the loop. D1 will never get to -{}1.
+
+There are two `interesting' \opcode{DBcc} instructions. These are \opcode{DBF}
+    (Decrement and Branch Until False) and \opcode{DBT} (Decrement and Branch Until
+    True). What is so interesting about these two?
+
+\opcode{DBF} is commonly written as \opcode{DBRA} which is more meaningful as it
+    implies that a decrement will be done followed by a branch. This is
+    exactly what happens. The condition FALSE can never be created so the
+    instruction always branches until the counter becomes -{}1.
+
+\opcode{DBT} is the opposite. It never branches because the condition is
+    always detected. I have never seen a \opcode{DBT} instruction used in any program I
+    have read, written or disassembled.
+
+Note that the loop is terminated when the counter becomes set to -{}1.
+    This means that the above loop will have 1,001 iterations assuming that D2
+    never became 100. This can cause confusion to programmers used to
+    processors that stop at zero. I learned on a Z80 (Sinclair ZX81) and there
+    was a DJNZ instruction which subtracted 1 from the B register and branched
+    if it was non zero.
+
+To loop around 10 times you set B to 10 and just did it. On the
+    68000 series, you would set the counter to 9 not 10. Some programmers do
+    this and others do it with the counter set to 10 but skip the first
+    iteration. The two examples shown in \lstlistingname~\ref{lst:LoopingExample} and \lstlistingname~\ref{lst:AnotherLoopingExample} are doing the same thing.
+
+\begin{lstlisting}[firstnumber=1,caption={Looping Example},label={lst:LoopingExample}]
+Start     MOVEQ     #10,D0
+          BRA.S     Skip
+Loop      BSR       Useful_code
+Skip      DBF       D0,Loop
+\end{lstlisting}
+
+\begin{lstlisting}[firstnumber=1,caption={Another Looping Example},label={lst:AnotherLoopingExample}]
+Start     MOVEQ     #9,D0
+Loop      BSR       Useful_code
+          DBF       D0,Loop
+\end{lstlisting}
+
+In \lstlistingname~\ref{lst:LoopingExample} the programmer sets the counter to the number of times
+    the loop is to be executed but then skips over the loop code itself to the
+    end of the loop. The counter is reduced to 9 and the loop is entered
+    properly this time. The subroutine at label `Useful\_code' will be executed
+    when the counter has values 9,8,7,6,5,4,3,2,1,0 or 10 times.
+
+In \lstlistingname~\ref{lst:AnotherLoopingExample} the programmer sets the counter to 9 and then executes
+    the code as normal. Once again the loop code at subroutine Useful\_code
+    will be executed 10 times once again, with the values 9,8,7,6,5,4,3,2,1
+    and 0 in the counter register D0.
+
+\begin{note}
+George Gwilt (the author of the GWASL\program{Gwasl} assembler we are using in
+      this series) points out that while the second example is better in terms
+      of readability, there could be problems if the value in the counting
+      register is zero. As George says, the method of subtracting one from the
+      counter then dropping into the loop could lead to a loop that performs
+      65536 times rather than zero times -{} how can this be?
+
+Assume that this subroutine is called from another part of some
+      program with the loop counter in D1.W:
+
+\begin{lstlisting}[firstnumber=1,caption={Potentially Bug-{}ridden Looping Example},label={lst:BuggyLoopExample}]]
+loopy_bit   SUBQ.W  #1,D1
+loop        BSR     do_something
+            DBF     D1,loop
+            RTS
+\end{lstlisting}
+
+
+Obviously, the problem is only apparent when the loop counter is
+      set by some calculation elsewhere in the program, not when setting it
+      directly with immediate data as in my examples above.
+
+Why would this fail, or more to the point, when?
+
+Imagine if D1.W was 1 then the above subroutine called, what would
+      happen? Well, remember how the \opcode{DBcc} instructions operate in three parts
+     :
+\begin{itemize}[itemsep=0pt]
+
+\item{}the condition, if any, is tested to see if it is true. In this
+          case, the condition is ignored as the \opcode{DBF} instruction will always
+          loop (it has no condition to check).
+
+
+\item{}the lowest word of D1 is decremented by one. Then tested to
+          see if it is -{}1 yet. If it is, the loop is not taken and the \opcode{RTS} is
+          executed
+
+
+\item{}Third, If the counter register is not -{}1 then the loop is
+          taken to the code at label `loop'.
+
+\end{itemize}
+
+So, with D1 set to 1 on entry, the loop is carried out once with
+      D1 adjusted to zero by the \lstinline{SUBQ.W \#1,D1} instruction. The loop will then terminate. No worries here. 
+
+What happens if D1 was set to zero on entry?
+
+D1 would be set to -{}1 by the \opcode{SUBQ.W} instruction, then the code at
+      `do\_something' would be executed -{} but we had a zero count so this is
+      wrong straight away. On return, the condition test would be checked -{}
+      but as there is no condition with \lstinline{DBF, D1} would be decremented to -{}2.
+      This does not equal -{}1 so the branch would be taken and taken again and
+      again until D1 once more became -{}1. Then it would have been executed
+      65,536 times too many!
+
+So beware. I can highly recommend the following code instead:
+
+\begin{lstlisting}[firstnumber=1,caption={Fixed Looping Example},label={lst:FixedLoopExample}]
+loopy_bit   BRA.S   skippy_bit
+loop        BSR     do_something
+skippy_bit  DBF     D1,loop
+            RTS
+\end{lstlisting}
+
+Which will always avoid the above problem. Now if D1 was zero, it
+      will be decremented to -{}1 when it skips to the \opcode{DBF} instruction and this
+      will correctly terminate the loop without executing the code in the
+      do\_something sub-{}routine.
+
+So keep in mind the fact that the loop stops when the counter
+      reaches -{}1 and that the counter is decremented before testing for -{}1.
+      Also bear in mind that George is a far better assembler programmer than I
+      am -{} if he says something, believe it!!
+
+\end{note}
+
+Which is the best to use? It's up to you. Sometimes I use the first
+    form and sometimes the second. As far as reading source code is
+    concerned, I prefer the second method because you can write something like
+   :
+
+\begin{lstlisting}[firstnumber=1,]
+Start     MOVEQ     #10-1,D0
+         :
+\end{lstlisting}
+
+Which at least shows better that the loop will be executed 10 times.
+    Unfortunately, when you disassemble the above instruction the assembler
+    has calculated that 10 -{} 1 is 9 and it has once again become:
+
+\begin{lstlisting}[firstnumber=1,]
+Start     MOVEQ     #9,D0
+         :
+\end{lstlisting}
+
+The first method, where the loop counter is initialised with the
+    actual iteration count, then skips the loop loses out in that there is the
+    extra \opcode{BRA.S} instruction which uses up 2 bytes every time it is used, and
+    the \opcode{BRA.S} has to be executed as well as the jump -{} all of this takes
+    time.
+
+\section{Counting}
+\label{ch3-counting}%\hyperlabel{ch3-counting}%
+
+\subsection{Adding and Subtracting}\mc6800x{ADD}\mc6800x{SUB}
+\label{ch3-adding-subtracting}%\hyperlabel{ch3-adding-subtracting}%
+
+In the above code fragments, I introduced the \opcode{ADDQ} instruction to
+      add a value to a register. There are a few arithmetic instructions
+      covering addition, subtraction, division and multiplication.
+
+\begin{lstlisting}[firstnumber=1,]
+          ADD.size    source,Dn
+          ADD.size    Dn,destination
+\end{lstlisting}
+
+This adds the source to the destination. The destination is
+      overwritten but source is not affected. The size can be byte, word or
+      long. All the flags are affected as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}N is set if the result is negative, cleared if not.
+
+
+\item{}Z is set if the result is zero, cleared if not.
+
+
+\item{}V is set if an overflow was generated, cleared if not.
+
+
+\item{}C is set if a carry was generated, cleared if not.
+
+
+\item{}X is set to the same value as the C flag.
+
+\end{itemize}
+
+Note that byte sized \opcode{ADD}s cannot be done if source is An. If
+      destination is An then \opcode{ADDA}\mc6800x{ADDA}\mc6800x{SUBA} should be used, however, some assemblers
+      will convert \lstinline{ADD Dn,An} into \lstinline{ADDA Dn,An} for you.
+
+\begin{lstlisting}[firstnumber=1,]
+          ADDA.size    source,An
+\end{lstlisting}
+
+This adds the source to the address register specified. The size
+      can only be word or long but note that regardless of the size of source,
+      the whole of the address register is affected. Words are sign extended
+      to 32 bits. This instruction has no effect on the condition
+      codes.
+
+\begin{lstlisting}[firstnumber=1,]
+          ADDI.size    #data,destination
+\end{lstlisting}
+\mc6800x{ADDI}\mc6800x{SUBI}
+This instruction adds immediate data to the destination. The flags
+      are all affected as per the \opcode{ADD} instruction above. The size can be byte,
+      word or long. It is not permitted to use this to add to an address
+      register.
+\mc6800x{ADDQ}\mc6800x{SUBQ}
+\begin{lstlisting}[firstnumber=1,]
+          ADDQ.size    #data,destination
+\end{lstlisting}
+
+This is a very quick version of the above \opcode{ADDI} but it can only be
+      used to add values between 1 and 8 to the destination. The size is byte,
+      word or long as required. This instruction is always 2 bytes long where
+      the \opcode{ADDI} can be 4 or 6 bytes. Use \opcode{ADDQ} wherever a value between 1 and 8
+      is to be added.
+
+The flags are affected as per the \opcode{ADDI} instruction. The difference
+      between this and \opcode{ADDI} is that you can use \opcode{ADDQ} to add 1,2,3,4,5,6,7 or 8
+      to an address register. Useful in loops.
+\mc6800x{ADDX}\mc6800x{SUBX}
+\begin{lstlisting}[firstnumber=1,]
+          ADDX.size    Dx,Dy
+          ADDX.size    -(Ax),-(Ay)
+\end{lstlisting}
+
+This one adds with the X flag added as well. It is useful when
+      adding numbers together that are more than a register long -{} 32 bits. If
+      you were to write a program that used 8 bytes in memory to store a
+      number, then you could add two of them together using \opcode{ADDX}.
+
+The destination becomes set to the value source + destination + X
+      flag.
+
+The flags are affected as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}N is set if the result is negative, cleared if not.
+
+
+\item{}Z is UNCHANGED if the result is zero, cleared if not.
+
+
+\item{}V is set if an overflow was generated, cleared if not.
+
+
+\item{}C is set if a carry was generated, cleared if not.
+
+
+\item{}X is set to the same value as the C flag.
+
+\end{itemize}
+
+Note the Z flag. If the result is zero it will be left as it is
+      and not changed. If the result is non zero it is cleared. For this
+      reason the Z flag should be set before any \opcode{ADDX}ing takes place so that
+      at the end, the result of zero shows up by having the Z flag still
+      set.
+
+This instruction and the \opcode{SUBX} one are mostly used in multiple
+      precision addition and subtraction routines.
+\mc6800x{ABCD}\mc6800x{SBCD}
+\begin{lstlisting}[firstnumber=1,]
+          ABCD    Dx,Dy
+          ABCD    -(Ax),-(Ay)
+\end{lstlisting}
+
+This is Add Binary Coded Decimal and is almost identical to \opcode{ADDX}
+      above except that the values in the source and destination are treated
+      as BCD instead of binary. Only 8 bits of the source and destination are
+      affected.
+
+\begin{lstlisting}[firstnumber=1,caption={ABCD Example}]
+Start     MOVEQ     #$19,D0
+          MOVEQ     #$03,D1
+          ABCD      D0,D1
+\end{lstlisting}
+
+Assuming that the X flag is clear, this will result in D1 being
+      set to \$22 which is the result of adding 19 and 3 in DECIMAL. The
+      hexadecimal numbers in the register \$19 and \$03 are interpreted as
+      decimal digits, one digit for each 4 bits. The above example is actually
+      adding 25 and 3 to make 34!
+
+The flags are affected as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}N is undefined.
+
+
+\item{}Z is UNCHANGED if the result is zero, cleared if not.
+
+
+\item{}V is UNDEFINED
+
+
+\item{}C is set if a DECIMAL carry was generated, cleared if
+          not.
+
+
+\item{}X is set to the same value as the C flag.
+
+\end{itemize}
+
+The Subtraction instructions are exactly the same as the Addition
+      flags, but subtract instead. I have listed them below, but not explained
+      them -{} read the corresponding \opcode{ADD} instruction for details.
+
+\begin{lstlisting}[frame=none,numbers=none]
+SUB, SUBA, SUBI, SUBQ, SUBX and SBCD.
+\end{lstlisting}
+
+\subsection{Division and Multiplication}
+\label{ch3-division-multiplication}%\hyperlabel{ch3-division-multiplication}%
+\mc6800x{DIVS}
+\begin{lstlisting}[firstnumber=1,]
+          DIVS source,Dn
+\end{lstlisting}
+
+This instruction divides the 32 bits of destination register Dn by the 16 bit source and puts the result
+      into Dn with the low word of Dn receiving the result of the division (quotient) and the high word of Dn receives the remainder. The
+      division is carried out using signed values. 
+
+Any attempt to divide by zero will cause a divide by zero
+      exception to occur and on a standard QL this will lock up. If overflow
+      is detected - the quotient won't fit into 16 bits - during the operation the overflow flag is set and the
+      operation is aborted and the source and destination are
+      unaffected.
+
+The flags are affected as follows, provided there is not a divide by zero or an overflow:
+\begin{itemize}[itemsep=0pt]
+
+\item{}N is set if the quotient is negative, cleared otherwise.
+          Undefined on overflow.
+
+
+\item{}Z is set if the quotient is zero, cleared if not. Undefined on
+          overflow.
+
+
+\item{}V is set if division overflow is detected. Cleared
+          otherwise.
+
+
+\item{}C is always cleared.
+
+
+\item{}X is never affected. (Unchanged)
+
+\end{itemize}
+
+\begin{warning}
+In the event of a divide by zero then all bets are off as far as the condition codes are concerned. If you do manage to trap one of these exceptions, then make no assumptions about the state of the CCR - many 68000 programming and reference books cannot agree on what happens, even  Motorola's own manuals don't agree!
+
+For best defensive programming advice, assume that all three N, Z and V flags will be undefined.
+\end{warning}
+
+For those of us with short memories or a long period since our
+      schooldays, the quotient is the result of the division. The remainder is
+      what is left over.
+
+\begin{lstlisting}[firstnumber=1,caption={DIVS Example}]
+Start     MOVEQ     #100,D0
+          MOVEQ     #9,D1
+          DIVS      D1,D0
+\end{lstlisting}
+
+Results in D0 being set to \$00010009 which is 9 remainder 1. The 9
+      is in the lowest word while the 1 is in the highest word.
+
+The instruction should be read as `divide source into
+      destination'.
+\mc6800x{DIVU}
+\begin{lstlisting}[firstnumber=1]
+          DIVU source,Dn
+\end{lstlisting}
+
+This is identical to the above except that both operands are
+      treated as unsigned numbers. The flags are affected as per the \opcode{DIVS}
+      instruction. Although the quotient is always positive, the N flag is set
+      to the value in the highest bit of the lower word of destination. (ie
+      the sign bit of a 16 bit word.)
+\mc6800x{MULS}
+\begin{lstlisting}[firstnumber=1,]
+          MULS source,Dn
+\end{lstlisting}
+
+Multiply the destination word by the source word and place the
+      LONG result into the destination register. Both operands are treated as
+      signed numbers.
+
+The flags affected are:
+\begin{itemize}[itemsep=0pt]
+
+\item{}N -{} set if the result is negative, cleared otherwise.
+
+
+\item{}Z -{} set if the result is zero, cleared otherwise.
+
+
+\item{}V -{} Always cleared.
+
+
+\item{}C -{} Always cleared.
+
+
+\item{}X -{} Unchanged.
+
+\end{itemize}
+
+\mc6800x{MULU}
+\begin{lstlisting}[firstnumber=1,]
+          MULU source,Dn
+\end{lstlisting}
+
+Multiply the destination word by the source word and place the
+      LONG result into the destination register. Both operands are treated as
+      unsigned numbers. The flags are set or cleared as per the \opcode{MULS}
+      instruction. The N flag is set to bit 31 of the result.
+
+\subsection{Negation}\mc6800x{NEG}
+\label{ch3-negation}%\hyperlabel{ch3-negation}%
+
+\begin{lstlisting}[firstnumber=1,]
+          NEG.size destination
+\end{lstlisting}
+
+This instruction converts the binary value in the destination to
+      its two's compliment value. This is done by subtracting the current
+      value from zero, putting the result back into the destination and setting
+      the flags. All the flags are affected by this instruction. The
+      instruction can act upon byte, word or long sized values.
+
+The flags affected are:
+\begin{itemize}[itemsep=0pt]
+
+\item{}N -{} set if the result is negative, cleared otherwise.
+
+
+\item{}Z -{} set if the result is zero, cleared otherwise.
+
+
+\item{}V -{} set if an overflow occurred, cleared otherwise.
+
+
+\item{}C -{} Cleared if the result was zero, set otherwise
+
+
+\item{}X -{} Set the same as the C flag.
+
+\end{itemize}
+\mc6800x{NEGX}
+\begin{lstlisting}[firstnumber=1,]
+          NEGX.size destination
+\end{lstlisting}
+
+Same as \opcode{NEG} above except the value in the X flag is also
+      subtracted to get the final result. The flags are not affected in the
+      same way as \opcode{NEG}, but as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}N -{} set if the result is negative, cleared otherwise.
+
+
+\item{}Z -{} set if the result is zero, \emph{unchanged} otherwise.
+
+
+\item{}V -{} set if an overflow occurred, cleared otherwise.
+
+
+\item{}C -{} Set if a `borrow' was generated, cleared otherwise.
+
+
+\item{}X -{} Set the same as the C flag.
+
+\end{itemize}
+
+\mc6800x{NBCD}
+\begin{lstlisting}[firstnumber=1,]
+          NBCD destination
+\end{lstlisting}
+
+This instruction works on byte sized values only. It is similar to
+      \opcode{NEGX} above, but the values are treated as decimal and not binary. The
+      contents of the byte at `destination' is subtracted from zero then the
+      current value of the X flag is subtracted as well. The result is put
+      back into `destination' and the flags set as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}N -{} undefined
+
+
+\item{}Z -{} set if the result is zero, \emph{unchanged} otherwise.
+
+
+\item{}V -{} undefined
+
+
+\item{}C -{} set if a borrow was required, cleared otherwise
+
+
+\item{}X -{} Set the same as the C flag.
+
+\end{itemize}
+
+\section{Coming Up...}
+\label{ch3-the-end}%\hyperlabel{ch3-the-end}%
+
+In the next chapter we shall continue our look at the instruction
+    set with a look at the logical instructions.
+

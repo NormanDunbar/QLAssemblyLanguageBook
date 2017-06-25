@@ -1,0 +1,439 @@
+\chapter{Single Linked Lists Demo Code}
+\index{Linked Lists!Single Link - Demo Code}
+ 
+\section{Introduction}
+\label{ch11-intro}%hyperlabel{ch11-intro}%
+
+The following code demonstrates the use of single linked lists. It
+    should be slotted into the test harness code wrapper in Chapter 10 at the
+    appropriate place. It cannot be assembled as it stands -{} it needs to be
+    part of the test harness.
+
+\section{How Does The Code Work?}
+\label{ch11-single-code}%hyperlabel{ch11-single-code}%
+
+The code is a small example of creating and navigating a linked
+    list. The demo starts by creating a list of 5 nodes, each holding one long
+    word of data being simply the node number 0 to 4.
+
+The list contents are then printed on the screen shoing the node
+    address, the next pointer and the data stored in that node. Once this is
+    done, the node with data contents of 3 is located and deleted prior to the
+    new list being printed out again.
+
+Finally, each node in the list is deleted.
+
+The first part of the code simply controls the whole demo by calling
+    various sub-{}routines to do the hard work, display messages etc on
+    screen.
+
+\begin{lstlisting}[firstnumber=1,caption={Single Linked List - Demo Code}]
+* =====================================================================
+* The DEMO code starts here.
+*
+* This demo does the following:
+*
+* Creates a number of nodes and stores a LONG value in each one.
+* Lists each node address, its NEXT pointer and data value on screen.
+* Deletes a node.
+* Lists each node address, its NEXT pointer and data value on screen.
+* Finds a node based on its data and displays its details on screen.
+* Deletes all the nodes from the list.
+* =====================================================================
+Demo       bsr     BuildList            ; Build a linked list
+           bsr     Before               ; Display 'BEFORE:'
+           bsr     ShowList             ; Display list details
+           bsr     FindNode             ; Locate a single node
+           bne.s   DemoAfter            ; Failed to find node data = 3
+           bsr     DeleteNode           ; Delete a single node
+
+DemoAfter  bsr     After                ; Display 'AFTER: '
+           bsr     ShowList             ; Show details again
+           bsr     KillList             ; Delete entire list
+           rts                          ; Done
+\end{lstlisting}
+
+Following on from the main control section of the demo, we have our
+    much beloved root node which must be initialised to zero as outlined in
+    the original article. This is the pointer we will be loading into A0 quite
+    often in the demo and it holds the address of the first node in the list.
+    At present, there is no list, so the contents are set to zero to indicate
+    the very end of the list.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Root Node}]
+* ---------------------------------------------------------------------
+* A location to hold a single long word pointing to the first 'real'
+* node in our linked list. This must be initialized to zero.
+* ---------------------------------------------------------------------
+RootNode   dc.l    0                    ; This is our root node.
+\end{lstlisting}
+
+The first of our sub-{}routines follows on. This part builds a list of
+    5 nodes in the most simple manner possible -{} it runs a loop which calls
+    the sub-{}routine to create a single node and link it into the list. If you
+    want a bigger list, change the counter loaded into D7 to one less than the
+    number of node you want. Don't forget to adjust the height of your window
+    as wll if you want to see all the results on screen at the same
+    time.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Build List}]
+* ---------------------------------------------------------------------
+* Build a list of 5 nodes each holding a long word of data.
+* ---------------------------------------------------------------------
+BuildList  lea     RootNode,a0          ; Pointer to root node address
+           moveq   #4,d7                ; How many nodes in D7 = 5
+           moveq   #8,d1                ; Each node is 8 bytes long
+
+BuildLoop  bsr.s   BuildNode            ; Create a node, address in A1
+           bne     all_done             ; Just die on errors
+           move.l  d7,4(a1)             ; Store data value
+           bsr.s   AddNode              ; Add to list
+           dbra    d7,BuildLoop         ; Do the rest
+           rts                          ; Done
+\end{lstlisting}
+
+Here's the first of the real list routines. We add a new node into
+    the list in the manner outlined in the article. We reject attempts to add
+    the rot node into the list -{} but without flagging any errors -{} and, as
+    explained, we don't attempt to check if the new node already exists in the
+    list because we are creating the node on the heap, so the chances of the
+    new node being present already are pretty slim to say the least.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Add Node}]
+* ---------------------------------------------------------------------
+* AddNode - Adds a new node to a list. See text for details.
+* Preserves all regsiters.
+* No errors returned.
+* ---------------------------------------------------------------------
+AddNode    cmpa.l  a0,a1                ; Don't add the root node again
+           beq.s   AddExit              ; Bale out quietly if attempted
+           move.l (a0),(a1)             ; Save first node in new NEXT
+           move.l  a1,(a0)              ; Store new node in root node
+AddExit    rts
+\end{lstlisting}
+
+A new node is built by allocating some space on the common heap but
+    we must preserve the working registers, the following code does this for
+    us.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Build Node}]
+* ---------------------------------------------------------------------
+* Allocate a single new node
+* On entry, D1.L is amount of memory required.
+* On exit, A1 holds the address of the new node, with D0 holding errors.
+* All registers preserved - unless otherwise stated.
+* ---------------------------------------------------------------------
+BuildNode  movem.l d1-d3/a0/a2-a3,-(a7) ; Save working registers
+           moveq   #MT_ALCHP,d0         ; Set the trap
+           moveq   #me,d2               ; I want it for me
+           trap    #1                   ; Do it
+           move.l  a0,a1                ; Node address into A1
+           movem.l (a7)+,d1-d3/a0/a2-a3 ; Restore working registers
+           tst.l   d0                   ; Set flags
+           rts                          ; Exit
+\end{lstlisting}
+
+The following sub-{}routine is called once to display the linked list
+    before we do the deletions and again after we have deleting a node. The
+    code simply walks through the entire list and prints out the node address,
+    the next pointer and the data value by calling other sub-{}routines.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Show List}]
+* ---------------------------------------------------------------------
+* Walk through a linked list displaying the details of each node as we
+* go.
+* On entry, A0 = root node of the list.
+* ---------------------------------------------------------------------
+ShowList    lea    RootNode,a0          ; Root node address
+
+ShowLoop    move.l (a0),a0              ; Get address of the next node
+            cmpa.l #0,a0                ; Done?
+            beq.s  ShowExit             ; Yes
+            move.l a0,-(a7)             ; Preserve A0 - it's our node
+            bsr.s  ShowNode             ; Display that node's details
+            move.l (a7)+,a0             ; Restore the node pointer 
+            bra.s  ShowLoop             ; Do the rest of the list
+
+ShowExit    rts                         ; Done
+\end{lstlisting}
+
+This next short routine is called with the address of a node in A0.L
+    and prints the details of that node to the screen.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Show Node}]
+* ---------------------------------------------------------------------
+* Display the details of a single node in the linked list.
+* On entry A0 = the node address.
+* ---------------------------------------------------------------------
+ShowNode    move.l a0,a5                ; The node address
+            move.l con_id2(a4),a0       ; The channel address
+            move.l a5,d4                ; The node address
+            bsr.s  ShowAddr             ; Print node address
+            move.l (a5),d4              ; The NEXT pointer
+            bsr.s  ShowNext             ; Print NEXT pointer
+            move.l 4(a5),d4             ; The node data
+            bsr    ShowData             ; Print the data
+            rts
+\end{lstlisting}
+
+Obviously, just displaying the list contents isn't very user
+    firiendly, so the next couple of routines display a title which informs
+    the user if the list being displyed is `before' or `after' the deletion
+    of a node.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Show Before and After States}]
+* ---------------------------------------------------------------------
+* Display 'BEFORE:' in the output channel.
+* ---------------------------------------------------------------------
+Before     lea     BeforeAddr,a1        ; The prompt
+           movea.l con_id2(a4),a0       ; Needs channel id
+           bsr     Prompt               ; Print it
+           rts
+
+BeforeAddr dc.w    B4End-BeforeAddr-2
+           dc.b    'BEFORE:',linefeed
+B4End      equ     *
+
+* ---------------------------------------------------------------------
+* Display 'AFTER:' in the output channel
+* ---------------------------------------------------------------------
+After      lea     AfterAddr,a1         ; The prompt
+           movea.l con_id2(a4),a0       ; Needs channel id
+           bsr     Prompt               ; Print it
+           rts
+
+AfterAddr  dc.w    AftEnd-AfterAddr-2
+           dc.b    linefeed,linefeed,'AFTER:',linefeed
+AftEnd     equ     *
+\end{lstlisting}
+
+There now follows one of three separate but short routines to
+    display on screen, the various parts of a list node. This one simply
+    displays the node's address in memory. Following after this routine is a
+    number of small sub-{}routines which assist in the displaying of node data
+    by converting the contents of D4 to hex and printing it to the
+    screen.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Show Addresses}]
+* ---------------------------------------------------------------------
+* Display the node's actual address in memory.
+* On entry D4 = the node address.
+* ---------------------------------------------------------------------
+ShowAddr   lea     MsgAddr,a1           ; Our prompt
+
+ShowPrompt bsr     Prompt               ; Print it
+           bsr.s   D4ToHex              ; Convert D4.L to hex
+           bsr.s   PrintHex             ; Print it and a linefeed
+           rts
+
+MsgAddr    dc.w    AddrEnd-MsgAddr-2
+           dc.b    linefeed,'Node address: '
+AddrEnd    equ     *
+
+* ---------------------------------------------------------------------
+* Print the contents of the buffer to screen.
+* ---------------------------------------------------------------------
+PrintHex   lea     Buffer,a1            ; What to print
+           move.l  con_id2(a4),a0       ; Channel to print to
+           bsr     Prompt               ; Do it
+           rts
+
+* ---------------------------------------------------------------------
+* Convert the long word in D4 to hex ready for printing
+* ---------------------------------------------------------------------
+D4ToHex    lea     buffer+2,a1          ; Buffer address
+           bsr     hex_l                ; Do all 4 bytes = 8 characters
+           lea     buffer,a1            ; Buffer again
+           move.w  #8,(a1)              ; Store text length
+           rts
+\end{lstlisting}
+
+The second and third routines to diplsy the details of a node now
+    follow. Starting with the code to show the node's NEXT pointer address
+    closely followed by the code to print the actual data stored in the
+    node.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Show Next Address}]
+* ---------------------------------------------------------------------
+* Display the node's NEXT address in memory.
+* On entry D4 = the node's NEXT pointer.
+* ---------------------------------------------------------------------
+ShowNext   lea     MsgNext,a1           ; Our prompt
+           bra.s   ShowPrompt           ; Print it
+
+MsgNext    dc.w    NextEnd-MsgNext-2
+           dc.b    '  NEXT pointer: '
+NextEnd    equ     *
+
+* ---------------------------------------------------------------------
+* Display the node's actual data content.
+* On entry D4 = the data.
+* ---------------------------------------------------------------------
+ShowData   lea     MsgData,a1           ; Our prompt
+           bra.s   ShowPrompt           ; Print it
+
+MsgData    dc.w    DataEnd-MsgData-2
+           dc.b    '  Data value: '
+DataEnd    equ     *
+\end{lstlisting}
+
+Next we have the code to locate a single node in the linked list
+    based upon the data part of the node. This part is simply the setup
+    routine for the following code at FindANode which does the actual scanning
+    of the node and calling the compare routine as described in the previous
+    chapter.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Find Node}]
+* ---------------------------------------------------------------------
+* Locate a node in the list based on its data value.
+* On exit, A1 is the required node's address plus Z set - if found.
+*          A1 is undefined plus Z clear - if not found.
+* ---------------------------------------------------------------------
+FindNode   lea     RootNode,a0          ; Pointer to root node in list
+           lea     Compare,a1           ; Node comparison routine
+           moveq   #3,d1                ; We are looking for this data
+           bsr.s   FindANode            ; Go find it, or not
+           rts
+
+* ---------------------------------------------------------------------
+* This routine expects the following input registers to be able to scan
+* a linked list for the required data and return the address of the
+* node holding that data with the Z flag set if found, or the Z flag
+* cleared for not found.
+*
+* A0.L = Rootnode of the list.
+* A1.L = Address of Compare routine.
+* D1.L = Value to look for in list.
+* ---------------------------------------------------------------------
+FindANode  moveq   #oops,d0             ; Assume not found (yet)
+
+FindLoop   cmpa.l  #0,a0                ; Reached the end yet?
+           beq.s   FindExit             ; Yes, node not found, exit
+
+           move.l  (a0),a3              ; Get NEXT node into A3.L
+           jsr     (a1)                 ; Call the comparison routine
+           beq.s   FindFound            ; Looks like we found our node
+
+FindNext   move.l  (a0),a0              ; A0 = NEXT node in the list
+           bra.s   FindLoop             ; Go around again
+
+FindFound  movea.l a3,a1                ; This is the required node
+           moveq   #0,d0                ; Clear error flag
+
+FindExit   tst.l   d0                   ; Set zero flag for success
+           rts
+
+* ---------------------------------------------------------------------
+* This is the simple compare routine for our FindNode code. On entry, 
+* we have the following registers set:
+*
+* D1.L = The value we want to find in a node in the list.
+* A3.L = The address of the node we are searching.
+*
+* We must preserve A0, A1 and D1.
+*----------------------------------------------------------------------
+NData      equ   4                      ; Offset to the data
+Compare    cmp.l NData(a3),d1           ; Found the data yet?
+           rts                          ; Exit with Z set if so
+\end{lstlisting}
+
+This next routine is not really required on QDOSMSQ as a terminating
+    job always has any allocated heap areas returned to the system by the job
+    scheduler routines. Because I'm a lazy typist and in order that I reduce
+    the large amounts of code in the magazine, I'm not writing any code here!
+
+If you wish to carry out the list tidying explicitly for yourself as
+    an exercise, feel free to do so. As a suggestion, start a loop which keep
+    going around the list fetching the NEXT node pointer and deleting that
+    from the list using the routines in this code. Once the node has been
+    unlinked from the list, you may deallocate its heap area -{} but don't
+    forget to preserve those registers.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Kill List}]
+* ---------------------------------------------------------------------
+* QDOSMSQ tidies up rather nicely for us on exit - so we don't have to!
+* ---------------------------------------------------------------------
+KillList    rts
+\end{lstlisting}
+
+The folowing code sets up the demo to delete the node that was just
+    `found' by searching for the node holding data 3. This code is called with
+    the address of the `3' node in A1.L and it simply sets up the following
+    routine which actually scans the list looking to make sure that the node
+    we are deleting exists in the list.
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Delete Node}]
+* ---------------------------------------------------------------------
+* A demo routine to delete the node whose address is passed in A1.L. 
+* Sets Z if found & deleted, clears it otherwise.
+* ---------------------------------------------------------------------
+DeleteNode  lea     rootnode,a0         ; Address of the root node
+            bsr.s   DelANode
+            rts
+\end{lstlisting}
+
+This is the node deletion code itself. As described in the article,
+    we must not delete the root node itself -{} as this isn't allocated on the
+    heap. We must also check that the node is in the list by scanning from
+    start to finish looking for the node in the list which has a NEXT pointer
+    holding the address of the node we want to delete.
+
+We remove a node from the list by copying the soon to be deleted
+    node's NEXT pointer into the NEXT pointer of the node before it, thus
+    bypassing the node we want to delete.
+
+\begin{warning}
+This code only deletes a node from the linked list. It does not
+      deallocate the memory on the common heap that was allocated to create
+      the node. QDOSMSQ will do this at the end of the demo, but in real life,
+      you would need to carry out this task yourself -{} especially as you may
+      not want a number of deleted heap areas hanging around in memory
+      fragmenting your heap.
+\end{warning}
+
+\begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Deleting A Node}]
+* ---------------------------------------------------------------------
+* Routine to delete a node with the address passed in A1.L from the 
+* list whose address is passed in A0.L. On exit, Z flag will be set if 
+* deleted or cleared if not.
+* ---------------------------------------------------------------------
+DelANode    moveq   #oops,d0            ; Assume it's going to fail
+            cmpa.l  a1,a0               ; Deleting the root node?
+            beq.s   DelExit             ; Exit if so.
+
+DelLoop     cmpi.l  #0,(a0)             ; Finished yet?
+            beq.s   DelExit             ; Exit not found
+            cmpa.l  (a0),a1             ; Found the previous node
+*                                       ; to the one we want to delete?
+            bne.s   DelNext             ; Not yet, try again
+
+DelFound    move.l  (a1),(a0)           ; Delete the node - set NEXT
+*                                       ; of the node BEFORE the one to
+*                                       ; be deleted to NEXT of the
+*                                       ; node that is being deleted.
+            moveq   #0,d0               ; Indicate found and deleted
+            bra.s   DelExit             ; Set Z flag on the way out
+
+DelNext     move.l  (a0),a0             ; Get the next node in the list
+            bra.s   DelLoop             ; And try again
+
+DelExit     tst.l   d0                  ; Set or clear Z flag
+            rts
+
+* =====================================================================
+* The DEMO code ends here.
+* =====================================================================
+\end{lstlisting}
+
+And that is all there is to it. The SingleList demo code should be
+    assembled and run in the normal fashion. You'll be able to see that there
+    are indeed 5 nodes in the list (in the BEFORE section at the top of the
+    screen) then under that, the AFTER section shows a missing node with data
+    content 3 -{} we have deleted it from the list.
+
+\section{Coming Up...}
+\label{ch11-the-end}%hyperlabel{ch11-the-end}%
+
+In the next chapter the real working demo code for doubly linked
+    lists will be shown and explained.
+

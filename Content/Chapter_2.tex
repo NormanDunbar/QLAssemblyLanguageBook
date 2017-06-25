@@ -1,0 +1,838 @@
+\chapter{The 6800x Instruction Set}
+
+\section{Introduction}
+\label{ch2-intro}%\hyperlabel{ch2-intro}%
+
+In part one, we learned some really boring stuff. Address modes are
+    not what I would call interesting reading, and I suppose that most of you
+    who are still reading this, would agree.
+
+At this point, however, it gets worse. We are now going to delve
+    into the instruction set of the processor.
+
+\section{The MOVE Instruction Family}\mc6800x{MOVE}
+\label{ch2-move}%\hyperlabel{ch2-move}%
+
+The most common instruction in the entire world, is probably the
+    \opcode{MOVE} instruction. It is actually wrongly named as it really does a COPY
+    rather than a MOVE. The format of the \opcode{MOVE} instruction is:
+
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVE    source,destination
+\end{lstlisting}
+
+
+or:
+
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVE.size    source,destination
+\end{lstlisting}
+
+
+The data in source is copied to the destination. For
+    example,
+\begin{lstlisting}[firstnumber=1,]
+          MOVE    D0,D1
+\end{lstlisting}
+takes whatever data
+    is in data register 0 (zero) and copies it into data register 1. How much
+    data is moved? In this case, because no size is specified, the default
+    size is always WORD so a single word of data is moved from D0 to D1. As
+    there is space for 2 words in each of these registers, which word is moved
+    from D0 to which word in D1?
+
+All instructions work from the `lowest' end of the register towards
+    the highest (with the exception of \opcode{MOVEP} -{} see below). So, in the above
+    example, the lowest 16 bits of D0 are copied to the lowest 16 bits of D1.
+    The data in D0 is not altered in any way whatsoever. The same cannot be
+    said for D1 as the original data in D1 has been replaced -{} but only the
+    lowest 16 bits. The highest word has not been altered.
+
+If D0 contained \$01020304 and D1 contained \$11223344 then after the
+    above move, D0 would be unchanged and D1 would contain
+    \$1122\emph{0304}. 
+    
+If the size of the instruction had been
+    specified, as follows:
+\begin{lstlisting}[firstnumber=1,]
+          MOVE.B    D0,D1
+\end{lstlisting}
+     Then only the lowest byte of D1 would have been altered. In this case D1
+    would have contained \$112233\emph{04} after the move. If the
+    size specifier had been `L' for LONG than the entire 4 bytes in D1 would
+    have been overwritten by the 4 bytes from D0. After a long sized \opcode{MOVE},
+    both D0 and D1 would contain \$01020304.
+
+Because the move takes place into a data register the condition
+    codes are affected. To copy data into an address register use the \opcode{MOVEA}
+    instruction, but always remember that it does not affect the flags in the
+    condition code register.
+
+The changes that will take place every time a data register or
+    memory location is used as the destination for a \opcode{MOVE} are:
+\begin{itemize}[itemsep=0pt]
+
+\item{}X flag is never affected. It remains as it is.
+
+
+\item{}N flag is set if the data moved was negative. If the data was
+        positive, N is cleared.
+
+
+\item{}V is always cleared. You cannot move a value into a register
+        that causes an overflow.
+
+
+\item{}C is always cleared for similar reasons.
+
+
+\item{}Z is set if the data moved was zero. It is cleared if it was any
+        other value.
+
+\end{itemize}
+
+The \opcode{MOVE} instruction has many variations, most of them simple and
+    easy to understand. These are:
+
+\opcode{MOVE} as described above.
+
+\opcode{MOVE CCR}\mc6800x{MOVE CCR} -{} this is the MOVE \emph{to} CCR instruction which appears on the standard QL's 68008 processor.
+There is another variant, the MOVE \emph{from} CCR which does not exist on that CPU. the size is always word although the upper 8 bits are
+    ignored -{} effectively a byte sized move. The format of the two instructions are, but only the first is available on a standard QL:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVE    source,CCR
+          MOVE    CCR,destination
+\end{lstlisting}
+
+Executing this instruction results in the condition codes being set
+    as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}X is set to bit 4 of source
+
+
+\item{}N is set to bit 3 of source
+
+
+\item{}Z is set to bit 2 of source
+
+
+\item{}V is set to bit 1 of source
+
+
+\item{}C is set to bit 0 of source
+
+\end{itemize}
+
+All the other bits are simply ignored.
+
+\opcode{MOVE SR}\mc6800x{MOVE SR} -{} the size is always word and may not be specified in the
+    instruction. This instruction copied the 16 bits of the condition code
+    register to the destination. The instruction format is:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVE    SR,destination
+\end{lstlisting}
+
+When the instruction has been carried out, the lower 16 bits of the
+    destination contain a copy of the Status Register of the processor. The
+    actual data in the status register is unaffected by the move.
+
+There is a complimentary instruction to move data into the status
+    register which is:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVE    source,SR
+\end{lstlisting}
+
+Which takes the lower 16 bits of the source data and copies it into
+    the status register. The lower 8 bits are used to change the flags in the
+    CCR or Condition Codes Register (See \opcode{MOVE CCR} above). The SR is affected
+    according to the lower 16 bits of the source data as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}T is set to bit 15 of source
+
+
+\item{}S is set to bit 13 of source
+
+
+\item{}III is set to bits 10, 9 and 8 of source
+
+
+\item{}X is set to bit 4 of source
+
+
+\item{}N is set to bit 3 of source
+
+
+\item{}Z is set to bit 2 of source
+
+
+\item{}V is set to bit 1 of source
+
+
+\item{}C is set to bit 0 of source
+
+\end{itemize}
+
+The other bits are simply ignored. There is a slight problem, the
+    instruction \lstinline{MOVE source,SR} must be executed in Privileged mode or it will
+    cause a `Privilege Violation Exception' which on a normal QL will simply
+    lock it up. (Exceptions are covered later on in the series.)
+
+\begin{warning}
+Note: on the 68010 and up, the \lstinline{MOVE SR,destination} becomes a
+      privileged instruction. There is a new instruction \lstinline{MOVE CCR,destination}
+      which allows access to the CCR part of the SR. Programs written for the
+      68000 and 68008 may require to be re-{}written with this in mind.
+\end{warning}
+
+\opcode{MOVE USP}\mc6800x{MOVE USP} -{} A long sized instruction which copies data into the User
+    Stack Pointer (USP) also knows as A7. This instruction is also privileged
+    and requires that the system is running in supervisor mode. The format of
+    the instruction is:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVE    source,USP 
+          MOVE    USP,destination
+\end{lstlisting}
+
+Both source and destination must be an address register. None of the
+    condition codes are affected by this instruction.
+
+Why does this have to be run in supervisor mode? Well, if not, a
+    privilege violation exception will be generated and these instructions
+    allow the operating system to set the value of a job's stack
+    pointer.
+
+If you remember, there are two A7 registers, one used for supervisor
+    mode and the other for user mode. Only one can be in use at any one time.
+    This instruction allows the supervisor to set the USP without affecting
+    its own version of the A7 register. Not used much, if at all on the
+    QL.
+
+\opcode{MOVEA}\mc6800x{MOVEA} -{} the contents (remember that word!) of the source is moved
+    into an address register. This instruction is either word or long sized
+    and does not affect the condition codes. The format is:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVEA.size    source,An
+\end{lstlisting}
+
+Beware because if you move a word sized source, it will be sign
+    extended to long (bit 15 will be copied into bits 16 to 31) before the
+    data is copied into the address register.
+
+For example:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVEA.W    #$0001,A0
+\end{lstlisting}
+
+This will set A0 to \$00000001 after the move. Bit 15 of the data is
+    a zero so this is copied into all the upper 16 bits of A0. The lower 16
+    bits are simply a direct copy of the data.
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVEA.W    #$8000,A0
+\end{lstlisting}
+
+This will set A0 to \$FFFF8000 after the move. Bit 15 is a one and
+    this is copied into all the upper 16 bits of A0. The lower 16 are again a
+    copy of the data.
+
+Don't forget about sign extension!
+
+\opcode{MOVEM}\mc6800x{MOVEM} -{} a word or long sized instruction which allows you to copy
+    data to or from a number of registers in a single instruction. The format
+    of the instruction is:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVEM    register_list,destination
+          MOVEM    source,register_list
+\end{lstlisting}
+
+None of the condition codes are affected by this instruction.
+
+The instruction is most often used to store a number of registers on
+    the stack on entry to a subroutine, and to reinstate the original values
+    on exit from the subroutine. The instruction stores the registers starting
+    with D0, then D1 and so on up to D7, then the address registers are stored
+    in order from A0 to A7 -{} assuming all registers are specified.
+
+A register list takes the format of a starting register name, a
+    hyphen then a finish register name. Another form is a start register name
+    a slash and another register name. The two formats can be mixed to give
+    almost endless possibilities. The following are all register list examples
+   :
+
+\begin{lstlisting}[frame=none,numbers=none]
+D1-D4
+A0-A3
+D1/D4-D7
+D0-D2/D4/D7/A0-A3/A6
+\end{lstlisting}
+
+The hyphen means that all registers from the starting one to the
+    finish one (inclusive) will be moved to the destination. The slash signals
+    that there \emph{might be} a `gap' in the register list, but not necessarily so. The above examples mean:
+
+\begin{lstlisting}[frame=none,numbers=none]
+D1 and D2 and D3 and D4
+A0 and A1 and A2 and A3
+D1 and D4 and D5 and D6 and D7
+D0 and D1 and D2 and D4 and D7 and A0 and A1 and A2 and A3 and A6.
+\end{lstlisting}
+
+And finally, this explains why the slash only signifies that there \emph{might} be a gap:
+
+\begin{lstlisting}[frame=none,numbers=none]
+D1/D2/D3/D4
+\end{lstlisting}
+
+
+The list can be specified in any order (unless the assembler rules
+    differently) as each register detected is used to set a single bit in a 16
+    bit word. This word is used by the processor to determine which of the
+    registers are to be copied.
+    
+    Regardless of the order in which the registers are specified in the instruction, they are always stored in memory in order from D0 to D7 then A0 to A7 - for all the registers that are specified that is.
+
+This instruction will be most often used in its Post decrement and
+    pre-{}increment forms:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVEM.L    D0-D3,-(A7) 
+          MOVEM.L    (A7)+,D0-D3
+\end{lstlisting}
+
+You cannot use the post-increment addressing mode when moving register data into memory, and likewise, when moving memory data into registers, you cannot use the pre-decrement addressing mode.
+
+\begin{warning}
+It should be noted, that when moving \emph{word} sized data from memory into registers, that these words will be \emph{sign extended to a long word} prior to being stored in the register.
+\end{warning}
+
+
+\opcode{MOVEP}\mc6800x{MOVEP} -{} Probably the strangest instruction in the 68000 set. It is used for 8 bit peripherals on a 16 bit data bus.
+
+This
+    instruction transfers data from a data register to alternating bytes in
+    memory. The data is transferred from the data register starting from the
+    highest 8 bits, then the next 8 bits and so on. This is a word or long
+    sized instruction. The condition code flags are not affected. (I have
+    never used or seen this instruction used on the QL.) The formats are
+   :
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVEP.size    Dn,displacement(An)
+          MOVEP.size    displacement(An),Dn
+\end{lstlisting}
+
+The size is long or word, Dn is any data register, An is any address
+    register and the displacement is added to the address register to get the
+    first address to be filled with data. An example might make things
+    clearer. If we assume that D0 holds \$11223344 and A1 holds the address
+    \$000200000 then the instruction:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVEP.L    D0,0(A1)
+\end{lstlisting}
+
+Copies the highest byte of D0 (\$11) into address \$20000, the next
+    highest (\$22) into address \$20002, the next byte (\$33) into address \$20004
+    and finally the lowest byte of D0 (\$44) into address \$20006. Addresses
+    \$20001, \$20003 and \$20005 are not affected.
+
+Had the displacement and A1 combined created an odd address then the
+    odd addresses would have been filled with data and the even ones would not
+    have been affected.
+
+\opcode{MOVEQ}\mc6800x{MOVEQ} -{} This is a very useful instruction and you will see it used
+    on many occasions in QL assembly language programs. It is the `Move Quick'
+    instruction and is used to quickly move any value between -{}128 and 127
+    into any data register. The value is sign extended to 32 bits or long
+    sized and so fills the entire data register. The format is:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVEQ    #data,Dn
+\end{lstlisting}
+
+The flags are affected by this instruction as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}X flag is never affected. It remains as it is.
+
+
+\item{}N flag is set if the data moved was negative. If the data was
+        positive, N is cleared.
+
+
+\item{}V is always cleared. You cannot move a value into a register
+        that causes an overflow.
+
+
+\item{}C is always cleared for similar reasons.
+
+
+\item{}Z is set if the data moved was zero. It is cleared if it was any
+        other value.
+
+\end{itemize}
+
+Remember, only 8 bit values are allowed and these must be between
+    -{}128 and 127.
+
+A number of 68000 instructions have this `quick' mode, but why is it
+    quick? Let us compare the \lstinline{MOVEQ #0,D0} with its equivalent \lstinline{MOVE.L #0,D0}.
+    We simply see two different forms of what is effectively the same
+    instruction, the QL's processor sees things a bit differently, as follows
+   :
+
+First \lstinline{MOVEQ #0,D0} is a 16 bit instruction in memory. \lstinline{MOVE.L #0.D0} is
+    also a 16 bit instruction but it is followed in memory by a long word (32
+    bit) holding the data, in this case zero. This makes the \opcode{MOVEQ} instruction
+    3 times smaller than the \opcode{MOVE.L} one. As the processor has less data to
+    fetch from memory, it takes less time to read the instruction and its
+    data, therefore it is quicker. Looking at the 68008 timing chart, it takes
+    the \opcode{MOVEQ} instruction 8 clock cycles to execute and the \opcode{MOVE.L} 24 clock
+    cycles.
+
+And that is about it for the 68008's \opcode{MOVE} instructions. This is
+    probably the instruction with the most variants and as I said before,
+    probably the most used instruction in any program.
+
+\subsection{Exercise}
+\label{ch2-exercise-1}%\hyperlabel{ch2-exercise-1}%
+
+1. Write down the correct instruction which will copy 4 bytes of
+      data from address \$20000 into data register D7.
+
+2. What is the fastest way to get the 8 bit value of 17 into all
+      32 bits of register D2?
+
+3. What instruction would you use to copy the lowest 16 bits of
+      register D1 into the lowest 16 bits of register D3? What happens to the
+      data in D1 after the move and what happens to the data that is currently
+      held in D3?
+
+4. How would you place the lowest byte of D1 into a memory
+      location which is 10 bytes further on from the address currently held in
+      A0?
+
+5. Why is the \opcode{MOVE} instruction `wrongly' named?
+
+6. What does a privileged instruction require before it can be
+      executed?
+
+7. What happens if a privileged instruction is executed in user
+      mode?
+
+8. How many data registers does the 68008 have and how many
+      address registers?
+
+9. What values are set in each of the condition codes when the
+      instruction \lstinline{MOVEQ #0,D1} is executed?
+
+10. What values are set if the instruction executed was \lstinline{MOVEA.L #0,A0}?
+
+\subsection{Answers}
+\label{ch2-ch2-answers-1}%\hyperlabel{ch2-ch2-answers-1}%
+
+1. MOVE.L \$20000,D7
+
+2. MOVEQ \#17,D2 or MOVEQ \#\$11,D2
+
+3. MOVE.W D1,D3. Nothing happens to the data in D1. The highest
+      word on D3 is not affected but the lower word is overwritten by the
+      lowest word from D1.
+
+4. MOVE.B D1,10(A0) or MOVE.B D1,\$0A(A0).
+
+5. The MOVE instruction actually copies data from source to
+      destination, it does not move it in the traditional sense of `it was
+      over there but it has been moved to over there'.
+
+6. The processor must be in supervisor mode.
+
+7. A privilege exception will be generated (and the QL will
+      probably hang).
+
+8. There are 8 data registers and 9 address registers but only one
+      of the A7 `twins' can be used at a time.
+
+9. The Z flag is set to one and all the rest are reset to zero
+      except the X flag which is unaffected and keeps its previous
+      value.
+
+10. No flags are changed. They all keep their previous
+      values.
+
+\section{The CMP Instruction Family}\mc6800x{CMP}
+\label{ch2-cmp}%\hyperlabel{ch2-cmp}%
+
+While all this talk of moving data around, be it in memory or within
+    the processor's internal registers, is `interesting', being able to move
+    data is not much use if you cannot do anything with it when you have moved
+    it. As the condition codes are affected by data movements we can sometimes
+    determine the value of the data we moved. This is of course true only if
+    we want to know if the value we moved was zero, or not zero, positive or
+    negative but that's about as accurate as we can get using the \opcode{MOVE}
+    instruction.
+
+If we need to compare two values we will need to use the \opcode{CMP} family
+    of instructions. \opcode{CMP} stands for `Compare' and allows data to be compared
+    against specific values, registers or memory contents.
+
+The general format of the \opcode{CMP} instruction is:
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.size    source, Dn
+\end{lstlisting}
+
+The \opcode{CMP} instruction has the effect of carrying out a subtraction of
+    the source from the destination register without changing the destination at all. What it does change is the condition codes, and these will be set as follows
+   :
+\begin{itemize}[itemsep=0pt]
+
+\item{}X flag is never affected. It remains as it is.
+
+
+\item{}N flag is set if the result was negative. If the result was
+        positive, N is cleared.
+
+
+\item{}V is set if the result caused an overflow otherwise
+        cleared.
+
+
+\item{}C is set if a `borrow' was generated and cleared
+        otherwise.
+
+
+\item{}Z is set if the result was zero. It is cleared if it was any
+        other value.
+
+\end{itemize}
+
+This instruction can be carried out in all three sizes -{} byte, word
+    or long, however, if the source is an address register, only word and long sizes are allowed.
+
+One of the common uses of this instruction, and perhaps the easiest
+    to understand, is testing to see whether two values are the same. If they
+    are then the result of the `subtraction' of source from destination will
+    always be zero. If the result is zero then the Z flag can be tested
+    (somehow -{} we shall see later) and then some actions taken if it is set
+    while others can be taken if it is not set.
+
+The instruction:
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L    D1,D2
+\end{lstlisting}
+
+Will set the Z flag if the same value is present in both D1 and D2.
+    If they are different, then the Z flag will not be set.
+
+There are only four variations of the \opcode{CMP} instruction -{} unlike \opcode{MOVE}
+    which has a few more. The first is simply \opcode{CMP} itself. This is used when
+    comparing with a data register as in the above example. The source,
+    however, can be any of the 68000 addressing modes -{} although you cannot
+    compare an address register and a data register using the BYTE size. This
+    means that:
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.W    A0,D2 
+\end{lstlisting}
+
+is a legal instruction, but that:
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.B    A0,D2
+\end{lstlisting}
+
+Is not. It is of course allowed that the data be POINTED to by an
+    address register, as in:
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.B    0(A0),D2
+\end{lstlisting}
+
+Which compares the byte of data at the address held in A0 with the
+    byte of data held in the lowest byte of register D2.
+
+\opcode{CMPA}\mc6800x{CMPA} -{} is the form of the instruction used when comparing against a
+    destination which is an address register. It is very similar to the \opcode{CMP}
+    variation, but only word and long sized comparisons can be made. If the
+    word size is used, then watch out for the old favourite pitfall of sign
+    extension. Whatever word sized data is used for the source of this
+    comparison will be sign extended up to a long word and then compared with
+    the entire 32 bits of the address register.
+
+This means that:
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPA.W    #$FFFF,A3
+\end{lstlisting}
+
+Would set the Z flag if and only if A3 contained the value of
+    \$FFFFFFFF but would not set it if A3 contained the value \$0000FFFF.
+    Beware. If at all possible, make your code explicit. So if you want to
+    test A3 as having \$FFFF in its lower word, use \lstinline{CMPA.L \#\$FFFF,A3} instead of
+    the word sized version.
+
+\opcode{CMPI}\mc6800x{CMPI} -{} is the third variation and this one is used when testing any
+    address mode destination (except PC relative or an address register's
+    contents) against source data which is, quite simply, a number. This
+    variation can be used in all 3 sizes. The format of the instruction is
+   :
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPI.size    #data,destination
+\end{lstlisting}
+
+If the destination is a data register, then the instruction is
+    equivalent to the \opcode{CMP} instruction.
+
+\opcode{CMPM}\mc6800x{CMPM} -{} is the final variation. It is used to compare one memory
+    location with another. It can be used in all 3 sizes but can only be used
+    in a single address mode -{} address register with post-increment. The format
+    is always:
+
+\begin{lstlisting}[firstnumber=1,]
+          CMPM.size    (An)+,(An)+
+\end{lstlisting}
+
+The two address registers are pointers to the memory addresses to be
+    compared and after this instruction, the flags have been set according to
+    the result of the `subtraction' while both address registers have been
+    incremented by 1, 2 or 4 depending upon the size of the data being
+    compared.
+
+\section{Signed and Unsigned Numbers}
+\label{ch2-signed-unsinged}%\hyperlabel{ch2-signed-unsinged}%
+
+Before we take a closer look at the condition codes and how we can
+    use them to alter the flow of a program -{} that is, how we can implement
+    loops, if then else etc, we need to take a break and discuss the
+    differences between signed and unsigned numbers.
+
+When we \opcode{MOVE} some data into a data register the same number can
+    actually mean two different things. Confused? You will be!
+
+If we use an 8 bit number as an example, the data \$FF can either
+    mean 255 or minus one. In a 16 bit example, \$FFFF can mean either 65535 or -{}1 and
+    in a 32 bit long word, \$FFFFFFFF means either $2^{32}-1$ or $-{}1$. 
+    
+The important thing to
+    remember is that it is \emph{you}, the programmer, who decides which version is
+    in use at any particular time.
+
+Ok, how does it work? The 68000 family of processors can use signed
+    or unsigned numbers. If the signed version is in use then the number will
+    be either negative (less than zero) or positive (zero or greater). If
+    unsigned numbers are being used then the value will always be positive.
+    How can the processor tell the difference?
+
+The answer to the question `is this number signed or unsigned?' is
+    either `yes' or `no' equivalent to one or zero in binary terms. This
+    implies that a single bit can be used to hold the sign of the number and
+    this is exactly how it happens. By convention the most significant bit of
+    the number holds the sign. A one indicates that the number is negative
+    while a zero indicated that it is not.
+
+Those of you who are thinking ahead of me now might well be saying
+    `but surely using a single bit of the register will reduce the amount of
+    numbers that can be represented by a factor of two?'. Not quite.
+
+In binary, the numbers representing the hexadecimal values \$00 to
+    \$0F will all fit into a half byte or nibble. A nibble is 4 bits and each
+    bit represent a single power of two in the number.
+
+Just as 1231 means $(1 * 10^{3}) + (2 * 10^{2}) + (3 * 10^{1}) + (1 * 10^{0})$, which is, $(1 * 10 * 10 * 10) + (2 * 10 * 10) + (3 * 10) + (1 * 1)$
+    which is, $1000 + 200 + 30 + 1$ which is the number we have at the start of
+    all this, the same is true in binary.
+
+The binary nibble 1010 is $(1 * 2^{3}) + (0 * 2^{2}) + (1 * 2^{1}) + (0 * 2^{0})$, which is $(1 * 2 * 2 * 2) + (0 * 2 * 2) + (1 * 2) + (0 * 1)$, which is
+    $8 + 0 + 2 + 0$, which is 10 in decimal with converts to \$0A in hexadecimal.
+
+All the possible values that can be held in an unsigned nibble are
+    0000 (zero) up to 1111 (15 or \$0F) and conversion is a matter of adding up
+    each power of two in the number. From the right we have $2^{0}$ which is simply one. Then $2^{1}$ or two and so on.
+
+In an unsigned nibble the most significant bit $(2^{3})$ is used to hold
+    the sign, so all numbers below unsigned 7 are positive while those `above' 7 are actually negative and so are below 0.
+
+If the highest bit was not the sign bit it would represent $2^{3}$ or 8.
+    To convert into a signed value simply negate the 8 to get minus 8, and add
+    all the other bit values to it. Taking the same binary example of 1010 as
+    above, this is now
+$(-{}1 * 2^{3}) + (0 * 2^{2}) + (1 * 2^{1}) + (0 * 2^{0})$. This 
+    gives minus 8 plus 2 which is minus 6. This implies that for a signed
+    number the range is minus 8 to plus 7 which is still a possible 16 values as with
+    the unsigned version, just shifted slightly down the number scale.
+
+That is the only difference between signed and unsigned numbers. The
+    ranges of values in a byte are minus 128 to plus 127, in a word it is
+    minus 32768 to plus 32767 and for a long word it is minus 2147483648 to
+    plus 2147483647.
+
+When dealing with signed numbers any number which has a 8, 9, A, B,
+    C, D, E or F in the most significant digit (hex that is) is negative. All
+    the rest are positive. I find the quickest way to find the equivalent
+    negative value is to subtract from $2^{bits}$. For example $-1$ in an 8 bit byte is $2^{8}-1$ which is $256 -1$ which is $255$. $255$ in hex is \$FF which is
+    the 8 bit representation of $-1$. Similarly, $-10$ is $256 -10$ = 146 which is
+    \$F6. Use 65,536 for 16 bit words and 4,294,967,296 for 32 bit long words.
+
+Enough for now. Just remember when coding a program in assembler
+    that numbers can be two different values at the same time. You determine
+    which one is appropriate at any one time. It is far easier to consider
+    unsigned numbers all the time but this might not be applicable. Writing a
+    program to record the number of sheep jumping over a fence need never use
+    signed numbers, while the amount of money in your bank account probably
+    will. Just remember to be consistent.
+
+\section{Testing Condition Codes and Branching}\mc6800x{Bcc}
+\label{ch2-testing-branching}%\hyperlabel{ch2-testing-branching}%
+
+As you may remember when data is \opcode{MOVE}d into a \emph{data} register or
+memory address, certain condition codes are set or unset. These codes can be used, along
+with the results of a \opcode{CMP} instruction and/or the discussion of signed and unsigned numbers
+above, to determine program flow. To change the flow, we use the branch instruction also
+known as \opcode{Bcc} or Branch on condition code. The general format of a \opcode{Bcc} instruction
+is:
+
+\begin{lstlisting}[firstnumber=1,]
+          Bcc    label 
+\end{lstlisting}
+
+The label part defines where the branch will be to (the destination)
+    and is an offset from the current program counter and of course may be
+    positive or negative.
+
+A branch instruction is equivalent to a SuperBasic GOTO command. Much frowned upon
+by purists, but useful in certain situations. Never say `Never use a GOTO' because in
+assembly language you almost always have one!
+
+There are a number of `branch' instructions that look at the
+    condition codes and change the course of your program according to what
+    they find. There are 14 of these and some appear remarkably similar to
+    others. They are listed in Table~\ref{tab:BranchOnConditionInstructions}:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l p{0.4\textwidth}}
+\toprule
+\textbf{Branch} & \textbf{Name} & \textbf{Signed/unsigned} & \textbf{Description}\\
+\midrule
+BCC & Branch Carry Clear      & Unsigned & The branch is executed if the carry flag is not set -{} ie zero.\\
+BCS & Branch Carry Set        & Unsigned & The branch is executed if the carry flag is set -{} ie one.\\
+BEQ & Branch Equal            & Both     & Branch only if the result of the last operation caused the zero flag to be set. MOVEQ \#0,D0 for example.\\
+BGE & Branch Greater or Equal & Signed   & Branch if the last operation resulted in a signed number that was zero or greater.\\
+BGT & Branch Greater Than     & Signed   & Branch if the last result was greater that zero.\\
+BHI & Branch Higher           & Unsigned & Branch if the last result was greater than zero.\\
+BLE & Branch Less or Equal    & Signed   & Branch if the last result was zero or less.\\
+BLS & Branch Lower or Same    & Unsigned & Same as BLE, but `equal' replaced by `same'.\\
+BLT & Branch Less Than        & Signed   & Branch only if the last result was less than zero.\\
+BMI & Branch Minus            & Signed   & Branch if the result of the last operation was negative. Ie less than zero but not including zero.\\
+BNE & Branch Not Equal        & Both     & Branch if the last operation resulted in a non-{}zero outcome. CMPI.L \#1,D1 if D1.L is not holding the value 1.\\
+BPL & Branch Plus             & Signed   & Branch if the result of the last operation is positive ie zero or greater.\\
+BVC & Branch oVerflow Clear   & Both     & Branch if the last operation left the V flag unset.\\
+BVS & Branch oVerflow Set     & Both     & Branch if the last operation left the V flag set.\\
+\bottomrule
+\end{tabular}
+\caption{Branch on condition instructions.}
+\label{tab:BranchOnConditionInstructions}
+\end{table}
+
+There is one more branch instruction that does not care about the
+    flags, this is the \opcode{BRA} or Branch unconditionally instruction. It is the
+    most like a GOTO instruction as that is its exact purpose -{} goto some
+    other place in the program.
+
+If the displacement value will fit into a single byte (-{}128 to +127)
+    then a `short' branch will take place. This entire instruction fits into a
+    single word. If the displacement is zero, then this would normally
+    indicate a short branch to the next instruction in the program. As this is
+    where the PC is pointing anyway the zero displacement is used to signify a
+    long branch and the word following is used as a 16 bit displacement
+    allowing relative values between -{}32768 to +32767.
+
+The short branch is written as \opcode{Bcc.S} with the dot and `s' indicating
+    the shortness. Most assemblers default to the long branch which adds 2
+    bytes to your program for every \opcode{Bcc} instruction in it. I find the `best'
+    way to reduce the `wasted' bytes is to make all branches short and the
+    assembler will reject those which are out of range.
+
+One of the most confusing aspects of assembly language programming
+    for new and experienced coders alike is `which are the signed and unsigned
+    tests?' I always have to look it up and I have never found a place where
+    all the tests are listed together with the signed and unsigned
+    comparisons. You won't have this problem as I have listed them all in Table~\ref{tab:SignedAndUnsignedTests}.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l}
+\toprule
+\textbf{Test for} & \textbf{Signed} & \textbf{Unsigned}\\
+\midrule
+Greater Equal & BGE & BCC\\
+Greater than & BGT & BHI\\
+Equal & BEQ & BEQ\\
+Not Equal & BNE & BNE\\
+Less Equal & BLE & BLS\\
+Less than & BLT & BCS\\
+Negative & BMI & Not applicable\\
+Positive & BPL & Not applicable\\
+\bottomrule
+\end{tabular}
+\caption{Signed \& Unsigned Tests.}
+\label{tab:SignedAndUnsignedTests}
+\end{table}
+
+
+In the above description of the \opcode{Bcc} instructions I state, for
+    example, that the \opcode{BNE} instruction will branch if the last result was not
+    zero. This is not quite the case. If I had just loaded a data register
+    with some value which was not zero then the branch would be taken, as in
+    the following fragment of code:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVE.L    (A0),D1 
+          BNE.S     Somewhere 
+\end{lstlisting}
+
+If, on the other hand, I was comparing two registers then the branch
+    would have been taken if they did not have exactly the same contents
+   :
+
+\begin{lstlisting}[firstnumber=1,]
+          CMP.L     D3,D4 
+          BNE.S     not_equal
+          BHI.S     greater
+\end{lstlisting}
+
+So you can see that there are more ways to use these conditional
+    branches. Bear in mind, however, that the \opcode{CMP} is simply a subtraction with
+    the answer `thrown away' and it is that discarded result that is being checked. One
+    other area of confusion is which register is greater in the \opcode{BHI}
+    instruction above?
+
+In a \opcode{CMP} instruction it should be read as Destination \opcode{CMP} source. If this is
+followed by a \opcode{Bcc} then it means branch if the destination is
+\emph{condition} source. So in the above code fragment, we will branch to
+the label `greater' if and only if D4 is greater than D3.
+
+There are other instructions that affect the flow of a program and
+    these are the `looping' constructs or \opcode{DBcc} as they are written. These are
+    the `Decrement and branch \emph{until} condition. Confused? All will be revealed
+    in the next chapter.
+
+\section{Coming Up...}
+\label{ch2-the-end}%\hyperlabel{ch2-the-end}%
+
+In the next chapter we will take a closer
+    look at some more branching instructions and start thinking about the project\footnote{The project was to be a disassembler named ``QLTdis''\program{QLTdis}, but it fell dramatically by the wayside and is not discussed further in this book.}.

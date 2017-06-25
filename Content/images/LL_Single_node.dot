@@ -1,0 +1,8 @@
+digraph structs {
+    rankdir=LR
+    pad="0.3";
+    //bgcolor=grey77;
+    node [shape=record fillcolor=yellowgreen style=filled];
+//
+    structNode [label="<lblNext> Next | <lblData> Data"];
+}

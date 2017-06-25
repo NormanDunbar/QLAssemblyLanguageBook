@@ -1,0 +1,16 @@
+digraph structs {
+    rankdir=LR
+        pad="0.3";
+    
+    node [shape=record fillcolor=yellowgreen style=filled];
+
+    structNameList [label=" <nlp> Random Garbage ... | {$09 | FLP1_NAME} | ...  | {<nlbas>$05 | PRINT}"];
+
+    node [shape=record fillcolor=white style=filled];
+    "BV_NLP(A6)" -> structNameList:nlp;
+    "BV_NLBAS(A6)" -> structNameList:nlbas;
+
+    //edge [dir=back];
+
+    
+}

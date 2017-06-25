@@ -1,0 +1,436 @@
+\chapter{Recursion}
+\index{Recursion}
+
+\section{Introduction}
+\label{ch13-intro}%hyperlabel{ch13-intro}%
+
+After the recent musings on single and double linked lists, this
+    time I'm going to delve into the murky depths of a subject I've never seen
+    before discussed for QDOSMSQ assembly language. The subject is
+    recursion.
+
+Recursion is a very simple concept, but for some people, it can be
+    quite difficult to get their head around it, and it never comes clear. I
+    suspect for those people, trying to do it in assembly language is equally
+    difficult. Lets hope I can explain it in simple enough terms for even me
+    to understand!
+
+\section{Recursion in Assembly Language}
+\label{ch13-recursion}%hyperlabel{ch13-recursion}%
+
+A recursive routine is simply a routine which calls itself until a
+    certain exit condition is detected. The exit condition is very important,
+    if you miss it out, your programs will loop around until such time as the
+    stack fills up and the program crashes, or eats itself.
+
+Here's a very simple example of a program that will recurse
+    `forever' until it dies.
+
+\begin{lstlisting}[firstnumber=1,caption={Very Faulty Recursive Program}]
+Start    bsr.s       Recurse
+         rts
+
+Recurse  bsr.s       Recurse
+         rts
+\end{lstlisting}
+
+None of the \opcode{RTS} instructions will ever get executed. because all the
+    program does is calls Recurse over and over again, but each call is nested
+    inside the previous call, so the (A7) stack pointer keeps going down by 4
+    each time it is called as the \opcode{BSR} instruction stacks the return address
+    and then branches off to the next iteration of Recurse.
+
+Recursion educators are very fond of certain examples when teaching
+    recursion. The towers of Hanoi, Factorials, Exponentiation, Fibonacci
+    numbers etc. I'm no different, so here's a few small explanations and
+    examples.
+
+\subsection{Factorials}
+\label{ch13-factorials}%hyperlabel{ch13-factorials}%
+\index{Recursion!Factorials}
+
+The factorial of a number is that number, multiplied by the
+      factorial of the number before it. The symbol for a factorial number is the exclamation mark (!)  So, $4! = 4 * 3!$
+      
+      There is no concept of a negative factorial, so $-3!$, doesn't
+      exist. The smallest factorial number is $1!$, which has the value of 1.
+
+Factorial numbers imply recursion and we have the following simple
+      code.
+
+However, just before we delve into the code be aware that factorials get
+      very big very quickly, $12!$ (\$1C8CFC00) is the largest that can fit into
+      a single 32 bit (unsigned) register and $13!$ ( \$17328CC00) cannot fit.
+      The largest factorial we can fit into a 16 bit unsigned word is only $8!$
+      (\$9D80) and as the 68008 processor can only multiply 16 bit numbers,
+      this means that $9!$ will be the biggest that the following routine can
+      calculate without overflowing.
+
+\begin{note}
+Other processors in the MC68000 family can multiply 32 bit
+        numbers.
+\end{note}
+
+On entry to the code, D0.W is the number to calculate the
+      factorial of and on exit, D0.L is the result. D0.W must in range 1 to 9
+      only but this routine does not perform error trapping -{} on your own head
+      be it!
+
+\begin{lstlisting}[firstnumber=1,caption={Recursive Factorial Program}]
+Start       bra.s     Start2        ; Skip over result area
+Result      dc.l      0             ; Result area
+FirstNumber dc.w      9             ; Assume 9! by default
+
+Start2      lea       Result,a3     ; Where to shove the answer
+            moveq     #0,d0         ; Clear all 32 bits of D0.L
+            move.w    4(a3),d0      ; Fetch FirstNumber
+            bsr.s     Factorial     ; Do it
+FRET_1      move.l    d0,(a3)       ; Shove it!
+            moveq     #0,d0         ; No errors
+            rts                     ; Back to SuperBasic
+
+Factorial   move.w    d0,-(a7)      ; Stack current number
+            subq.w    #1,d0         ; Calculate previous number
+            bne.s     Not_zero      ; Not done unless next number is 0
+FPOP        move.w    (a7)+,d0      ; Retrieve the value 1 from stack
+            rts                     ; Back to FRET_1 if FirstNumber 
+*                                   ; was 1 else FRET_2
+
+Not_zero    bsr.s     Factorial     ; Lets go round again, and again
+FRET_2      mulu      (a7)+,d0      ; Do the multiplication
+            rts                     ; Exit
+\end{lstlisting}
+
+For the simplest case, assume we start with a value of \$0001. The
+      stack will look like this at label `Start':
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Return address to SuperBasic.
+\end{lstlisting}
+
+As we drop through the code beginning at `Start2' and execute our
+      first branch to subroutine `Factorial' the stack now looks like this
+     :
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Return address to SuperBasic.
+Return address to FRET_1
+\end{lstlisting}
+
+Tracing through the `Factorial' code, we stack the current value
+      of D0.W (which is 1) so the stack now looks like this:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Return address to SuperBasic.
+Return address to FRET_1
+$0001
+\end{lstlisting}
+
+After the subtraction, D0 has become zero, so we exit out of the
+      `Factorial' code from label FPOP by popping the value \$0001 off the
+      stack into D0.W leaving the stack like this:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Return address to SuperBasic.
+Return address to FRET_1
+\end{lstlisting}
+
+Then we execute the \opcode{RTS} instruction to return us to the label
+      FRET\_1 where we store the result of \$00000001 from D0.L into the result
+      area set aside for this very purpose.
+
+So far so good, we haven't actually done any recursion yet, but
+      read on. If we start with the value of \$0002 in `FirstNumber' then the
+      process is slightly different. We start, as ever with the SuperBasic
+      return address on the stack when we are at label `Start'.
+
+Dropping into `Start2' and executing our first \opcode{BSR} to `Factorial',
+      the stack is as above at the same point. Nothing much has changed.
+      However, we then stack the current value in D0.W to give a stack as
+      follows:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Return address to SuperBasic.
+Return address to FRET_1
+$0002
+\end{lstlisting}
+
+This is slightly different. When we calculate the next number, we
+      do not set D0.W to zero, so we skip out of the `Factorial' code block to
+      the code at `Not\_zero' which immediately causes another \opcode{BSR} to
+      `Factorial' leaving the stack as follows:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Return address to SuperBasic.
+Return address to FRET_1
+$0002
+Return address to FRET_2
+\end{lstlisting}
+
+Once again, we stack D0.W and subtract one to find that we have
+      now reached zero. The stack looks like this:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Return address to SuperBasic.
+Return address to FRET_1
+$0002
+Return address to FRET_2
+$0001
+\end{lstlisting}
+
+Once more, we pop the value \$0001 off the stack back into D0.W and
+      then execute the \opcode{RTS} instruction. This time, however, we do not return
+      to FRET\_1 but to FRET\_2 where we end up with the following stack
+      arrangement:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Return address to SuperBasic.
+Return address to FRET_1
+$0002
+\end{lstlisting}
+
+The instruction at `FRET\_2' causes the top word on the stack to be
+      multiplued by D0.W the result store in D0.L. This leaves D0.L equal to
+      \$00000002 which just happens to be the correct value for $2!$ and we exit
+      the code by returning to `FRET\_1' where we store the result
+      again.
+
+The process is similar for all the other numbers, so $5!$ will have
+      a stack looking like this when we reach, but just before we execute the
+      code at `FPOP':
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Return address to SuperBasic.
+Return address to FRET_1
+$0005
+Return address to FRET_2
+$0004
+Return address to FRET_2
+$0003
+Return address to FRET_2
+$0002
+Return address to FRET_2
+$0001
+\end{lstlisting}
+
+The stack will begin to unwind as we do the sequence of \opcode{MULU} and
+      \opcode{RTS} instructions at FRET\_2 as we first calculate $1!$, then $2!$, then $3!$,
+      then $4!$ and finally $5!$ which is the result we return to
+      SuperBasic.
+
+To run the above code, do this, or something like it:
+
+\begin{lstlisting}[firstnumber=1,language={}]
+1000 Start = ALCHP(128)
+1010 LBYTES win1_source_factorial_bin, Start
+1020:
+1030 DEFine PROCedure Fact(n)
+1040   IF n < 1 OR n > 9 THEN
+1050      PRINT n; ' is slightly out of range, 1 to 9 only please.'
+1060   END IF
+1070   POKE_W Start + 6, n
+1080   CALL Start
+1090   PRINT n; '! = '; PEEK_L(Start + 2)
+1100 END DEFine Fact
+\end{lstlisting}
+
+Now, at the SuperBasic prompt, run the above to load the code, you
+      only need to do this once, then just type Fact(n) where `n' is a value
+      between 1 and 9 as described above in the text. The results will be
+      `interesting' if you use values outside of this range.
+
+Actually, in the interests of experiment, I tried it out. Using
+      values above 9 is fine, up to a point, but zero will trash SuperBasic as
+      the stack wanders down through memory and corrupts data that it shouldn't
+      be anywhere near. Larger values will no doubt have the same effect, but
+      anything over 9 gives incorrect results as the 16 bit \opcode{MULU} instruction
+      isn't using the additional bits of the number. Anyone got a good 32 bit
+      \opcode{MULU} and/or \opcode{MULS} routine they want to share?
+
+I don't have the numeric skills to write one, and while there are
+      plenty on the Web, they are, of course, someone else's work and subject
+      to copyright etc.
+
+\subsection{The Fibonacci Series}
+\label{ch13-fibonacci}%hyperlabel{ch13-fibonacci}%
+\index{Recursion!Fibonacci}
+
+The Fibonacci series looks like this:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+1, 1, 2, 3, 5, 8, 13, 21, 34, 55 ...
+\end{lstlisting}
+
+Apart from the first two numbers, each number in the series is the
+      sum of the previous two numbers. This is written as
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Fibonacci(N) = Fibonacci(N-1) + Fibonacci(N-2)
+\end{lstlisting}
+
+The very explanation cries out for recursion, you can see it in
+      the statement above. We need to cater for the first two terms in the
+      series and test for a Fibonacci(0) or Fibonacci(1) and return the value
+      1 for both of these values. The slight difference between Fibonacci and
+      Factorial is that we need to recurse twice for each number, once for
+      ($N-{}1$) and once for ($N-{}2$). This makes the code slightly more interesting
+      and the stack too.
+
+Here's how it looks in plain and simple SuperBasic:
+
+\begin{lstlisting}[firstnumber=1,language={}]
+1000 DEFine FuNction Fibonacci(n)
+1010   IF n = 0 OR n = 1 THEN RETurn 1
+1020   RETurn Fibonacci(n-1) + Fibonacci(n-2)
+1030 END DEFine
+\end{lstlisting}
+
+So how difficult could it be to convert the above (two) lines of
+      working code into assembly language? It all depends on how easily you
+      get your head around the recursion, I had to sit and stare at the screen
+      for a while until I finally came up with the following code:
+
+\begin{lstlisting}[firstnumber=1,caption={Recursive Fibonacci Program}]
+Start       bra.s    Start2         ; Skip over result storage
+Result      dc.l     0              ; Space for result at Start + 2
+FirstNumber dc.l     9              ; Fib(9) by default = Start + 6
+
+Start2      lea       Result,a3     ; Where to shove the answer
+            move.l    4(a3),d0      ; Fetch FirstNumber
+            bsr.s     Fibonacci     ; Do it
+FRET_1      move.l    d0,(a3)       ; Shove it!
+            moveq     #0,d0         ; No errors
+            rts                     ; Back to SuperBasic
+
+Fibonacci  cmpi.l   #2,d0           ; Special cases 0 or 1?
+           bcc.s    Fib_2           ; No, D0 is 2 or more. (Unsigned!)
+           moveq    #1,d0           ; Return 1 for Fib(0) or Fib(1)
+           rts                      ; That's our exit clause!
+
+Fib_2      subq.l   #1,d0           ; Calculate N-1
+           move.l   d0,-(a7)        ; Stack our 'N-1' value
+           bsr.s    Fibonacci       ; Work out Fib(N-1)
+FRET_2     move.l   d0,-(a7)        ; Save the result of Fib(N-1)
+           move.l   4(a7),d0        ; Retrieve N-1
+           subq.l   #1,d0           ; Calculate N-2
+           bsr.s    Fibonacci       ; Work out Fib(N-2)
+FRET_3     add.l    (a7)+,D0        ; Add Fib(N-1) to Fib(N-2)
+           adda.l   #4,a7           ; Tidy original N-1 off of stack
+           rts                      ; And return
+\end{lstlisting}
+
+To run the above code, do this, or something like it:
+
+\begin{lstlisting}[firstnumber=1,language={}]
+1000 Start = ALCHP(128)
+1010 LBYTES win1_source_fibonacci_bin, Start
+1020:
+1030 DEFine PROCedure Fib(n)
+1040   IF n < 0 THEN
+1050      PRINT n; ' is slightly out of range, 0 and over only please.'
+1060   END IF
+1070   POKE_L Start + 6, n
+1080   CALL Start
+1090   PRINT n; '! = '; PEEK_L(Start + 2)
+1100 END DEFine Fib
+\end{lstlisting}
+
+This time we can use numbers larger than 9 as we are adding 32 bit
+      values in the code, not multiplying. Of course, you can still pick a
+      number big enough to trash the stack. Interestingly enough, Fib (30)
+      executes in 1 second on my QPC setup, but the original SuperBasic
+      version ran and ran and ran I CTRL-{}SPACE'd it after a while.
+
+As an exercise, try to work out what the stack looks like for
+      different values of N -{} it's an interesting lesson in mind numbing
+      loops. Once you figure it out though, it gets easier.
+
+When you are writing recursive code like the two examples above,
+      you must remember two golden rules:
+\begin{itemize}[itemsep=0pt]
+
+\item{}you must always have a `get out' clause to stop
+          recursion
+
+
+\item{}never ever try to use other registers as storage -{} it just
+          doesn't work!
+
+\end{itemize}
+
+In the above, we just stacked our working values and this is fine,
+      but in other code, you might need to have a lot more values to stack, so
+      how best to do this? The answer is quite simple, use the \opcode{LINK} and \opcode{UNLK}
+      instructions which are designed to build stack frames that you can
+      access using Address Register Indirect With Displacement -{} for example
+      4(a5) -{} addressing mode instructions.
+
+Out of interest, has anyone spotted a potential problem with the
+      above code?
+
+The calculation of Fib(N-{}2) duplicates most of the work done by
+      Fib(N-{}1). One solution to this problem is to have an array of values
+      in memory and when calculating a new value, store it in the table if it
+      has not been stored already, if it has been stored already, simply
+      extract it from the table.
+
+The last two paragraphs should have given you an inkling of some
+      homework -{} which will not be marked -{} feel free to try out the implied
+      exercises for yourself. The only problem with the array of values is
+      that you never know how big to make the table and you need some method
+      of determining if the table has been initialised (to all zeros) GWASL\program{Gwasl}
+      doesn't fill buffers with zeros, just with assorted random characters,
+      unlike an array in SuperBasic.
+
+The array could be set up as follows:
+
+\begin{lstlisting}[firstnumber=1,caption={Improving the Fibonacci Code - Answers Array}]
+Answers   dc.l     0         ; Fib(0), 0 indicates uninitialised table
+          ds.l     1000      ; Fib(1) through Fib(1000)
+\end{lstlisting}
+
+Because GWASL won't initialise the entries for 2 to 1000 you have
+      to do it yourself, as follows:
+
+\begin{lstlisting}[firstnumber=last,caption={Improving the Fibonacci Code - Array Initialisation}]
+Init      lea       Answers,a3     ; Start of answer array
+          cmpi.l    #0,(a3)        ; Has table been initialised yet?
+          bne.s     Done           ; Yes, exit
+          move.w    1000,d0        ; 1000 = 1001 entries
+I_Loop    clr.l     (a3)+          ; Clear this entry, point at next
+          dbra      d0,I_Loop      ; Do the rest
+          lea       Answers,a3     ; Answer(0)
+          move.l    #1,(a3)+       ; Initialised to Fib(0)
+          move.l    #1,(a3)        ; An initialise Fib(1) as well.
+\end{lstlisting}
+
+Code like the above should be called at the start of the file so
+      that the initialisation is only ever performed once per session. Making
+      multiple calls to the Fibonacci code will only require the table be
+      initialised once.
+
+When the code has calculated Fib(N-{}1) then it can store the result
+      in D0.L into the table. As N-{}1 is on the stack, it can be retrieved into
+      a spare register -{} say D1 -{} and converted to an offset by shifting it
+      right twice (LSL.L \#2,D1) and using that as an offset into the answer
+      table.
+
+Now, when asked to calculate a value, check the offset into the
+      table and if it is not zero, return that as your answer -{} no recursion
+      and much faster. You'll have to remember to limit the number of
+      allowable values if using a table -{} you could end up corrupting some
+      random bits of memory and the amount of space you need to ALCHP will go
+      up as a result of the table -{} check it after assembly to see how big it
+      is.
+
+Have fun and if you feel brave, Dilwyn wrote a SuperBasic version
+      of `The Towers Of Hanoi' some time back, why not convert that to
+      Assembly language:o)
+
+\section{Coming Up...}
+\label{ch13-the-end}%hyperlabel{ch13-the-end}%
+
+The next chapter takes a bit of a breather from all this hard work
+    writing code. In it, I'll discuss \emph{my} own personal
+    methods of writing code.
+

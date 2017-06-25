@@ -1,0 +1,17 @@
+digraph structs {
+    rankdir=LR
+    //label="EX With Lots Of Files";
+    pad="0.3";
+    //bgcolor=grey77;
+    node [shape=record fillcolor=yellowgreen style=filled];
+
+    structNameTable [label="Long Integer 2 | <long_1> Long Integer 1 "];
+
+    node [shape=record fillcolor=white style=filled];
+    "(A1,A6)" -> structNameTable:long_1;
+
+    //edge [style="dashed" dir=back];
+
+    //"Highest address" -> structNameTable:A5A6;
+    //"Lowest address" -> structNameTable:A3A6;
+}

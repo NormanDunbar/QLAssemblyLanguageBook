@@ -1,0 +1,168 @@
+\chapter{Program Development}
+
+\section{Introduction}
+\label{ch14-intro}%hyperlabel{ch14-intro}%
+
+In this chapter I'll be going through the way I tend to write my
+    assembly language (and indeed, all my other languages too) programming
+    from the initial thought to the `final completed' program. I put `final'
+    and `completed' in quotes because programs never ever reach that stage
+    there are always bugs to fix and improvements to be made.
+
+\section{Program Development in Assembly Language}
+\label{ch14-program-development}%hyperlabel{ch14-program-development}%
+
+Program development is the art of starting from nothing more than an
+    idea and progressing with various stages until the thought becomes
+    reality, or is discarded as unworkable.
+
+We don't all do things the same way, and assembly language
+    programming is no different -{} we all do it in a manner that is comfortable
+    for us. The following lets you have a brief glance into my own
+    methods.
+
+\subsection{The Initial Thought.}
+\label{ch14-initial-thought}%hyperlabel{ch14-initial-thought}%
+
+The initial idea for a program comes at the most inopportune
+      moments I have found. I've had `great' ideas at three in the morning, at
+      other times when I was in the bath reading a novel, while driving to
+      work and so on. The fact is, you never know when an idea will suddenly
+      appear, so be prepared and have a bit of paper and a pen handy -{} not
+      while driving of course -{} to jot down your ideas before they vanish from
+      memory forever.
+
+\subsection{Work It Out.}
+\label{ch14-work-it-out}%hyperlabel{ch14-work-it-out}%
+
+Sometimes, given a little thought, the initial idea is found to be
+      not so good after all and the project is abandoned there and then. Those
+      ideas that get through need to be fleshed out a little to see just how
+      good they are.
+
+If they get past this stage, we can start to jot down the basic
+      structure of our program. I personally tend to start with `the big idea'
+      and break it down into stages before breaking these down into smaller
+      stages and so on until I have a set of small (hopefully) self contained
+      routines at the bottom. This is top down development and used to be
+      quite popular.
+
+\subsection{Start Writing Code.}
+\label{ch14-start-coding}%hyperlabel{ch14-start-coding}%
+
+At this point, armed with your list of routines, you can begin to
+      write down your initial thoughts for the code you want to write to make
+      the 'big idea' come to fruition. Having all the routines broken down by
+      the previous stage, you know where repeated code can be extracted to a
+      sub-{}routine and so on.
+
+I tend to use a pencil to write code at this stage and arm myself
+      with a decent rubber (eraser for my American readers!) because mistakes
+      will be made. I also arm myself with three books:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Andy Pennell's QDOS manual.
+
+
+\item{}Andy Pennell's Assembly Language Programming book.
+
+
+\item{}My trusty copy of the Motorola MC68000/MC68008 Programmer's
+          Guide.
+
+\end{itemize}
+
+I also have a cheap narrow feint ruled A4 sized notepad to do my
+      coding on. I then let my brain run away with itself to see how many
+      different mistakes I can make in as short a time as possible.
+
+Even after all these years, I still write down assembly code that
+      just isn't legal syntax and this is sometimes `obvious' when I look over
+      the code, but usually I notice when George's trusty assembler (GWASL)
+      \program{Gwasl}complains about something in my code.
+
+As I produce code for one routine. I usually find myself needing
+      another, so I note it down on my list and carry on. This `stepwise
+      refinement' of my rough draft usually produces code that will be typed
+      in using my trusty \program{PFE - Programmers File Editor}PFE text editor. This isn't a QL program, it runs on
+      Windows, but I've used it form many years to write code and I prefer it.
+      It allows me to save code in Linux format -{} which just happens to be the
+      same as the QL's format and I like it.\footnote{Since that was originally written I've converted over to Linux.}
+
+Once I have the code typed into a file, it gets saved to my C:\textbackslash{} or
+      D:\textbackslash{} drive ready for import into \program{QPC}QPC. Within \program{QPC}QPC, my code files are
+      copied from the DOS\_ device to my RAM\_ disc and \program{Gwasl}GWASL is called into
+      action. It almost never assembles first time.
+
+QED\program{QED} is fired up and I make my changes to the RAM\_ version, saving
+      the file to DOS\_ as a backup. Once I have a code file that actually
+      assembles, I save the whole lot to WIN1\_SOURCE\_ and get ready to test it
+      all out.
+
+\subsection{Testing The Code.}
+\label{ch14-testing}%hyperlabel{ch14-testing}%
+
+I tend to look on the bright side of most things, and running my
+      own code is always fun. I simply EX the binary file and see what
+      happens. Usually, it's a crash or system lock-{}up and I have to reboot.
+      At least rebooting \program{QPC}QPC takes a lot less time that rebooting
+      Windows.
+
+So, I know that there is at least one bug in my code and so it's
+      bug hunting time again. After reloading, I run my next test with a code
+      listing and \program{JMON}\program{QMON}JMON/QMON to trace through the code.
+
+I wrote an article recently about debugging with \program{JMON}\program{QMON}JMON/QMON so I
+      wont go into great detail here. (See Appendix~\ref{debugging-with-qmon2}~\nameref{debugging-with-qmon2})
+
+Suffice to say, my initial trace starts
+      off with me single stepping up to each sub-{}routine call, then let each
+      sub-{}routine run as a single unit. This way, I tend to quickly find out
+      where my major problem lies.
+
+After another reboot -{} if required -{} I use the procedures outlined
+      in my \program{JMON}\program{QMON}JMON/QMON article (See Appendix~\ref{debugging-with-qmon2}~\nameref{debugging-with-qmon2}) to set a break point at the 'broken'
+      sub-{}routine, and I run the code to that point. From there on, I trace
+      the code one line at a time until I hit a sub-{}sub-{}routine and let that
+      run as a unit again. Once more, I quickly narrow my search for the main
+      problem down to a single (or a couple) of small bits of code.
+
+This code is then breakpointed and tested again, but in single
+      step mode all the way through.
+
+Eventually I either find the offending line(s) and fix them, or I
+      find out which conditional branch I've got the wrong way round -{} I have
+      been known to \opcode{BCC} when I should have used \opcode{BCS} and so on.
+
+The rest of the process is similar to the above. It may not be the
+      best in the world, but it works for me and I can quickly get debugged
+      code finished and start `tarting' it all up.
+
+To show how easy most of the above is, I am going to work through
+      a full example of `an idea' from initial rough draft onwards to the
+      finished code. I'm still working on this code at the moment and will not
+      be writing up the article until I'm finished. I shall be documenting the
+      process as I go and will write the article up from that.
+
+You will no doubt have read some of my rants and raves about the
+      Disassembler I'm writing as a project for this series. It has been
+      developed bit by bit without any of the above `discipline' so it has
+      suffered from an extremely large number of errors, some stupidity on my
+      part and a couple of rewrites in places. As I've said before, this is
+      not how I wanted to write the utility but I'm somewhat stuck with it
+      now. It shows how much better things are when you do it
+      properly.
+
+%Next time, we'll get down to the design and writing of a small (I
+%      hope) utility piece of code to make handling menus in your assembly
+%      language programs a bit easier and standardised. It's not going to be a
+%      world beater in programming excellence, but you'll see how I develop
+%      programs from start to finish.
+
+\section{Coming Up...}
+\label{ch14-the-end}%hyperlabel{ch14-the-end}%
+
+Coming up in the next chapter we have a discussion of problems with QDOSMSQ EXECable
+files being downloaded from the internet and how to best recreate the correct dataspace
+settings.
+

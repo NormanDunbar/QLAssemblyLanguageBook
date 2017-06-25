@@ -1,0 +1,188 @@
+\chapter{Creating and Using Libraries With GWASL}
+
+\section{Introduction}
+\label{ch30-intro}%hyperlabel{ch30-intro}%
+
+At the end of the last issue, I promised to continue looking at
+    Application Sub-{}Windows by adding some code to our menu enabled program.
+    Unfortunately, due to the current very busy situation at work, and a mild
+    dose of tendonitis in my thumb, I'm having to do a lot of one-{}handed
+    typing these days which is slowing me down a lot. To this end, I'm taking
+    a break from application menus for a wee while, and this issue, my article
+    will be small -{} but hopefully, perfectly formed -{} looking at how we can
+    create and use our own libraries of useful routines with
+ GWASL\program{Gwasl}.
+
+\section{The Library Code}
+\label{ch30-app-menu-code}%hyperlabel{ch30-app-menu-code}%
+
+The following is the complete code for a small library that allows
+    your own assembly code to clear various parts of the screen. I apologise
+    for the briefness of this article, but as I said, I'm typing one handed at
+    the moment.
+
+The code should be typed into a file named
+ lib\_cls\_asm or something similar.
+
+\begin{lstlisting}[firstnumber=1,caption={Example Library - Lib\_cls\_asm},label={lst:LibClsAsm}]
+;=========================================================;
+; lib_cls_asm.                                            ;
+;=========================================================;
+; A small library to demonstrate the use of same in GWASL ;
+; It's not particularly useful, it only demonstrates a    ;
+; point!                                                  ;
+;=========================================================;
+; All routines expect the channel id in A0.L.             ;
+; All routines assume infinite timeout.                   ;
+; All regsiters are preserved, except D0.L.               ;
+; Error codes are returned in D0.L and the Z flag.        ;
+;=========================================================;
+
+cls_screen equ $20
+cls_top    equ $21
+cls_bottom equ $22
+cls_line   equ $23
+cls_end    equ $24
+
+infinity   equ -1
+
+;---------------------------------------------------------
+; CLEAR_SCREEN - Clears entire screen.                    
+;---------------------------------------------------------
+clear_screen  moveq #cls_screen,d0
+              bra.s just_do_it
+
+;---------------------------------------------------------
+; CLEAR_TOP - Clears top of screen.                       
+;---------------------------------------------------------
+clear_top     moveq #cls_top,d0
+              bra.s just_do_it
+
+;---------------------------------------------------------
+; CLEAR_BOTTOM - Clears bottom of screen.                 
+;---------------------------------------------------------
+clear_bottom  moveq #cls_bottom,d0
+              bra.s just_do_it
+
+;---------------------------------------------------------
+; CLEAR_TO_EOL - Clear to end of cursor line.             
+;---------------------------------------------------------
+clear_to_eol  moveq #cls_end,d0
+              bra.s just_do_it
+
+;---------------------------------------------------------
+; CLEAR_LINE - Clears entire cursor line.                 
+;---------------------------------------------------------
+clear_line    moveq #cls_line,d0
+
+just_do_it    movem.l d1/d3/a1,-(a7)
+              moveq #infinity,d3
+              trap #3
+              movem.l (a7)+,d1/d3/a1
+              tst.l d0
+              rts
+\end{lstlisting}
+
+So, you can see that there's not much to it. 
+
+That's the end of step one. The next step is to assemble the file
+    using GWASL\program{Gwasl} in the normal manner, fix any
+    errors, and create an output file most likely named
+ lib\_cls\_bin. In addition to the binary file, there
+    will be another symbol file named lib\_cls\_sym     created. We need that file shortly, however, it isn't in a format we can
+    use just yet.
+
+Once all errors have been removed and the source assembled, we are
+    ready to move onto creating our library. In actual fact, half of the
+    library is already created -{} lib\_cls\_bin -{} but we
+    need to convert the symbol file into a text file that we can include in
+    our own source code in order to actually call the routines in the
+    library.
+
+Execute the utility named sym\_bin\program{Sym\_bin} in your
+    gwasl directory. The layout of the screen should look pretty familiar if
+    you have used GWASL\program{Gwasl} frequently. Choose option 1
+    as normal, and type in the path to the lib\_cls\_sym file.
+
+After a couple of seconds, you can choose the option to exit. Our
+    work is done!
+
+Sym\_bin\program{Sym\_bin} has taken the binary formatted
+ lib\_cls\_sym file and created from it a new text file
+    names lib\_cls\_sym\_lst. If you open this in an editor,
+    it will look something like the following:
+
+\begin{lstlisting}[firstnumber=1,caption={Example Library - Lib\_cls\_sym\_lst},label={lst:LibClsSymLst},language={}]
+CLS_SCREEN    EQU   $00000020
+CLS_TOP       EQU   $00000021
+CLS_BOTTOM    EQU   $00000022
+CLS_LINE      EQU   $00000023
+CLS_END       EQU   $00000024
+INFINITY      EQU   $FFFFFFFF
+
+CLEAR_SCREEN  EQU   *+$00000000
+JUST_DO_IT    EQU   *+$00000012
+CLEAR_TOP     EQU   *+$00000004
+CLEAR_BOTTOM  EQU   *+$00000008
+CLEAR_TO_EOL  EQU   *+$0000000C
+CLEAR_LINE    EQU   *+$00000010
+\end{lstlisting}
+
+You can see that all the equates defined in our source code have
+    been made visible as well as offsets to the various routines. These
+    offsets are the actual addresses within the
+ lib\_cls\_bin file where the individual routines start.
+ 
+
+It would be nice if there was some way for equates etc within a
+    library to be invisible from outside it without us having to do too much
+    extra work, however, as far as I'm aware, it's not possible to define an
+    equate as `local' -{} similar to SuperBasic. What we can do is delete the
+    top few lines leaving only the offsets to the routines. Edit the file to
+    delete the lines from CLS\_SCREEN down to INFINITY. 
+
+Next, create a new file containing these two lines, call it
+ lib\_cls\_in:
+
+\begin{lstlisting}[firstnumber=1,caption={Example Library - Lib\_cls\_in},label={lst:LibClsIn}]
+              in    win1_gwasl_libs_lib_cls_sym_lst
+              lib   win1_gwasl_libs_lib_cls_bin 
+\end{lstlisting}
+
+And that's all there is to it. To use the code simply include the
+    following at the end of your own assembly code: 
+
+\begin{lstlisting}[firstnumber=1,caption={Example Library - Invoking the Library},label={lst:LibClsInvoke}]
+              in    win1_gwasl_libs_lib_cls_in
+\end{lstlisting}
+
+Obviously, your paths will be different from mine, so change
+    accordingly to suit your own system. 
+
+I have combined the IN and the LIB commands into one single file
+    because I like to do as little typing as possible. You need not do this
+    and to use the library, simply add the two lines above into the end of
+    your own code at some point.
+
+To demonstrate the code, all you need is something like this. Not
+    shown in this example are other libraries that I use to set colours, open
+    screens etc. 
+
+\begin{lstlisting}[firstnumber=1,caption={Example Library - Brief Example of Use},label={lst:LibClsExampleUse}]
+start         bsr   open_scr       ; Open scr_ channel return id in A0
+              bsr   set_colours    ; Set paper, strip and ink preserves
+;                                  ; all registers except D0.L
+              bsr   clear_screen   ; Clear screen  
+              ...                  ; Etc
+
+              in  win1_gwasl_libs_lib_cls_in
+              in  win1_gwasl_libs_lib_defaults_in
+              in  win1_gwasl_libs_lib_colours_in
+\end{lstlisting}
+
+\section{End Of Chapter 30}
+\label{ch30-the-end}%hyperlabel{ch30-the-end}%
+
+In the next chapter I'll continue where I left off at the end of the previous chapter. I shall also be
+    looking at the recent changes to EasyPEasy\program{EasyPEasy}.
+

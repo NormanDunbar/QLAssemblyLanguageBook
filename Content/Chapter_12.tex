@@ -1,0 +1,275 @@
+\chapter{Doubly Linked Lists Demo Code}
+\index{Linked Lists!Double Link - Demo Code}
+
+\section{Introduction}
+\label{ch12-intro}%hyperlabel{ch12-intro}%
+
+The following code demonstrates the use of doubly linked lists. It
+    should be slotted into the test harness code wrapper from Chapter 10 at the
+    appropriate place. It cannot be assembled as it stands -{} it needs to be
+    part of the test harness.
+
+\section{How Does The Code Work?}
+\label{ch12-double-code}%hyperlabel{ch12-double-code}%
+
+Much of the demo code is identical to last time, so I'll save some space and
+paper by only showing you routines that are changed or new ones that were added.
+
+As with the SingleList demo, the code is a small example of creating and navigating a
+linked list. The demo starts by creating a list of 5 nodes, each holding one long word
+of data being simply the node number 0 to 4. Each node is linked to the one after it and
+to the one before it.
+
+The list contents are then printed on the screen showing the node address, the prior
+pointer, the next pointer and the data stored in that node. Once this is done, the node
+with data contents of 3 is located and deleted prior to the new list being printed out
+again. Sounds very familiar doesn't it?
+
+I've had to trim the informational part of the screen output for each node to accommodate
+the extra address in the PRIOR pointer and to make sure that it all fits on one screen
+line.
+
+As with the demo code for singly linked lists, I'm not physically deleting the allocated
+heap areas used for each node. This reduces the amount of code that appears in the
+magazine and reduces the need to chop down a few more trees. However, bear in mind that
+if you create programs which don't delete the heap areas when a node is deleted, that
+your memory usage will remain high throughout the run of the program.
+
+In my case, this is a small demo and QDOSMSQ does the tidying up for me at the end of the
+demo.
+
+\begin{note}
+In the following descriptions of changes to the existing demo code for single linked lists, all of the line numbers shown or mentioned, refer to the original line numbers in the demo code for single linked lists from the previous chapter.
+
+Where code is being added, the first line number shown is where I have inserted it into my version of the demo code. Your mileage may vary - as \emph{they} say!
+\end{note}
+
+The first part of the code which has changed is the definition of the root node at line 24. In the single linked list, this was a single long word initialised to zero. In this demo we have a pair of long words initialised to zero. To make life easier, we also define a number of equates for use throughout the remainder of the code.
+
+The root node must now be initialised to zero in both its NEXT and PRIOR areas as outlined
+in the original article. This is the pointer we will be loading into A0 quite often in
+the demo and it holds the address of the first node in the list. At present, there is no
+list, so the contents are set to zero to indicate the very end of the list. The PRIOR
+pointer will always be zero because there is never a previous node to the root.
+
+\begin{note}
+So, effectively, I could have simply left the root node identical to that of the single linked list demo, if there's no need to hold a PRIOR address, we don't need a PRIOR pointer storage area.
+
+However, read any book on linked lists in almost any language, and you will note that the root node is simply a normal node, without any use of its PRIOR pointer. Some books do use the PRIOR pointer, to point at the final node in the list, but that can lead to runaway code if there's no way to detect the end node. Especially when the last node's NEXT pointer points to the root node!
+\end{note}
+
+\begin{lstlisting}[firstnumber=24,caption={Doubly Linked List - Demo Code - Root Node}]
+*---------------------------------------------------------------------
+* A location to hold a single long word pointing to the first `real'
+* node in our linked list. This must be initialized to zero.
+*---------------------------------------------------------------------
+RootNode   dc.l    0,0             ; Root node with 2 pointers.
+
+NodeSize   equ     12              ; Node size in bytes
+Next       equ     0               ; Offset to NEXT pointer
+Prior      equ     4               ; Offset to PRIOR pointer
+NData      equ     8               ; Offset to the node's data
+\end{lstlisting}
+
+The code in BuildList (line 29 onwards) has been changed slightly too. In the single list version, the offsets were hard coded as numbers. This isn't very clever -{} if you change the offsets at any future point, you have to find all the places where the numbers are hard coded. In the new version, I use equates instead of hard coded values. This way, if I change my node structure, I only have to change the equates once.
+
+\begin{lstlisting}[firstnumber=29,caption={Doubly Linked List - Demo Code - Build List}]
+*---------------------------------------------------------------------
+* Build a list of 5 nodes each holding a long word of data.
+*---------------------------------------------------------------------
+BuildList  lea     RootNode,a0     ; Root node address
+           moveq   #4,d7           ; 5 nodes to create
+           moveq   #NodeSize,d1    ; Each node is 12 bytes long
+
+BuildLoop  bsr.s   BuildNode       ; Create node, address in A1.L
+           bne     all_done        ; Just die on errors
+           move.l  d7,NData(a1)    ; Store data value
+           bsr.s   AddNode         ; Add to list
+           dbra    d7,BuildLoop    ; Do the rest
+           rts                     ; Done
+\end{lstlisting}
+
+AddNode has been changed to cater for the doubly linked list by initialising the NEXT
+and PRIOR pointers in the new node and in the root node, then checking if there was
+already any nodes in the list. If there were any nodes, the previous `first' node in
+the list (ie, the most recent one added) needs to have its PRIOR pointer set to be our
+brand new node. This is done by loading A0 with the new node's NEXT pointer and testing
+that for zero, if the new node has no NEXT address, it can only be the very first node
+in the list.
+
+We initialise as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}NEXT(Root) copied to NEXT(NewNode)
+
+
+\item{}Root address copied to PRIOR(NewNode)
+
+
+\item{}NewNode address copied to NEXT(Root)
+
+\end{itemize}
+
+If this is not the very first node in the list then:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Get address of NEXT(NewNode)
+
+
+\item{}NewNode address copied to PRIOR(NextNode).
+
+\end{itemize}
+
+\begin{lstlisting}[firstnumber=43,caption={Doubly Linked List - Demo Code - Add Node}]
+*---------------------------------------------------------------------
+* AddNode - Adds a new node to a list. See text for details.
+*
+* Entry: A0.L = root node address, A1.L = New node address.
+* Exit :Preserves all registers, no error codes returned.
+*---------------------------------------------------------------------
+AddNode    cmpa.l  a0,a1           ; Don't add the root node again
+           beq.s   AddExit         ; Bale out quietly if attempted
+           move.l (a0),(a1)        ; Save first node in node's NEXT 
+           move.l  a0,Prior(a1)    ; Set the new node's PRIOR
+           move.l  a1,(a0)         ; Store address of node in root
+           cmpa.l  #0,(a1)         ; First ever node?
+           beq.s   AddExit         ; Yes. Exit with Z set
+           move.l  a0,-(a7)        ; Preserve root node pointer
+           move.l  (a1),a0         ; A0 = addr of previous first node
+           move.l  a1,prior(a0)    ; Set PRIOR to our new node
+           move.l  (a7)+,a0        ; Restore root node pointer
+AddExit    rts
+\end{lstlisting}
+
+The ShowNode code is the next part that has changed. It has had a couple of lines added
+to call a new routine -{} ShowPrior -{} which, as its name suggests, displays the address of
+the PRIOR pointer for the node being displayed on screen.
+
+\begin{warning}
+The line \lstinline{BSR.S ShowNext} must also be changed to remove the `.S' from the \opcode{BSR} instruction. We've slipped out of range of a short jump now, so you'll get an error message `Number Too Big' if you don't.
+\end{warning}
+
+\begin{lstlisting}[firstnumber=82,caption={Doubly Linked List - Demo Code - Show Node}]
+*---------------------------------------------------------------------
+* Display the details of a single node in the linked list.
+* On entry A0 = the node address.
+*---------------------------------------------------------------------
+ShowNode    move.l a0,a5           ; The node address
+            move.l con_id2(a4),a0  ; The channel address
+            move.l a5,d4           ; The node address
+            bsr.s  ShowAddr        ; Print node address
+            move.l (a5),d4         ; The NEXT pointer
+            bsr    ShowNext        ; Print NEXT pointer
+            move.l Prior(a5),d4    ; The PRIOR pointer
+            bsr.s  ShowPrior       ; Print PRIOR pointer
+            move.l NData(a5),d4    ; The node data
+            bsr    ShowData        ; Print the data
+            rts
+\end{lstlisting}
+
+In addition, I've abbreviated the message printed by ShowAddr to the following:
+
+\begin{lstlisting}[firstnumber=129,caption={Changes to MsgAddr Text Data}]
+MsgAddr    dc.w    AddrEnd-MsgAddr-2
+           dc.b    linefeed,'Node addr: '
+AddrEnd    equ     *
+\end{lstlisting}
+
+The following short routine should be added just above ShowNext (currently at line 149 onwards) in the original code. It is called by ShowNode to display the address in a node's PRIOR pointer.
+
+\begin{lstlisting}[firstnumber=149,caption={Doubly Linked List - Demo Code - Show Prior Address}]
+*---------------------------------------------------------------------
+* Display the node's PRIOR address in memory.
+* On entry D4 = the node's PRIOR pointer.
+*---------------------------------------------------------------------
+ShowPrior  lea     MsgPrior,a1     ; Our prompt
+           bra.s   ShowPrompt      ; Print it
+
+MsgPrior   dc.w    PriorEnd-MsgPrior-2
+           dc.b    '  PRIOR: '
+PriorEnd   equ     *
+\end{lstlisting}
+
+The code in the ShowNext and ShowData routines hasn't changed, but the messages they
+display have. I needed to shorten the text to get everything on screen in one line per
+node. Please make the following changes at original lines 156 and 167:
+
+\begin{lstlisting}[firstnumber=156,caption={Changes to MsgNext Text Data}]
+MsgNext    dc.w    NextEnd-MsgNext-2
+           dc.b    '  NEXT: '
+NextEnd    equ     *
+\end{lstlisting}
+
+
+\begin{lstlisting}[firstnumber=167,caption={Changes to MsgData Text Data}]
+MsgData    dc.w    DataEnd-MsgData-2
+           dc.b    '  Data: '
+DataEnd    equ     *
+\end{lstlisting}
+
+The code in DelANode has been reduced quite dramatically to the following. As before we
+don't allow deletion of the root node itself and exit quietly if any attempt is made to
+do so.
+
+Next we check to ensure that we actually have a list to delete from. If the root
+node's NEXT pointer is still zero, we have no nodes in the list and again, we exit
+quietly. In both these exit situations, we clear the Z flag to indicate a node not
+deleted error.
+
+Deleting the node from the list (but, as before, not from memory) is actually quite
+simple. As A1 points to the node to be deleted we can find the node before it from the
+PRIOR(a1) address, and the node after it by the NEXT(A1) address. All we do to delete the
+node from the list is set the prior node's NEXT address to the current value in the
+deleted node's NEXT address and then set the next node's PRIOR address to the PRIOR
+address of the deleted node.
+
+However, if we are deleting the very last node in the list, we must not attempt to
+change the (non-{}existent) next node's pointers as we may well end up writing to random
+locations in memory. In the last node, the NEXT pointer is always zero.
+
+\begin{lstlisting}[firstnumber=232,caption={Doubly Linked List - Demo Code - Deleting A Node}]
+*---------------------------------------------------------------------
+* Routine to delete a node with the address passed in A1.L from the
+* list with the address passed in A0.L. On exit, Z flag will be set if
+* the node was deleted, or cleared if not.
+* Trashes A0 and D0 on exit.
+*---------------------------------------------------------------------
+DelANode    moveq   #oops,d0       ; Assume it's going to fail
+            cmpa.l  a1,a0          ; Trying to delete the rootnode?
+            beq.s   DelExit        ; Exit if so.
+
+DelList     cmpi.l  #0,(a0)        ; Empty list?
+            beq.s   DelExit        ; Yes. Exit not found
+            move.l  Prior(a1),a0   ; A0 = node before the 'deleted' one
+            move.l  (a1),(a0)      ; Prior's NEXT = deleted node's NEXT
+*                                  ; thus deleting the node from the
+*                                  ; NEXT chain through the list.
+            cmpi.l  #0,(a1)        ; Deleting final node in list?
+            beq.s   DelDone        ; Yes, nothing more to do
+            move.l  (a1),a0        ; A0 = deleted node's NEXT
+            move.l  Prior(a1),Prior(a0) ; Next's PRIOR = deleted node's
+*                                  ; PRIOR thus deleting the node
+*                                  ; from the PRIOR chain.
+DelDone     moveq   #0,d0          ; Indicate node deleted successfully
+
+DelExit     tst.l   d0             ; Set or clear Z flag
+            rts
+
+* =====================================================================
+* The DEMO code ends here.
+* =====================================================================
+\end{lstlisting}
+
+And that is all the changes you have to make. The DoubleList demo code should be
+assembled and run in the normal fashion. You'll be able to see that there are indeed 5
+nodes in the list (in the BEFORE section at the top of the screen) then under that, the
+AFTER section shows a missing node with data content 3 -{} we have deleted it from the
+list.
+
+\section{Coming Up...}
+\label{ch12-the-end}%hyperlabel{ch12-the-end}%
+
+In the next chapter we'll stray a little into some territory that I have never
+    seen demonstrated in assembly language programming for the QL, I'm talking
+    of recursive routines. Until then, keep your stack untangled! 
+

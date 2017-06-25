@@ -1,0 +1,471 @@
+\chapter{QL Assembly Language Programming}
+
+\section{Introduction}
+\label{ch1-intro}%\hyperlabel{ch1-intro}%
+
+Assembly language is very, very simple.
+
+Not many people will agree at first, but if you think about it, it
+    is. You have to tell the processor what you want it to do in very simple
+    steps. In SuperBasic, you can multiply two numbers together easily -{} you
+    can do it almost as easily in machine code too.
+
+This series of articles is intended to let you in on the basic
+    secrets of programming your QL in its own natural language -{} machine code
+    or assembly language. (Actually, machine code is what the QL talks, we use
+    assembly language which is `English' sounding `words' that get converted
+    to machine code by an assembler -{} I will tend to use the two terms as
+    one.) To talk directly to the QL, you must learn its language. This series
+    should hopefully teach you how to do just that.
+
+I make no assumptions about how much or how little you may already
+    know -{} I will start very simple and continue from there. Hopefully you
+    will have an assembler, but if not, see below!
+
+I was going to base the series on George Gwilt's
+ GWASS\program{Gwass} assembler, which is free and can be
+    distributed easily. Unfortunately, it won't run on anything less than a
+    68020 which is no good for those of us who are still running on an
+    original QL. George, however, has supplied another of his assemblers, 
+ GWASL\program{Gwasl} for use in the series. Thanks George.
+
+Most assembly language books tend to give little example programs as
+    they go along to try to show the bits of the instruction set that you have
+    just learned about. I will attempt to do likewise.
+
+\section{The 6800x Processor}
+\label{ch1-6800x}%S\hyperlabel{ch1-6800x}%
+
+The processor we are programming is one of Motorola's 68000 series.
+    Be it a 68008 or a 68060 (if you are lucky) all of them have the same
+    basic instruction set, although some of the more powerful processors have
+    additional instructions. Partly because we have to cater for those on an
+    original QL but mostly because I don't have a clue about these additional
+    instructions, we will be dealing with the basic instruction set -{} there is
+    enough there to keep us happy for a while. Inside the processor there are
+    a few different parts, but we are only concerned with the registers -{} the
+    rest just does the work and puts the results somewhere, setting a few
+    flags along the way. Talking of flags, we will also take a look at the
+    status register -{} a very important part of programming.
+
+\subsection{Registers}
+
+Registers are where numbers get loaded into, manipulated and
+      written out from. Some instructions operate directly on memory
+      locations, but to all intents and purposes, memory is just another
+      register but outside of the processor and a lot slower. The 68000 -{}
+      which is the term I shall use from now on to describe the entire family
+      of processors -{} has different types of registers -{} data, address, status
+      and program counter. Data held in registers and in memory is held in
+      High Order format. This simply means that the numbers are stored in a
+      similar manner to the way in which we would expect them to be -{} the
+      `rightmost' end holds the most significant bit and the `leftmost' the
+      lowest -{} just the way we write numbers down.
+
+\subsection{Data Registers}
+
+There are 8 data registers named D0 to D7 and these can be used to
+      perform manipulations on the numbers that are held in them. Each
+      register can hold 32 bits of information. (A bit is a single binary
+      digit -{} basically a one or a zero). What these bits actually represent
+      depends on the program running at the time. Data registers are normally
+      used for manipulating data in the form of bytes, words and long words -{}
+      these being 8, 16 and 32 bits long respectively.
+
+\subsection{Address Registers}
+
+There are 9 address registers named A0 to A7. A7 is sometimes
+      known as the stack pointer or SP register. What about the other address
+      register then? The ninth address register is a duplicate of A7 and is
+      the SSP or Supervisor Stack Pointer. When coding the chip, you only have
+      access to 8 address registers at any one time -{} you are either using the
+      SP or SSP version of A7 but never both at the same time.
+
+Address registers are normally used to hold memory addresses,
+      stack pointers etc and cannot be used for byte sized
+      manipulations.
+
+\subsection{Status Register}\mc6800x{Status Register}\mc6800x{Flags}
+
+The status register holds a list of flags to tell the processor
+      what is happening or has happened internally. The status register is a
+      16 bit register in two 8 bit halves. The user byte is held in bits 0 to
+      7 ( the lowest end) and the system byte is held in the upper half or
+      bits 8 to 15. The layout of the system byte is shown in Figure~\ref{fig:StatusRegisterSystemByte}.
+
+
+\begin{figure}[h]
+\centering
+\begin{tabular}{|r|c|c|c|c|c|c|c|}
+\hline
+Bit 15 & 14 & 13 & 12  & 11 & 10 & 9 & 8 \\
+\hline
+T & & S & & & I & I & I \\
+\hline
+\end{tabular}
+
+\caption{Status Register -{} System Byte.}\mc6800x{Status Register!System Byte}
+\label{fig:StatusRegisterSystemByte}
+\end{figure}
+
+\begin{itemize}[itemsep=0pt]
+
+\item{}Bit 15, `T' is the trace flag -{} this defines whether the
+            processor is in `single step' mode or running normally. If set to
+            1, the processor is tracing and if 0, is running normally. In
+            trace mode the processor `stops' after each instruction has been
+            executed and jumps to the Trace exception routine. Exceptions are
+            covered later in the series.
+
+
+\item{}Bit 13, `S' is the supervisor flag -{} this defines whether
+            the code being executed is running in user or supervisor mode. If
+            set, the processor is in supervisor mode otherwise it is in user
+            mode.
+
+
+\item{}Bits 10, 9 and 8, `III' is the interrupt mask and represents
+            a value between 0 and 7 and indicates which of the seven interrupt
+            levels are enabled. 
+
+\item{}The other bits in the system byte are not used.
+
+\end{itemize}
+
+\begin{figure}[h]
+\centering
+\begin{tabular}{|r|c|c|c|c|c|c|c|}
+\hline
+Bit 7 & 6 & 5 & 4  & 3 & 2 & 1 & 0 \\
+\hline
+ & & & X & N & Z & V & C \\
+\hline
+\end{tabular}
+
+\caption{Status Register -{} User Byte.}\mc6800x{Status Register!User Byte}
+\label{fig:StatusRegisterUserByte}
+\end{figure}
+The user byte contains the 5 condition
+        code flags which are set or reset by certain instructions and then
+        used by arithmetic or comparison instructions. The are used to tell
+        later parts of a program what happened recently. The program can
+        adjust its operations to suit. Figure~\ref{fig:StatusRegisterUserByte} shows the layout of the user byte, the various flag bits are:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Bit 4, `X' is the extended flag. Which is very similar to
+            the `C' flag bit but is affected by fewer instructions than `C'
+            is. This is used when carrying out very large sized arithmetic
+            instructions -{} such as 64 bit adds, for example. When affected it
+            is set exactly like the `C' flag.
+
+
+\item{}Bit 3, `N' is the negative flag. It gets set to 1 if the
+            last instruction created a negative number.
+
+
+\item{}Bit 2, `Z' is the zero flag and is set to 1 if the last
+            instruction generated a result of zero.
+
+
+\item{}Bit 1, `V' is the overflow flag and is set to 1 if the last
+            instruction generated an overflow during 2's complement
+            arithmetic. See later for details.
+
+
+\item{}Bit 0, `C' is the carry or borrow flag. And is used when a
+            subtraction operation is carried out -{} be it an actual subtraction
+            or an implied one.
+
+\item{}The other bits in the user byte are not used.
+
+ \end{itemize}
+
+The flags are used by the branch on condition (\opcode{Bcc})
+        instructions, the Decrement and branch (\opcode{DBcc}) instructions or the Set
+        (\opcode{Scc}) instructions. These will be explained later.
+
+\subsection{The Program Counter}\mc6800x{Program Counter}
+
+The program counter does just that, it keeps track of where
+      exactly the processor is within a program. The program counter always
+      points to the address in memory of the next instruction to be executed.
+      The program counter can of course be changed by a \opcode{JMP} (jump) instruction
+      or a \opcode{BRA} (branch) but it is always ready with the next instruction to be
+      executed.
+
+\section{Addressing Modes}
+\label{ch1-addressing}%\hyperlabel{ch1-addressing}%
+
+The 68000 has a large number of addressing modes and these can often
+    become overwhelming to a new machine code programmer -{} I know. It takes
+    some time to understand each and every mode, what it does and why it is
+    used. Having said that, you do not need to remember all of their names,
+    just what they look like in source code and of course, what they
+    do.
+
+From here on, you need to be aware that numbers may be in decimal
+    format or hexadecimal. All hexadecimal numbers are prefixed with the
+    dollar sign (\$) and wherever this is seen in front of a number (or in some
+    cases, what appears to be a word) will be a hexadecimal number. (I will
+    assume that you are familiar with hex.) A couple of examples of
+    hexadecimal numbers are:
+
+\begin{lstlisting}[frame=none,numbers=none]
+$100
+$C0FFEE
+\end{lstlisting}
+
+which are equivalent to 256 and 12,648,430 respectively.
+
+Without any further hesitation, lets dive right in with the
+    addressing modes ...
+
+\subsection{Register Direct}\address{Register Direct}
+
+This is an easy one to start off with. Register direct addressing
+      mode simply means that both the source and the destination in the
+      instruction are registers either data, address or a mixture of
+      both.
+
+Simple examples are:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVE.L    A2,D1
+          MOVE.W    D0,D1
+          MOVE.L    A1,A3 
+\end{lstlisting}
+
+These simply move (actually, they copy) data between various
+      registers. The full meaning of the actual instructions will be described
+      later on.
+
+\subsection{Absolute}\address{Absolute}
+
+In this mode, the operand of the instruction is simply a memory
+      address. This is also quite simple. For example to `zeroise' the
+      contents of the first byte of screen memory (assuming a standard QL and
+      this is the last time that I will assume anything!)
+
+\begin{lstlisting}[firstnumber=1,]
+          CLR.B    $20000  
+\end{lstlisting}
+
+There are two variations to this mode, absolute short and absolute
+      long. If the address given is a 16 bit word (ie 0 to 7FFF hex or 32767
+      decimal) then it refers to addresses in the first 32K of memory. If the
+      address given is 8000 hex or 32768 decimal and upwards it refers to
+      address FFFF8000 and upwards due to sign extension of the address word.
+      This is absolute short, best used for addresses of 0 to 7FFF hex only -{}
+      to avoid confusion.
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVE.L    $1000,D1    get a long from address $1000
+          MOVE.L    $9000,D1    get a long from address $FFFF9000  
+\end{lstlisting}
+
+The other variation is absolute long, in this case, the address
+      given is a full 32 bits long and refers to the actual address in memory
+      -{} there is no ambiguity with absolute long. \lstinline{MOVE.L $123456,D1} -{} gets the
+      long word at address \$123456.
+
+\subsection{Relative}\address{Relative}
+
+This mode will probably be the most used with QL programs as all
+      code should be relocatable. This means that it never assumes that it is
+      running at a specific location in memory. Some early QL programs were
+      written to run at a specific location in memory and this caused no end
+      of problems when memory expansions became available. I think Psion chess
+      was one of the guilty ones.
+
+However, relative addressing simply means, relative to where the
+      program counter is. The program counter is always pointing at the
+      address of the instruction in memory after the current one. An example
+      of relative addressing is this small loop and the jump back to the start
+      of the loop:
+
+\begin{lstlisting}[firstnumber=1,]
+Start    MOVEQ #1000,D0
+Loop     SUBQ #1,D0
+         BNE.S Loop(PC)  
+\end{lstlisting}
+
+This is a small and totally useless fragment of code. The relative
+      address mode is in the \lstinline{BNE.S LOOP(PC)} instruction -{} it says -{} branch to
+      the label called `loop', relative to where the program counter is
+      currently pointing, if the result of the subtraction was not zero. The
+      jump is specified in the code as a negative number, not the actual
+      address of where the label `loop' is at.
+
+This negative number (in the example above) is how many bytes are
+      to be added to the program counter to get the address of the next
+      instruction to be executed. The jump can be forwards as well as
+      backwards.
+
+Using relative addressing means that the program can be loaded
+      anywhere in memory and still work. If absolute addressing was used, the
+      program would always have to be loaded at the same address if a crash
+      was to be avoided. The example above is the equivalent of the following
+      SuperBasic code:
+
+\begin{lstlisting}[firstnumber=1,language={[Visual]Basic}]
+1000 REMark Start
+1010 LET D0 = 1000
+1020 REMark Loop
+1030 LET D0 = D0 - 1
+1040 IF D0 <> 0 THEN GOTO (1040 - 10)
+\end{lstlisting}
+
+\begin{note}
+Because of the slightly different way that assembler works, the
+        calculation of the destination line is not quite accurate. When the
+        \opcode{BNE.S} instruction is being executed, the program counter is already
+        set to the following instruction. In the SuperBasic example above, the
+        subtraction of 10 from 1040 should really be 20 from 1050. However, it
+        shall remain as above for now.
+\end{note}
+
+\subsection{Address Register Indirect}\address{Address Register Indirect}
+
+This mode is called `indirect' because the address register in
+      question is not the operand in the instruction. It simply serves as a
+      pointer to the operand. In an earlier example we cleared out the first
+      byte of screen memory by using absolute addressing like this:
+
+\begin{lstlisting}[firstnumber=1,]
+          CLR.B    $20000 
+\end{lstlisting}
+
+This instruction could have been carried out using address
+      register indirect mode as follows:
+
+\begin{lstlisting}[firstnumber=1,]
+          MOVEA.L    #$20000,A1
+          CLR.B      (A1) 
+\end{lstlisting}
+
+All that this is doing is setting address register A1 with the
+      value 131072 (decimal) which is 20000 (hexadecimal). It then clears out
+      the first byte at that address. This is the same as this SuperBasic
+      example:
+
+\begin{lstlisting}[firstnumber=1,language={[Visual]Basic}]
+1000 LET A1 = 131072
+1020 POKE A1,0 
+\end{lstlisting}
+
+The register's name is put in between a pair of brackets to
+      signify that it is the memory address held in the register that will be
+      acted upon and not the register itself.
+
+\subsection{Register Indirect With Displacement}\address{Register Indirect With Displacement}
+
+This mode is similar to the above, except that a displacement is
+      added or subtracted from the address register to give the final address
+      to be operated upon. Using the above example again, we can zeroise the
+      first 4 byes of screen memory as follows: 
+\begin{lstlisting}[firstnumber=1,]
+          MOVEA.L    #$20000,A1
+          CLR.W      (A1)
+          CLR.W      2(A1) 
+\end{lstlisting}
+
+
+This time we use word sized operations, these simply affect 16
+      bits instead of 8 as with the byte sized operations. The displacement is
+      the number outside of the brackets and it is added to the address
+      registers contents to create the address to be operated upon. The
+      displacement can be any signed number that will fit into 16 bits.
+      (-{}32768 to +32767)
+
+\subsection{Register Indirect With Displacement And Index}\address{Register Indirect With Displacement And Index}
+
+It's starting to get complicated now. This is another mode where
+      we have an address register and a displacement to consider, but this
+      time we have an index as well. In this case the displacement has been
+      reduced to 8 bits only giving a range of -{}128 to +127. The format of
+      this addressing mode is:
+
+\begin{lstlisting}[firstnumber=1,]
+          CLR.W    2(A2,A0.L)
+\end{lstlisting}
+
+The contents of A2 is added to A0 to get the first address then
+      the displacement is added to give the final result. The 16 bits of
+      memory at the final address is cleared out. (Like POKE\_W A2 + A0 + 2,
+      0). In this case the entire 32 bit value of A0 is added to A2, this is
+      indicated by the `.L' after the second register -{} the index.
+
+If the suffix had been omitted or was `.W' (which is the default
+      if omitted) then the lower 16 bits of A0 would have been used instead of
+      the whole 32. Take note that the 16 bits will be `sign extended' to a
+      full 32 bits and this can have unpleasant side effects if the value in
+      bit 15 is a 1 as this will cause a negative index to be generated. There
+      will be more on sign extension later.
+
+The first register specified is always treated as 32 bit (.L) and
+      does not require a `.L' suffix -{} most, if not all, assemblers will
+      reject it anyway.
+
+\subsection{Register Indirect With Pre Decrement Or Post Increment}\address{Register Indirect With Pre Decrement Or Post Increment}
+
+These addressing modes are used for stack operations, usually. The
+      format of the pre-{}decrement instruction is: 
+\begin{lstlisting}[firstnumber=1,]
+          MOVE.L    D0,-(A7) 
+\end{lstlisting}
+       And for post-{}increment it is: 
+\begin{lstlisting}[firstnumber=1,]
+          MOVE.L    (A7)+,D0 
+\end{lstlisting}
+
+
+The actions carried out are as follows for pre-{}decrement: The
+      value in A7 is decremented (reduced) by the size of the data to be
+      stored (byte, word or long) then the contents of D0 are stored at the
+      location pointed to by A7. In SuperBasic this equates to the following
+      code fragment: 
+\begin{lstlisting}[firstnumber=1,language={[Visual]Basic}]
+1000 LET A7 = A7 - 4
+1010 POKE_L A7, D0 
+\end{lstlisting}
+
+
+The opposite action takes place with post-{}increment, as follows:
+      The contents of the memory address pointed to by A7 is copied into D0,
+      then the address held in A7 id incremented by the size of the data just
+      copied ( byte, word or long). Again, this equates to: 
+\begin{lstlisting}[firstnumber=1,language={}]
+1000 LET D0 = PEEK_L(A7)
+1010 Let A7 = A7 + 4 
+\end{lstlisting}
+
+
+\subsection{Immediate}\address{Immediate}
+
+This is probably the simplest of all the addressing modes. It
+      simply means that the data specifies the address value. For example:
+ 
+\begin{lstlisting}[firstnumber=1,]
+          MOVE.L    #100,D0 
+\end{lstlisting}
+
+
+This copies the value of 100 into data register D0. The hash sign
+      indicates that the data is copied directly into the register. Do not get
+      confused between this instruction and: 
+\begin{lstlisting}[firstnumber=1,]
+          MOVE.L    100,D0 
+\end{lstlisting}
+
+
+Note that there is no hash. This instruction means load the
+      \textit{contents} of address 100 into register D0. This is not the same! This is
+      a good source of confusion for beginners -{} I know all about it, and
+      sometimes still make this mistake!
+
+\section{Coming Up...}
+\label{ch1-the-end}%\hyperlabel{ch1-the-end}%
+
+In the next chapter, we will take a closer
+    look at some of the actual instructions in the 68000 instruction
+    set.

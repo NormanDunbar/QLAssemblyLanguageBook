@@ -1,0 +1,1110 @@
+\chapter{Application Sub-{}Window Menus}
+
+\section{Introduction}
+\label{ch29-intro}%hyperlabel{ch29-intro}%
+
+At the end of the last chapter, I promised to continue looking at
+    Application Sub-{}Windows by adding Application Sub-{}Window Menus to them.
+
+Effectively, there are two different types of application sub-{}window
+    menus:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Static -{} which are defined in the program source code and never
+        change;
+
+\item{}Dynamic -{} which may change as the applications runs.
+
+\end{itemize}
+
+In this chapter, we shall look at the Static Application Sub-{}Window
+    Menus only. In a future chapter, we shall look at Dynamic Menus as they are much more difficult to set up correctly.
+
+\section{Static Application Sub-{}Window Menus}
+\label{ch29-app-menu-static}%hyperlabel{ch29-app-menu-static}%
+
+Static menus, as I shall call them from this point onwards, are
+    created by the developer as s/he writes the program. As the program runs,
+    static menus do not change -{} other than setting entries to available or
+    unavailable as required.
+
+We can use SETW\program{SETW} to create static menus.
+    All that is required is for the developer to decide on the menu options,
+    the required layout of rows and columns, and what to do when the user
+    clicks on an option -{} although this latter option is not needed by
+ SETW\program{SETW}, only in the application's code.
+
+We need to design a new window using SETW\program{SETW}, so proceed to execute the
+    utility and proceed as follows:
+\begin{enumerate}
+\item{When prompted for `name\$' enter
+ \emph{AppMenuTest1}. I'd like to use the name \emph{AppMenuTest1Win},
+          but that is too big for SETW. When
+          finished, the file \emph{AppMenuTest1\_asm} is easily
+          renamed to \emph{AppMenuTest1Win\_asm}.
+}
+\item{On the `Alter Text' screen.
+\begin{itemize}[itemsep=0pt]
+
+\item{}Press N for new, type `X' (without the quotes) then
+            ENTER.
+
+
+\item{}Press N for new, type `Application Menu Test 1' (without the
+            quotes) then ENTER
+
+
+\item{}Press N for new, type `One' then enter.
+\item{}Press N for new, type `Two' then enter.
+\item{}Press N for new, type `Three' then enter.
+\item{}Press N for new, type `Four' then enter.
+\item{}Press N for new, type `Five' then enter.
+\item{}Press N for new, type `Six' then enter.
+\item{}Press N for new, type `Seven' then enter.
+\item{}Press N for new, type `Eight' then enter.
+\item{}Press N for new, type `Nine' then enter.
+\item{}Press N for new, type `Ten' then enter.
+
+\item{}Press ESC.
+
+
+\end{itemize}
+}
+\item{On the `Alter Sprite' screen.
+\begin{itemize}[itemsep=0pt]
+
+\item{}Press ESC.
+
+\end{itemize}
+}
+\item{On the `Alter Blob' screen.
+\begin{itemize}[itemsep=0pt]
+
+\item{}Press ESC.
+
+\end{itemize}
+}
+\item{On the `Alter Patt' screen.
+\begin{itemize}[itemsep=0pt]
+
+\item{}Press ESC.
+
+\end{itemize}
+}
+\item{Number of main windows = 1.
+}
+\item{Number of Loose Items = 1.
+}
+\item{Number of Information windows = 2.
+}
+\item{For Information Window 1 of 2, the number of IW Objects =
+        1.
+}
+\item{For information windows 2 of 2, the number of IW Objects =
+        0.10
+}
+\item{Number of application windows = 1.
+}
+\item{Application windows menu items = 10.
+}
+\item{For main window 1:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Shadow = 2
+
+
+\item{}Border size = 1
+
+
+\item{}Border colour = colour\_ql -{}>{} black
+
+
+\item{}Paper colour -{} colour\_ql -{}>{} white
+
+
+\item{}Sprite = arrow
+
+\end{itemize}
+}
+\item{Presentation of loose Items:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Press N for `system palette defaults'
+
+
+\item{}Confirm N when prompted again for defaults
+
+
+\item{}Border size = 1
+
+
+\item{}Border colour = colour\_ql -{}>{} black
+
+
+\item{}Unavailable background = colour\_ql -{}>{} white
+
+
+\item{}Unavailable Ink = colour\_ql -{}>{} grey
+
+
+\item{}Available background = colour\_ql -{}>{} white
+
+
+\item{}Available Ink = colour\_ql -{}>{} black
+
+
+\item{}Selected background = colour\_ql -{}>{} green
+
+
+\item{}Selected Ink = colour\_ql -{}>{} black
+
+\end{itemize}
+}
+\item{Loose Item 1:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Type = text
+
+
+\item{}Object -{}>{} select the `X' text object
+
+
+\item{}Selection key = ESC
+
+\end{itemize}
+}
+\item{Information Window 1:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Border size = 0
+
+
+\item{}Paper = colour\_ql -{}>{} No 92
+
+\end{itemize}
+}
+\item{Object 1:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Type = text
+
+
+\item{}Object -{}>{} select the `Application Window Test' text
+            object.
+
+
+\item{}Colour = colour\_ql -{}>{} black
+
+
+\item{}Xcsize = 0
+
+
+\item{}Ycsize = 0
+
+\end{itemize}
+}
+\item{Information Window 2:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Border size = 1
+
+
+\item{}Border colour = ql\_colour -{}>{} black
+
+
+\item{}Paper = colour\_ql -{}>{} white
+
+\end{itemize}
+}
+\item{Application Window 1:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Border size = 1
+
+
+\item{}Border colour = colour\_ql -{}>{} black
+
+
+\item{}Paper colour = colour\_ql -{}>{} white
+
+
+\item{}Sprite = arrow
+
+
+\item{}Selection key = TAB
+
+
+\item{}Presentation of Menu Items\begin{itemize}[itemsep=0pt]
+
+\item{}Select N for system palette defaults
+
+
+\item{}Select N for defaults, again.
+
+
+\item{}Border size = 1.
+
+
+\item{}Border colour = ql\_colour -{}>{} black.
+
+
+\item{}Unavailable background = ql\_colour -{}>{} white.
+
+
+\item{}Unavailable ink = ql\_colour -{}>{} grey.
+
+
+\item{}Available background = ql\_colour -{}>{} white.
+
+
+\item{}Available ink = ql\_colour -{}>{} black.
+
+
+\item{}Selected background = ql\_colour -{}>{} green.
+
+
+\item{}Selected ink = ql\_colour -{}>{} black.
+
+
+\item{}Scroll arrow = ql\_colour -{}>{} white.
+
+
+\item{}Scroll bar = ql\_colour -{}>{} black.
+
+
+\item{}Scroll background = ql\_colour -{}>{} red.
+
+
+\item{}When prompted for the ten menu items, select the text
+                  items `One' through `Ten'. Give each one a selection key of
+                  the digit that matches the number described by the text
+                  object. For example, `One' has a key of `1', `Two' has `2'
+                  and so on up to `Ten' which has selection key `0'
+                  (Zero).
+
+\end{itemize}
+
+
+\end{itemize}
+}
+\item{Main window size: (Use the arrow keys to change the size, press
+        ENTER when correct)
+\begin{itemize}[itemsep=0pt]
+
+\item{}Width = 220
+
+
+\item{}Height = 140
+
+
+\item{}Do you want a variable window = N
+
+
+\item{}Set the origin to 0,0 (Press ENTER when correct)
+
+\end{itemize}
+}
+\item{Loose Item 1: (Toggle hit/position with F2. Press ENTER when
+        correct)
+\begin{itemize}[itemsep=0pt]
+
+\item{}Hit size = 10 x 10
+
+
+\item{}Position = 206 x 3
+
+\end{itemize}
+}
+\item{Information Window 1: (Toggle size/position with F2. Press ENTER
+        when correct)
+\begin{itemize}[itemsep=0pt]
+
+\item{}Size = 220 x 16
+
+
+\item{}Position = 0 x 0
+
+
+\item{}Object position = 2 x 2
+
+\end{itemize}
+}
+\item{Information Window 2: (Toggle size/position with F2. Press ENTER
+        when correct)
+\begin{itemize}[itemsep=0pt]
+
+\item{}Size = 216 x 14
+
+
+\item{}Position = 2 x 125
+
+\end{itemize}
+}
+\item{Application Window 1: (Toggle size/position with F2. Press ENTER
+        when correct)
+\begin{itemize}[itemsep=0pt]
+
+\item{}Size = 208 x 104
+
+
+\item{}Position = 2 x 18
+
+\end{itemize}
+}
+\end{enumerate}
+
+When you have completed this procedure, and
+ SETW\program{SETW} has exited, you should save the file
+ ram1\_AppMenuTest1\_asm to a safer place and rename it
+    to AppMenuTest1Win\_asm. The file should look similar
+    to the following, although I have added some extra comments to my copy of
+    the generated code.
+
+\section{The Generated Code}
+\label{ch29-app-menu-code}%hyperlabel{ch29-app-menu-code}%
+
+The file should look similar to the following, although I have added
+    some extra comments to my copy of the generated code.
+
+\begin{note}
+I have removed a few sections of the following file in order to
+      reduce duplication of chunks of code in the magazine. These sections are
+      discussed below.
+\end{note}
+
+\begin{lstlisting}[firstnumber=1,caption={AppMenuTest1Win\_asm}]
+; AppMenuTest1Win_asm.
+
+; Undefined Labels - need to be defined elsewhere in my own code.
+
+;        ahit2_0 - menu item 0, hit routine.
+;        ahit2_1 - menu item 1, hit routine.
+;        ahit2_2 - menu item 2, hit routine.
+;        ahit2_3 - menu item 3, hit routine.
+;        ahit2_4 - menu item 4, hit routine.
+;        ahit2_5 - menu item 5, hit routine.
+;        ahit2_6 - menu item 6, hit routine.
+;        ahit2_7 - menu item 7, hit routine.
+;        ahit2_8 - menu item 8, hit routine.
+;        ahit2_9 - menu item 9, hit routine.
+;        asmnu0  - User defined setup routine.
+;        adraw0  - User defined draw routine.
+;        ahit0   - application window 0 hit action routine.
+;        afun0_0 - Loose item 0 hit action routine.
+
+; Labels for External Use
+;     mst0    - menu items status area
+;     wst0    - Window status area
+;     wd0     - Window definition address
+;     ww0_0   - Window default size
+;     ww0_1   - Window button size
+
+SYS_SPR  dc.w     0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,
+                  19,20,21,22,23,24,25,26,7,28,29,30,31,32,33,
+                  34,35,36,37
+
+; Text object for "Close" loose item.
+txt0     dc.w      txt0_e-2-txt0
+         dc.b      "X"
+txt0_e   ds.b      0
+         ds.w      0
+
+; Text object for caption bar.
+txt1     dc.w      txt1_e-2-txt1
+         dc.b      "Application Menu Test 1"
+txt1_e   ds.b      0
+         ds.w      0
+
+;----------------------------------------------------------------------
+; **** Text objects for the menu items. Removed - see text.
+
+; **** Menu items list. Removed - see text.
+
+; **** Row list. Removed - see text.
+
+; **** Spacing list. Removed - see text.
+;----------------------------------------------------------------------
+
+; Application window list.
+app_list0
+         dc.w      appw0-*
+         dc.w      0
+
+
+;----------------------------------------------------------------------
+; **** Application window 0 definition. Removed - see text.
+;----------------------------------------------------------------------
+
+
+; Information Object(s).
+pobl0
+         dc.w      138       xsize
+         dc.w      10        ysize
+         dc.w      2         xorg
+         dc.w      2         yorg
+         dc.b      0         type
+         dc.b      0         spar
+         dc.l      0         spce
+         dc.w      txt1-*    pobj *
+         dc.w      -1
+
+; Information Window(s).
+infw0
+         dc.w      220       xsize
+         dc.w      16        ysize
+         dc.w      0         xorg
+         dc.w      0         yorg
+         dc.w      0         flag
+         dc.w      0         borw
+         dc.w      526       borc
+         dc.w      92        papr
+         dc.w      pobl0-*   pobl *
+         dc.w      216       xsize
+         dc.w      14        ysize
+         dc.w      2         xorg
+         dc.w      125       yorg
+         dc.w      0         flag
+         dc.w      1         borw
+         dc.w      0         borc
+         dc.w      7         papr
+         dc.w      0         pobl *
+         dc.w      -1        end
+
+; Loose Item(s).
+litm0
+         dc.w      10,10     xsize, ysize
+         dc.w      206,3     xorg, yorg
+         dc.b      0,0       xjst, yjst
+         dc.b      0,3       type, skey
+         dc.w      txt0-*    pobj *
+         dc.w      0         item
+         dc.w      afun0_0-* pact *
+         dc.w      -1        end
+
+litm1
+         dc.w      16404,12  xsize, ysize
+         dc.w      0,0       xorg, yorg
+         dc.b      0,0       xjst, yjst
+         dc.b      0,0       type, skey
+         dc.w      0         pobj *
+         dc.w      0         item
+         dc.w      0         pact *
+         dc.w      -1        end
+
+; Window definition
+wd0
+         dc.w      220       xsize
+         dc.w      140       ysize
+         dc.w      0         xorg
+         dc.w      0         yorg
+         dc.w      258       flag
+         dc.w      1         borw
+         dc.w      0         borc
+         dc.w      7         papr
+         dc.w      0         sprt *
+         dc.w      1         curw
+         dc.w      0         curc
+         dc.w      7         uback
+         dc.w      255       uink
+         dc.w      0         ublob *
+         dc.w      0         upatt *
+         dc.w      7         aback
+         dc.w      0         aink
+         dc.w      0         ablob *
+         dc.w      0         apatt *
+         dc.w      4         sback
+         dc.w      0         sink
+         dc.w      0         sblob *
+         dc.w      0         spatt *
+         dc.w      0         help
+         dc.w      220       xsize
+         dc.w      140       ysize
+         dc.w      infw0-*   pinfo *
+         dc.w      litm0-*   plitem *
+         dc.w      app_list0-*         pappl *
+         dc.w      16384     xsize
+         dc.w      12        ysize
+         dc.w      0         pinfo *
+         dc.w      litm1-*   plitem *
+         dc.w      0         pappl *
+         dc.w      -1
+
+; Sizes
+ww0_0    equ       670
+ww0_1    equ       148
+
+; Status Areas:
+; Menu item status area.
+mst0     ds.b      10
+mst0_e   ds.b      0
+         ds.w      0
+
+; Window status area.
+wst0     ds.b      65
+wst0_e   ds.b      0
+         ds.w      0
+\end{lstlisting}
+
+Much of the above is similar to when was discussed in a previous
+    article. If you think back to that article on application sub-{}windows, we
+    simply used the hit routine to print text all over the application
+    sub-{}window. That was about as simple as it gets -{} other than not actually
+    having a hit routine I suppose! Adding a menu to an application
+    sub-{}window means we have quite a lot more work to do at the coding stage
+    as we have to consider the following:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Defining the menu objects -{} these can be text, sprite etc. Every
+        menu item must be defined.
+
+
+\item{}Defining the menu items list -{} when we have defined each menu
+        object, we then have to build a list of all the menu items that we
+        wish to include in our final menu.
+
+
+\item{}Defining the menu row list -{} when we have the menu items list
+        defined, we amalgamate that list into a menu row list which defines
+        the start and end of each row in the menu.
+
+
+\item{}Defining the spacing lists -{} the row list defines the hit size
+        and the spacing for each row and each column in the menu.
+
+
+\item{}Define the application sub-{}window -{} menus need their own section
+        in the application sub-{}window definition.
+
+\end{itemize}
+
+So much to do just to show a menu in a window, lets get on and do
+    it.
+
+\section{Menu Objects}
+\label{ch29-app-menu-objects}%hyperlabel{ch29-app-menu-objects}%
+
+The first stage is to define the various objects that will be
+    incorporated into the menu. In this example, I have used ten separate text
+    objects (as they are the simplest). You can use any of the various Pointer
+    Environment object types if you wish. The code generated by
+ SETW\program{SETW} for these items is as follows.
+
+\begin{lstlisting}[firstnumber=1,caption={AppMenuTest1Win\_asm - Menu Objects}]
+; **** Text objects for the menu items.
+
+txt2     dc.w      txt2_e-2-txt2
+         dc.b      "One"
+txt2_e   ds.b      0
+         ds.w      0
+
+
+; **** Txt3 through txt10 deleted for brevity.
+
+
+txt11    dc.w      txt11_e-2-txt11
+         dc.b      "Ten"
+txt11_e  ds.b      0
+         ds.w      0
+\end{lstlisting}
+
+As you can see from the above, I have omitted to show text objects
+    txt3 through txt10 as there is really no need to take up space in the
+    magazine with repetitive data.
+
+The above code simply defines ten separate text objects -{} `One',
+    `Two', ..... `Nine' and `Ten' to be used, later, in our static
+    menu.
+
+You should be aware, also, that the line numbers above (and indeed, in the following snippets) bear no resemblance to the ones in the original file.
+
+\section{Menu Items (and Index) List}
+\label{ch29-app-menu-item-list}%hyperlabel{ch29-app-menu-item-list}%
+
+The next section of code that I have removed from the main listing
+    above is the menu items list. This is shown below, but please note that
+    once again, I have removed the vast majority of the code for
+    brevity.
+
+\begin{lstlisting}[firstnumber=last,caption={AppMenuTest1Win\_asm - Menu Item List}]
+; **** Menu items list. 
+
+meos2    dc.b      1,0             ; x_justification, y_justification 
+         dc.b      0,49            ; Item type, selection key
+         dc.w      txt2-*          ; Pointer to object
+         dc.w      0               ; Item number. (-1 for indexes)
+         dc.w      ahit2_0-*       ; Hit routine for this item
+;                                  ; Zero for indexes
+
+
+; NOTE: Menu items 1 through 8 removed here for brevity.
+
+
+         dc.b      1,0             ; x_justification, y_justification 
+         dc.b      0,48            ; Item type, selection key
+         dc.w      txt11-*         ; Pointer to object
+         dc.w      9               ; Item number. (-1 for indexes)
+         dc.w      ahit2_9-*       ; Hit routine for this item
+;                                  ; Zero for indexes
+\end{lstlisting}
+
+The label meos2 is the start of the menu items list. We told SETW\program{SETW}
+    that there would be 10 items, and so, there will be 10 menu items in this
+    list. Each one has the structure described in \tablename~\ref{tab:ApplicationSubWindowMenuItemListEntry}.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{c c p{0.7\textwidth}}
+\toprule
+\textbf{Offset} & \textbf{Size} &\textbf{Description}  \\
+\midrule
+%
+0 & 1 & X (Horizontal) justification.
+\begin{itemize}[itemsep=0pt]
+\item{} -ve = Right justified
+\item{}0 = Centred
+\item{}+ve = Left Justified
+\end{itemize}
+The justification value is the number of pixels from the edge of the hit area that the object is
+to be positioned at.\\
+
+1 & 1 & Y (Vertical) justification.
+\begin{itemize}[itemsep=0pt]
+\item{}-ve = Bottom justified
+\item{}0 = Centred
+\item{}+ve = Top Justified
+\end{itemize}
+The justification value is the number of pixels from the edge of the hit area that the object is
+to be positioned at.\\
+
+2 & 1 & Item type:
+\begin{itemize}[itemsep=0pt]
+\item{}0 - Text object
+\item{}2 - Sprite object
+\item{}4 - Blob object
+\item{}6 - Pattern object
+\end{itemize}
+\\
+
+3 & 1 & Selection key, upper cased if necessary.\\
+
+4 & 2 & Relative pointer to the actual object.\\
+
+6 & 2 & Item number. If this is an index items list, set to -1 for all items.\\
+
+8 & 2 & relative pointer to the hit/action routine for this particular item. For index item lists, must be zero.\\
+%
+\bottomrule
+\end{tabular}
+\caption{Application Sub-Window Menu Item List Entry}
+\label{tab:ApplicationSubWindowMenuItemListEntry}
+\end{table}
+
+ 
+
+
+Each item in a menu items list is 10 bytes in length.
+
+Looking at the first menu object generated by
+ SETW\program{SETW}, we see that it is left justified and one
+    pixel from the start of the left end of the hit area. Vertically, it is
+    centred within the hit area. It is a text object and has a selection key
+    of 49, witch is the code for a digit `1' on the keyboard. The text object
+    itself is the text `One' as shown above in the preceding section. The item
+    is numbered zero and the hit routine for this item is defined to be at
+    label ahit2\_0.
+
+So far, so good. We have defined a list of objects and then gathered
+    them into a list of menu items. The menu items list -{} in this case -{} is in
+    a contiguous section of memory, it need not be so. The row list defines
+    the menu ordering, that comes next.
+
+The above structure is used to define menu item lists and also index
+    lists. An index is drawn by the \pe{wm\_index} vector (which also draws pan and
+    scroll bars \& arrows -{} if necessary). Indices are best thought of as
+    the row and column headings -{} similar to a spreadsheet, for example, when
+    columns have letters and rows have numbers to identify them.
+
+WMAN\program{WMAN} takes
+    care of aligning the indices with the contents of the static menu.
+
+\section{Row List}
+\label{ch29-app-menu-row-list}%hyperlabel{ch29-app-menu-row-list}%
+
+The row list takes the various menu items, defined above, and
+    organises them into rows -{} surprisingly enough. For every row you wish to
+    have in your menu, you need a single row list entry. As SETW\program{SETW} tries to make
+    as few rows and/or columns as it can -{} it tries to fit as much as possible
+    into a given space -{} what SETW\program{SETW} generates may not be what you want. In the
+    default case for our SETW\program{SETW} session, we have been given two rows and thus,
+    five columns, for our ten menu items.
+
+Our generated row list is as follows:
+
+\begin{lstlisting}[firstnumber=last,caption={AppMenuTest1Win\_asm - Row List}]
+; **** Row list.
+
+drow0    dc.w      0+meos2-*       ; Pointer to row 0 start = item 0.
+         dc.w      50+meos2-*      ; Pointer to row 0 end = item 4.
+
+         dc.w      50+meos2-*      ; Pointer to row 1 start = item 5.
+         dc.w      100+meos2-*     ; Pointer to row 1 end = item 9.
+\end{lstlisting}
+
+Each row list item contains two pointers, the first is to the start
+    of the first entry in the menu items list entry for this row. The second
+    pointer is to the first byte past the end of the last menu items list
+    entry for this row.
+
+Given the above then, we can see that the first row, starting at
+    label drow0, begins at meos2 (relative to the pointer itself -{} as usual).
+    Meos2 is a list of 10 sets of 10 byte entries defining all ten items in
+    our menu. The first row ends at meos2 + 50, which happens to be the very
+    first byte of the menu items list for menu item number 5 (ie, the sixth
+    menu item -{} we count from zero)
+
+The second row list entry starts at meos2 + 50 and ends at meos2 +
+    100. These pointers are to menu items list item number 5 and at the first
+    byte past the very last menu items list entry. As the following diagram
+    attempts to display:
+
+\begin{lstlisting}[frame=none,numbers=none,caption={Relationship between the Row List \& Menu Items List} ]
+Meos2+0     Menu Item 0 <-----+          Start of row 0.   
+Meos2+10    Menu Item 1       |  
+Meos2+20    Menu Item 2       |
+Meos2+30    Menu Item 3       |
+Meos2+40    Menu Item 4       |
+Meos2+50    Menu Item 5 <--------+--+    End of row 0, start of row 1.
+Meos2+60    Menu Item 6       |  |  |  
+Meos2+70    Menu Item 7       |  |  |  
+Meos2+80    Menu Item 8       |  |  |
+Meos2+90    Menu Item 9       |  |  |
+Meos2+100   equ  *      <--------------+ End of row 1.
+                              |  |  |  | 
+Drwo0       Pointer to -------+  |  |  |
+            Pointer to ----------+  |  |
+            Pointer to -------------+  |
+            Pointer to ----------------+
+\end{lstlisting}
+
+If the menu items list is a single chunk of memory, then each row
+    start pointer is equal to the previous row end pointer -{} except for the
+    first row. As in the example above, the end pointer for row 0 is the same
+    address as the start pointer for row 1.
+
+Now that we have our rows defined, we have to set up the spacing
+    lists for each row and each column in the menu.
+
+\section{Spacing Lists}
+\label{ch29-app-menu-space-lists}%hyperlabel{ch29-app-menu-space-lists}%
+
+Each menu item in our static menu has a given hit area and a
+    spacing. The hit area defines where the pointer can be to make the item
+    beneath it the current item, this is normally indicated by a border being
+    drawn around the current item. A HIT or a DO within the hit area, or a
+    press of the selection keystroke while the pointer is withing the
+    application sub-{}window, will cause the appropriate menu item action
+    routine to be executed.
+
+The spacing defines how many pixels across -{} or down depending on
+    whether this is the column or row spacing list -{} there are between the
+    start of `this' menu item and the start if the `next' one. The spacing
+ \emph{must} include an allowance for the border to be drawn
+    around the current item.
+
+\begin{lstlisting}[firstnumber=42,caption={AppMenuTest1Win\_asm - Spacing Lists}]
+; **** Spacing lists.
+
+; Spacing list. Defines width of hit area for each COLUMN and spacing
+; between columns. (5 columns.)
+
+spls0    dc.w      34      ; Hit area width column 0
+         dc.w      36      ; Space between this column and the next.
+
+         dc.w      34      ; Hit area width column 1
+         dc.w      36      ; Space between this column and the next
+
+         dc.w      34      ; Hit area width column 2
+         dc.w      36      ; Space between this column and the next
+
+         dc.w      34      ; Hit area width column 3
+         dc.w      36      ; Space between this column and the next
+
+         dc.w      34      ; Hit area width column 4
+         dc.w      36      ; Space between this column and the next
+
+
+; Spacing list. Defines height of hit area for each ROW and spacing
+; between rows. (2 rows.)
+
+spls1    dc.w      10      ; Hit area height row 0
+         dc.w      12      ; Space between this row and the next
+
+         dc.w      10      ; Hit area height row 1
+         dc.w      12      ; Space between this row and the next
+\end{lstlisting}
+
+The first list above, at label spls0 defines the columns in our
+    menu. We already know that SETW\program{SETW} has decreed
+    that there shall be five columns and two rows, so the column spacing list
+    has five entries, one for each column. Each entry consists of a pair of
+    words -{} the first defines the width of the column (or the height of the
+    row) and the second defines the space between this column and the
+    next.
+
+In the example above, we see that SETW\program{SETW} has calculated that our
+    widest text object is 5 characters wide -{} this corresponds to `Three',
+    `Seven' and `Eight' -{} and has allocated 34 pixels of hit area for each
+    column. The spacing for each columns is set to the (border width * 2) plus
+    the hit area width. It must be twice the border width as there is a border
+    on each side (or top \& bottom).
+
+The spacing list for the rows shows a height of ten pixels for the
+    hit area and taking the border into consideration again, a spacing of 12
+    pixels between the tops of each row.
+
+\section{Menu Section of Application Window Definition}
+\label{ch29-app-menu-win-def}%hyperlabel{ch29-app-menu-win-def}%
+
+The application window definition needs an extra section adding
+    after the normal definition, to cover the need for a static menu. In
+    addition, two entries in the normal definition part are amended (from what
+    we used for an application sub-{}window without a menu -{} see last time) to
+    point to the:
+\begin{itemize}[itemsep=0pt]
+
+\item{}User defined setup routine, or zero if not required.
+
+
+\item{}User defined drawing routine, or zero if not required.
+
+\end{itemize}
+
+The new style application window definition is as follows:
+
+\begin{lstlisting}[firstnumber=1,caption={AppMenuTest1Win\_asm - Application Window Definition}]
+; **** Application window 0 definition.
+
+appw0    dc.w      208      ; Width in pixels (+ scaling)
+         dc.w      104      ; Height in pixels (+ scaling)
+         dc.w      2        ; X origin, relative to 0 in main window
+         dc.w      18       ; Y origin, relative to 0 in main window
+         dc.w      256      ; Flag - bit 7 set = clear window
+;                           ;      - bit 1 set = disable cursor keys
+         dc.w      1        ; Border width
+         dc.w      0        ; Border colour
+         dc.w      7        ; Paper colour
+         dc.w      0        ; Pointer to pointer sprite, or 0 for arrow
+\end{lstlisting}
+
+The first part is exactly as we used last time, nothing different to
+    see here. Following the above, we have this:
+
+\begin{lstlisting}[firstnumber=last,caption={AppMenuTest1Win\_asm - Application Window Definition}]
+; Note the following for menus.
+
+         dc.w      asmnu0-* ; User defined setup routine, or 0
+         dc.w      adraw0-* ; User defined drawing routine, or 0
+         dc.w      ahit0-*  ; Application window hit routine
+         dc.w      0        ; Control routine, or 0
+         dc.w      0        ; Max X control sections (splits)
+         dc.w      0        ; Max Y control sections (splits)
+         dc.b      9        ; Selection key
+         dc.b      0        ; Spare byte - must be 0
+\end{lstlisting}
+
+The first two entries in the above definition are the new ones.
+    These are our pointers to a user defined setup routine and a user defined
+    drawing routine. You will notice that the application window still has
+    its own hit routine, even though it contains a menu and each and every
+    menu item has a dedicated hit routine of its own. Note also, in this small
+    example,that our settings for the pan and scroll sections are all unused.
+    We'll come back to those in a future chapter.
+
+The user defined setup code would normally consist of a single line
+    as follows:
+
+\begin{lstlisting}[firstnumber=1,caption={AppMenuTest1Win\_asm - Application Window Setup Routine}]
+asmnu0  jmp wm_smenu(a2)    ; Vector $08
+\end{lstlisting}
+
+Similarly, the user defined drawing routine need only perform the
+    following tasks:
+
+\begin{lstlisting}[firstnumber=last,caption={AppMenuTest1Win\_asm - Application Window Drawing Routine}]
+adraw0  jmp wm_index(a2)    ; Vector $34
+        bne.s adexit        ; Bale out on errors
+        jmp wm_mdraw(a2)    ; Vector $20
+adexit  rts        
+\end{lstlisting}
+
+The call to \pe{wm\_index} is not required unless your menu has been
+    defined to have sections and/or index items\footnote{George Gwilt has discovered that anything to do with these index items is not actually implemented in the WMAN code. Looks like Tony Tebby had a good idea, that couldn't be fulfilled.}. What are index items? Think
+    of a spreadsheet, each row has a number and each column has a letter.
+    These are the index items. Our example is not using index items, however,
+    if it did then we would set them up exactly as per the menu items list,
+    except, for indexes the list entries have no hit routine (set to zero) and
+    the item number is always -{}1.
+
+\begin{note}
+If the pointer to the user defined drawing routine is zero, then
+ WMAN\program{WMAN} will still draw the application
+      sub-{}window's border and, unless the flag is set to say `do not clear',
+      will clear it to the defined paper colour. If you find missing menus in
+      your application sub-{}windows, check that you have a drawing
+      routine!
+\end{note}
+
+Following on from the above, there is a brand new section dedicated
+    to the menu.
+
+\begin{lstlisting}[firstnumber=23,caption={AppMenuTest1Win\_asm - Application Window Menu Area Definition}]
+; The following section is required when an application sub-window
+; contains a menu.
+
+         dc.w      mst0-wst0 ; Pointer to menu status area. (See text)
+
+         dc.w      1        ; Current Item, border width
+         dc.w      0        ; Current Item, border colour
+
+         dc.w      7        ; Unavailable background colour
+         dc.w      255      ; Unavailable ink colour
+         dc.w      0        ; Unavailable blob pointer
+         dc.w      0        ; Unavailable pattern pointer
+
+         dc.w      7        ; Available background colour
+         dc.w      0        ; Available ink colour
+         dc.w      0        ; Available blob pointer
+         dc.w      0        ; Available pattern pointer
+
+         dc.w      4        ; Selected background colour
+         dc.w      0        ; Selected ink colour
+         dc.w      0        ; Selected blob pointer
+         dc.w      0        ; Selected pattern pointer
+
+         dc.w      5        ; Number of columns in the menu
+         dc.w      2        ; Number of rows in the menu
+         dc.w      0        ; X offset to start of menu
+         dc.w      0        ; Y offset to start of menu
+         dc.w      spls0-*  ; Pointer to column spacing list
+         dc.w      spls1-*  ; Pointer to row spacing list
+         dc.w      0        ; Pointer to column index list
+         dc.w      0        ; Pointer to row index list
+         dc.w      drow0-*  ; Pointer to menu row list
+\end{lstlisting}
+
+The first new entry we need is a pointer to the menu items status
+    area. This has been defined for us, by SETW\program{SETW}, at
+    label mst0. There should be a single byte for each menu item. Note
+    however, that we need to have this status area pointer defined as relative
+    to the window status area. Hence the calculation in the above
+    definition.
+
+\begin{note}
+This fact is not very clearly documented in the PE documentation.
+      I had an extended conversation with George on this setting as I had
+      never seen the fact that the menu status area pointer is relative to the
+      window status area -{} George had a pencilled in note in his copy of the
+      documentation indicating this need. Obviously, I didn't.
+\end{note}
+
+Next up, we see the menu attributes -{} border width and colour, item
+    paper and ink, blobs and patters for unavailable, available and selected
+    items.
+
+After the attributes section, we define the menu itself with details
+    of how many columns there are, how many rows, offsets to the start of the
+    menu and the pointers to the various sections discussed above.
+
+\section{Application Sub-{}Window Menu Item Hit Routines}
+\label{ch29-app-menu-item-hit}%hyperlabel{ch29-app-menu-item-hit}%
+
+In addition to the application sub-{}window's own hit routine, as
+    described previously, each and every item in the menu (Static or dynamic)
+    may also have a hit routine. This routine could be a single one for all,
+    or a separate one for each menu item. It depends on how the program is
+    designed.
+
+\begin{note}
+Whenever a program has a static or dynamic menu, there
+ \emph{must} be a hit routine for the application
+      sub-{}window containing the menu. The absolute minimum code in the hit
+      routine is as follows:
+
+\begin{lstlisting}[firstnumber=1,caption={AppMenuTest1Win\_asm - Application Window Hit Routine}]
+ahit0   jmp wm_hit(a2)            ; Vector $34
+\end{lstlisting}
+
+If you do not have the above code present in the hit routine for
+      the application sub-{}window, then when you attempt to hit or do a menu
+      item, nothing will work. The above code does not need an \opcode{RTS}.
+\end{note}
+
+On entry to a menu item hit routine various registers are set with
+    specific parameters as described in \tablename~\ref{tab:MenuItemHitRoutineRegisters}.
+
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l p{0.8\textwidth}}
+\toprule
+\textbf{Register} &\textbf{Description}  \\
+\midrule
+%
+D1.L & Virtual column/row for the hit menu item.\\
+D2.W & Item number.\\
+D4.L & An event number. This can only be 0 or pt\_\_do (16).\\
+A0.L & Channel id.\\
+A1.L & Pointer to the menu status area.\\
+A2.L & WMAN vector.\\
+A3.L & Pointer to sub-window definition.\\
+A4.L & Pointer to window working definition.\\
+%
+\bottomrule
+\end{tabular}
+\caption{Menu Item Hit Routine Registers}
+\label{tab:MenuItemHitRoutineRegisters}
+\end{table}
+
+Registers not mentioned above are free for use as they are not used
+    by the hit routine.
+
+Hit routines should exit with D5 -{} D7, A0 and A4 preserved to the
+    same value that they had on entry to the routine. D1 -{} D3, A1 -{} A3, A5 and
+    A6 are undefined on exit (which means that they don't care what value they
+    have.) D4.B must be either zero or a window event to be set on
+    exit.
+
+D0 should contain zero or an error code and the SR must be set
+    according to the value in D0 on exit.
+
+\begin{note}
+D3, on return from a hit routine, should normally be returned as
+      per its value on entry. It is not used by \pe{wm\_rptr} however, it is used by
+      \pe{wm\_rptrt} (read pointer with return on timeout) from
+ WMAN\program{WMAN} 1.5 onwards. Wm\_rptr ignores the upper
+      word of D3. If your read pointer loop is using the \pe{wm\_rptrt} vector
+      instead, and you have changed the value of D3 within the hit code, you
+      must clear the high word on exit.
+\end{note}
+
+On exit, if D0 is clear and the status (Z) bit is set, control will
+    return to the \pe{wm\_rptr} loop and not to your application's code. To return
+    to your own code, the hit routine needs to set at least one event bit in
+    the event vector which can be done by returning a suitable value in D4.B
+    on exit.
+
+If an error is detected within the hit code, then it should exit
+    with the appropriate error code in D0 and the status register set
+    accordingly.
+
+\section{Coming Up...}
+\label{ch29-the-end}%hyperlabel{ch29-the-end}%
+
+So, that's the end of this exciting chapter. We have designed a
+    window and looked deep into the structures involved in defining a static
+    menu. 
+    
+In the upcoming chapter we'll add some code and play around. We might even see if
+    it's possible to take the design from SETW\program{SETW} and
+    massage it to suit our own needs and considerations.
+

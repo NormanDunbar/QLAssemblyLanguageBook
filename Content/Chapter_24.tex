@@ -1,0 +1,272 @@
+\chapter{Creating Your Own Windows With SETW}
+\program{SETW}
+
+\label{ch24}%hyperlabel{ch24}%
+
+\section{Introduction}
+\label{ch24-intro}%hyperlabel{ch24-intro}%
+
+In this chapter, I shall be taking a small diversion into one
+        of George Gwilt's utility programs. This one, SETW\program{SETW}, allows you to interactively
+        create windows for your applications. SETW\program{SETW} then goes away and does all the hard
+        work of setting everything up.
+
+\section{Downloading SETW}
+\label{ch24-setw}%hyperlabel{ch24-setw}%
+
+SETW\program{SETW}, and other useful utilities, are available from George's web site, \url{http://gwiltprogs.info/} and from there I advise you to download the following three utilities:
+\begin{itemize}[itemsep=0pt]
+
+\item{}SETW -{} setwp05.zip
+
+
+\item{}EasyPEasy -{} peassp02.zip
+
+
+\item{}GWASL -{} gwaslp07.zip
+
+\end{itemize}
+
+The latest version of GWASL\program{Gwasl} is required to enable you to assemble PE
+        programs created using SETW\program{SETW} and using the EasyPEasy\program{EasyPEasy} library files in peassp02.zip.
+        As you will require these for the remainder of the tutorial then you should
+        download them all now to save time later.
+
+There are other files there similarly names but with a `p' replaced by and
+        `s' -{} these are the sources for the utilities and while educational, you don't
+        need them.
+
+The files are zipped up using the QDOS version of zip, so copy them from
+        wherever you downloaded them to into your QL system (QPC etc) and unzip them using
+        the QDOS version of unzip. There is one supplied with the C68\program{C68} system and that
+        works fine.
+
+\section{Running SETW}
+
+In order to create correctly written assembly source for GWASL\program{Gwasl}, we need to
+        pass a single parameter to SETW\program{SETW} when we execute it. The parameter is "-{}abin" with
+        no spaces. This tells SETW\program{SETW} that the code produced will be used to build a binary
+        file rather than a relocatable one which will be subsequently linked with other
+        relocatable files to produce the final binary.
+
+We GWASL\program{Gwasl} users don't have a linker so all our programs need to be self
+        contained, or may include pre-{}assembled modules and libraries using the LIB
+        command.
+
+\begin{lstlisting}[firstnumber=1,caption={Executing SETW},language={}]
+EX SETW ; '-abin'
+\end{lstlisting}
+
+The command above is all we need. If you do not have Toolkit 2, then the
+        EXECUTE command from Turbo Toolkit can be used instead.
+
+We will use SETW\program{SETW} to create a file that we will use later on. It will be a
+        very simple window with a single information window near the top and a single text
+        object within the information window. Feel free to follow along on your own QL
+        system as we go.
+
+The program starts by opening a window as big as it can on your screen, it
+        displays a few bits of information and prompts for the root name of the various
+        files to be created.
+
+For our example, we simply set the name to `hello' -{} without the quotes.
+        Type it in and press ENTER.
+
+SETW\program{SETW} will create three files when we are done. They will be created on ram1\_
+        (in my case) or wherever you have configured SETW\program{SETW} to put them by default. The
+        three files created will be:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Ram1\_hello\_wda -{} a file for use by George's TurboPTR\program{TurboPTR} utility. It is
+                of no use to us and can be safely deleted when finished.
+
+
+\item{}Ram1\_hello\_asm -{} a file for use by an assembler, in our case, GWASL\program{Gwasl},
+                this is the file we will need.
+
+
+\item{}Ram1\_hello\_z -{} a file for use with another of George's utilities,
+                CPTR\program{Cptr}, a program to help C68\program{C68} users write PE programs. Again, we don't need
+                this file and it can safely be deleted.
+
+\end{itemize}
+
+\subsection{Entering Text Objects}
+
+The next screen that appears is titled `ALTER TEXT' and is where we
+            enter every text object to be used in our finished utility. We must be very
+            careful here and not forget any because SETW\program{SETW} creates code for what we enter
+            and we cannot go back and add another if we forget one. (Well possibly we can
+            in the generated assembler file, but I have not confirmed this yet.)
+
+To enter your text objects, press the `N' key to create a new text
+            object and simply type in the required text. For our example window all we
+            need is one single object containing the text `Hello World' (without quotes) -{}
+            for the main reason that this is how everyone starts to learn a new language!
+            Press ENTER when you have entered the text.
+
+In slightly more complicated programs, there would be a lot more text
+            objects to enter, but for now, press the ESC key to exit from the ALTER TEXT
+            screen.
+
+\subsection{Entering Sprites, Blobs \& Patterns}
+
+We don't need any sprites, blobs or patterns in this example, so simply
+            press the ESC key when prompted for each of these.
+
+\subsection{The Main Window}
+
+The next prompt is to tell SETW\program{SETW} about the main window, how many windows
+            are needed and so on. In many cases the default is correct and all we need do
+            is press ENTER at each prompt -{} however, make sure you read the prompt and
+            think before pressing ENTER -{} once you have done so, there's no going back!
+            (Ask me how I know!)
+
+When asked for the number of main windows, accept the default of 1 by
+            pressing ENTER.
+
+When asked for the number of loose Items, accept the default of zero by
+            pressing ENTER.
+
+When asked for the number of Information Windows, we will need one, so
+            press the `1' key and press ENTER.
+
+We are now asked to enter the number of information objects in each
+            information window. We require one information object in our one single
+            information window. Type `1' and press ENTER.
+
+When asked how many Applications Windows you want, accept the default of
+            zero.
+
+Next we are asked to select a shadow size. I find a size of 2 to be
+            adequate. Type `2' and press ENTER.
+
+For the border size choose a width of 1.
+
+For all the prompts asking us to select a colour, select option 1 each
+            time. Use the arrow keys to highlight the desired option and press ENTER to
+            select it. We want "1. Default" for our colours. (I will explain the others
+            later on in the series.)
+
+Next we get to choose the sprite to be used as a pointer in the main
+            window. I much prefer the standard arrow, so select it as above, and press
+            ENTER. If you wish, you can choose another sprite to use as the pointer
+            instead -{} it's your choice.
+
+\subsection{Information Windows \& Objects}
+
+Now that all the details for the main window have been entered, or
+            default chosen, we get to enter the requirements for each (or in our case,
+            one!) Information Window.
+
+First of all we need to enter the border width, I use a width of one
+            pixel for all my programs. Type `1' and press ENTER.
+
+Next we need the border colour, as before, select "1. Default" and press
+            ENTER.
+
+Select the default again for the paper colour.
+
+We are now asked to select a type for our information objects for this
+            information Window. As we only entered a single information object way back at
+            the beginning and that was a text object, we should select "text" and press
+            ENTER. Other object types would be available if we had entered any sprites,
+            blobs or patterns.
+
+Next we see a window appear with the list of (one!) text objects. As
+            there is only one, it has been highlighted for us. Press ENTER to select
+            it.
+
+Select the default colour again.
+
+When asked for the character sizes for X and Y for this text object,
+            select zero for both.
+
+\subsection{Interactively Sizing The Window \& Contents}
+
+Now the fun begins! A window appears that allows us to interactively
+            resize the main window and the information window we have created. Once done,
+            we can position these items almost at will.
+
+Looking at the window currently being displayed, the lower right corner
+            shows the currently defined dimensions for the main window itself. At the top
+            left is an outline of the noted dimensions. We can use the arrow keys to
+            change the dimensions -{} up makes the window less tall, down makes it taller,
+            left makes the window narrower and right makes it wider.
+
+Pressing the ALT key makes the change in size bigger. This saves wearing
+            out your keyboard getting the window to the size you would like!
+
+For this demonstration program, we require a window size of 200 wide by
+            100 deep. Use the ALT and arrow keys to make the dimensions 200 wide and 100
+            deep. When the desired dimensions have been achieved, press ENTER.
+
+We are now asked if a variable window is to be created, this will be
+            covered in a future tutorial so for now, type `N'. (There is no need to press
+            ENTER.)
+
+Next we need to set the origin of the window. Again the arrow keys move
+            things around and the ALT key makes the movements bigger. For the
+            demonstration, set the origin to 50, 50. You will get a rough idea of where
+            the origin will be as a small dot moves around the screen under the control of
+            your arrow keys. Press ENTER when the origin is where you would like it to
+            be.
+
+Next up, we get to size our information windows, or window in our case!
+            I have decided to make it slightly wider than the space required for the text
+            object. That itself is 12 characters of 6 pixels wide or 72 pixels in total.
+            As I like to have a bit of leading and trailing space in my information
+            windows, use the arrow keys and ALT, as before, to resize information window
+            number one to be 74 pixels wide by 12 deep. You may choose a different
+            dimension if you like, but it will need to be a minimum of 72 pixels wide to
+            hold all the text.
+
+The program starts off in position mode rather than in size mode. You
+            may need to press F2 to toggle between the two modes. Check the prompt on
+            screen for advice about which mode you are currently in.
+
+Once you have the desired size, press F2 and move the window to a
+            position of 62 across by 2 down. If the information window size plus the
+            position causes it to extend off the edge(s) of the main window, you will not
+            be allowed to position it where you want to. In this case, toggle between size
+            and position with the F2 key until you have it correctly sized and
+            positioned.
+
+Press ENTER when done. This takes you now to the sizing and positioning
+            of the information window object (where the actual text object will be
+            placed). If you remember the text object is 12 characters or 72 pixels wide
+            which means that we need an object big enough to take that plus a little space
+            at the beginning and end. As I like a couple of pixels either end of my
+            objects, set the information object to be at position 4 across and 1 down.
+            Press ENTER when satisfied.
+
+That's it for our little test window. SETW\program{SETW} now displays some information
+            about the files it created and after a pause, or when you press a key, it will
+            cycle through all the main windows we created -{} one in our case -{} and display
+            them on screen as they have been defined.
+
+At this point, there's not much we can do if it all went horribly wrong.
+            We simply have to start again -{} or get down and dirty in the generated
+            assembly file! Press ENTER to exit from SETW.
+
+On ram1\_, in my case, we now have the files that SETW\program{SETW} generated for us.
+            We are only interested in the hello\_asm file and can happily delete the
+            others. Feel free to examine the generated file in an editor and compare what
+            has been created with the previous articles where I explain what the
+            individual bits of a WMAN\program{WMAN} window definition are.
+
+The assembly source file generated is not able to be assembled as it is
+            and then run, it has no code in it to make it a correctly functioning QDOS
+            job. That comes later.
+
+Until next time, feel free to generate more windows of your own and get
+            to know George's SETW\program{SETW} utility -{} we will be using it in future articles in this
+            series.
+
+\section{Coming Up...}
+\label{ch24-the-end}%hyperlabel{ch24-the-end}%
+
+We take the file we created with SETW\program{SETW} and feed it into
+        another of George's utilities, EasyPEasy, in the next chapter. EasyPeasy tries to make coding for the PE
+        much easier. Until next time, happy windowing.
+

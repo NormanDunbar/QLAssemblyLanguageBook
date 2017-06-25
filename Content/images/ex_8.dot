@@ -1,0 +1,18 @@
+digraph structs {
+    rankdir=LR
+    //label="EX With Pipes and Lots Of Files";
+    pad="0.3";
+    //bgcolor=grey77;
+    node [shape=record fillcolor=yellowgreen style=filled];
+    structA7 [label="<f0> A7.L"];
+    structS  [label="<cmd> $00.W | <o_pipe> $nnnn.L | <par_chid> $nnnn.L| <db_chid> $nnnn.L | <i_pipe> $nnnn.L| <ch> $04.W"];
+    structP [label="<cmd> Command String size | <o_pipe> Output Pipe channel ID | <par_chid> par channel ID| <db_chid> debug_txt channel ID | <i_pipe> Input pipe channel ID | <ch> Number of open channels" style=filled fillcolor=thistle];
+    structA7:f0 -> structS:ch;
+    edge [style="dashed" dir=back];
+    structS:cmd -> structP:cmd;
+    structS:o_pipe -> structP:o_pipe
+    structS:par_chid -> structP:par_chid
+    structS:db_chid -> structP:db_chid
+    structS:i_pipe -> structP:i_pipe
+    structS:ch -> structP:ch;
+}

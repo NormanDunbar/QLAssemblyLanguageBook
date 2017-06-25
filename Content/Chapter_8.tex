@@ -1,0 +1,956 @@
+\chapter{The QL Screen}\index{Screen handling}
+
+\section{Introduction}
+\label{ch8-intro}%\hyperlabel{ch8-intro}%
+
+In the last chapter, we looked at how easy it was to extend
+    SuperBasic with new procedures and functions. Hopefully you all tried out
+    the exercise I left for you to do, if not, there will be points deducted
+    from your final score at the end of the course!
+
+In this chapter, we shall take a look at the QL's screen memory and
+    how to play around with it. I won't be writing any extensions to
+    SuperBasic this time, but you could extend some of the routines to do so
+    yourselves, and extend SuperBasic to your heart's content.
+
+\section{The Screen}
+\label{ch8-screen}%\hyperlabel{ch8-screen}%
+
+Inside the original QL, there were supposed to be two screen areas.
+    As it turned out, the final product only had one, but some memory was
+    still left around for the second. Unfortunately, the second screen's
+    memory has been partially overwritten by the system variables and so
+    cannot be safely used. To all intents and purposes, we can ignore that
+    second screen and concentrate on the primary screen itself. This is the
+    one we can all use.
+
+Nowadays, we have all sorts of screen modes and resolutions and with
+    the coming of the Q40 \& Q60, we have numerous colours as well. As an
+    old lag, I deal in mode 4 and mode 8 only but as I use a QXL mostly (I am
+    awaiting delivery of QPC 2 even as I type, and hopefully it will have
+    arrived by the time you read this!) I also have more resolution that the
+    old 512 by 256 that the original QL was limited to.
+
+I also have no documentation regarding the resolutions available on
+    other emulators, cards etc so I cannot deal with those here -{} perhaps
+    someone with more details/knowledge could write a follow up article for an
+    Aurora, Super Gold Card, Q40 etc. (Please!)
+
+In the old days, 512 by 256 was the best you could expect -{} and only
+    on 4 colours -{} red, black, green and white. If you wanted more colours,
+    you only had 256 by 256 to play with, however you did get to use blue,
+    yellow, magenta and cyan as well -{} it was a trade off, as with most things
+    computer related.
+
+OK, here is how it was in the old days .... the screen starts at
+    address \$20000 or 131,072 in the QL's memory. Each line on the screen, all
+    256 of them, use 128 bytes to hold the colour information for the pixels
+    in the line. This implies that a QL screen takes up 32K of memory, and
+    indeed this is the case. To get the screen memory address of pixel x,y (x
+    = dots across and y = dots down) a calculation similar to the following
+    was used:
+
+$address = 131072 + (y * 128) + INT(x / 4)$
+
+This is because each scan line (or row down the screen) starts 128
+    bytes on from the previous line hence $(y * 128)$. Each row has 512 pixels
+    in it (even in mode 8!) so the dots across are $512/128 = 4$. This is why
+    the dots across (or x) must be divided by 4.
+
+\begin{warning}
+\emph{Don't ever assume that the two paragraphs above are
+      true.} The various new cards and graphics modes have changed
+      all of the above. On my QXL, I can see the screen at the above address
+      only when I run it in QL 512 by 256 mode. The other modes use more
+      memory and in different places, so any program that writes to the screen
+      at the original addresses will probably cause carnage within the QXL and
+      lead to unexplained crashes later on -{} if not straight away. It must
+      always be assumed the the old ways have gone forever and we must always
+      calculate the screen start address and how long a scan line is before
+      trying to access the memory.
+\end{warning}
+
+For those of you who care about these things, the base of the screen
+    address is at offset \$32 in the channel definition block, while the size,
+    in bytes, of a scan line is at offset \$64. (Except if the QDOS version is less
+    than 1.03, in which case, the scan line size is always 128 bytes.)
+
+How to get this information? Easy, given the following code which
+    assumes that A0.L holds a channel id for a scr\_ or con\_ channel:
+
+\begin{lstlisting}[firstnumber=1,caption={Obtaining the Screen Address with SD\_EXTOP},label={lst:ObtainingTheScreenAddressWithSdextop}]
+scr_stuff   moveq   #sd_extop,d0    ; Trap code
+            moveq   #-1,d3          ; Timout
+            lea     extop,a2        ; Routine to call via sd_extop
+            trap    #3              ; Do it
+            tst.l   d0              ; OK?
+            bne.s   done            ; No, bale out D1 = A1 = garbage
+
+got_them    move.w  d1,-(a7)        ; Need to check qdos, save scan_line
+            moveq   #mt_inf,d0      ; Trap to get qdos version
+            trap    #1              ; Get it (no errors)
+            move.w  (a7)+,d1        ; Retrieve scan_line value
+            andi.l  #$ff00ffff,d2   ; Mask the dot in QDOS "1.03" etc
+            cmpi.l  #$31003034,d2   ; Test "1x03" where x = don't care
+            bcs.s   too_old         ; Less than 1.03 is too old
+done        rts                     ; Finished
+
+too_old     move.w  #128,d1         ; Must be 128 bytes
+            rts                     ; All done
+
+extop       move.w  $64(a0),d1      ; Fetch the scan_line length
+            move.l  $32(a0),a1      ; Fetch the screen base
+            moveq   #0,d0           ; No errors
+            rts                     ; done
+\end{lstlisting}
+
+So given that we have a channel id in A0 we can extract the required
+    information from the channel definition block by using the \trap{SD\_EXTOP} trap.
+    This trap takes the address of a routine to call in A2, parameters for the
+    routine in D1, D2 and A1, a channel id in A0 and returns with D1 and A1
+    holding values returned from the routine called and an error code in
+    D0.
+
+The way we are using it here we don't need any parameters on the way
+    in, but coming out, D1.W holds the scan\_line size and A2.L holds the
+    address for the start of the screen memory.
+
+The actual routine itself get presented with the channel definition
+    block's address in A0, not the channel id. Within the routine we copy the
+    screen base address into A1 and the scan\_line size into D1.W and
+    return.
+
+On exit, we need to know if the scan\_line size is correct so we call
+    QDOS again to get the version of QDOS in D2. As this corrupts D1 we first
+    save it on the stack. After the trap, D2 holds the ASCII representation of
+    the QDOS version, for example `1.02' or `2.10' or possibly `1m03' for some
+    foreign ROMS. (Foreign as in not UK!)
+
+To test for the version we simply mask out the dot or the `m' or
+    whatever from D2 and if the version is less than 1x03, we simply set D1.W
+    to 128 as this is the only value allowed. All other QDOS versions from
+    1x03 onwards have the correct scan\_line size in D1.W.
+
+So, on exit, A1.L holds the screen address and D1.W holds the
+    scan\_line size in bytes. This scan width is useful because we can use it
+    to discover the maximum width of the screen in pixels, provided we know
+    the mode -{} and I am talking about mode 4 and 8 only here because that is
+    all I know about!
+
+If we have, as I have on my QXL, a scan\_line of 160 bytes, what is
+    this telling me? It says that the number of pixels across the screen will
+    fit into one scan\_line of 160 bytes. In mode 4 I know that one word of
+    memory holds the data for 8 individual pixels. In mode 8, I know that one
+    word in memory holds the data for 4 pixels. (Or, as My wife Alison refers
+    to them, `pixies'.)
+
+As there are 16 bits in a word we can assume correctly that two bits
+    hold the data for mode 4 pixels and 4 bits hold the data for mode 8
+    pixels. Thus we have 160 bytes times 8 bits and divided by 4 to give 640
+    pixels across in mode 4. In mode 8 the answer will be 320 BUT the screen
+    width is always the mode 4 width. Only the pixels double up in mode 8, so
+    plotting point 639,0 in mode 8 still works! (or is it 0,639 -{} I can never
+    remember!)
+
+Our calculation above still works because the memory address of a
+    pixel is now:
+
+$screen\_base + (y * screen\_width) + INT(x / 4)$
+
+and this works even on a QXL. We come back to this later.
+
+\section{Mode 4 -{} screen memory usage}
+\label{ch8-mode-4}%\hyperlabel{ch8-mode-4}%
+
+So, as I said above, we have two bits per pixel (or 8 pixels per
+    memory word) in mode 4. How does this work? Mode 4 allows 4 colours, in
+    binary the numbers from 0 to 3 can be represented by two bits. Colours are
+    also represented by `digits' in that if you add two colours together you
+    get a different colour
+
+The word in memory looks like Table~\ref{tab:Mode4ScreeMemoryWordFormat}.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l}
+\toprule
+\textbf{Green byte bits (even address)} & \textbf{Red byte bits (odd address = green address + 1)}  \\
+\midrule
+%
+G7 G6 G5 G4 G3 G2 G1 G0 & R7 R6 R5 R4 R3 R2 R1 R0 \\
+%
+\bottomrule
+\end{tabular}
+\caption{Mode 4 Screen Memory Word Format}
+\label{tab:Mode4ScreeMemoryWordFormat}
+\end{table}
+
+
+
+In the above table, G7 refers to bit 7 of the green byte. The green
+    byte is always even and lower in memory than the red byte which is always
+    odd.
+
+The colour codes for the allowed mode 4 colours are as per Table~\ref{tab:Mode4ColourCodes}.
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l}
+\toprule
+\textbf{Colour} & \textbf{GR (Binary)} & \textbf{Value (Decimal)}  \\
+\midrule
+%
+Black & 00 & 0 \\
+Red   & 01 & 1 \\
+Green & 10 & 2 \\
+White & 11 & 3 \\
+%
+\bottomrule
+\end{tabular}
+\caption{Mode 4 Colour Codes.}
+\label{tab:Mode4ColourCodes}
+\end{table}
+
+So white is represented by both colours mixed together, black by the
+    lack of both colours and red and green by themselves.
+
+If in memory we have the green byte and the red byte in each word
+    set up as follows, we can add the corresponding bit in each byte to
+    represent the colour for a single pixel as follows:
+
+
+\begin{lstlisting}[frame=none,numbers=none]
+Green byte = 0000 1111 
+Red byte   = 0101 0101
+\end{lstlisting}
+
+Which gives us the following:
+
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l}
+\toprule
+\textbf{Bit} & \textbf{GR (Binary)} & \textbf{Colour}  \\
+\midrule
+%
+7 & 00 & Black \\
+6 & 01 & Red \\
+5 & 00 & Black \\
+4 & 01 & Red \\
+3 & 10 & Green \\
+2 & 11 & White \\
+1 & 10 & Red \\
+0 & 11 & White \\
+%
+\bottomrule
+\end{tabular}
+\caption{Mode 4 Example Bits}
+\label{tab:Mode4ExampleBits}
+\end{table}
+
+
+And that is how it works in mode 4. So we know the screen address
+    (or do we? Think about it) and we know how to poke values into the correct
+    location so we can now write directly to the screen can't we? More later,
+    keep those brain cells ticking over for now. There is something I have not
+    yet mentioned.
+
+\section{Mode 8 -{} screen memory usage}
+\label{ch8-mode-8}%\hyperlabel{ch8-mode-8}%
+
+In mode 8 we have 8 different colours. To represent the values 0 to
+    7 we need at least 3 bits. As there is flashing allowed in mode 8, we need
+    a bit for flash on or flash off as well. 4 bits per pixel is what we need
+    and that is what we use.
+
+In this mode, the green byte and the red byte are at the same
+    addresses as in mode 4 with the green being even and the red being odd,
+    but the layout is different. The green byte shares with the flash bit
+    where the green bit is the odd numbered bit (7, 5, 3, 1) and the flash
+    bits are in the even bits (6, 4, 2, 0). A similar arrangement goes on in
+    the red byte with the red bits being even and the blue being odd. So the
+    layout looks like Table~\ref{tab:Mode8ScreenMemoryWordFormat}.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l}
+\toprule
+\textbf{Green byte bits (even address)} & \textbf{Red byte bits (odd address = green address + 1)}  \\
+\midrule
+%
+G3 F3 G2 F2 G1 F1 G0 F0 & R3 B3 R2 B2 R1 B1 R0 B0 \\
+%
+\bottomrule
+\end{tabular}
+\caption{Mode 8 Screen Memory Word Format.}
+\label{tab:Mode8ScreenMemoryWordFormat}
+\end{table}
+
+Again the values for the colours represent the mixing of the reds,
+    greens and blues -{} much like colours in nature are just mixes of red, blue
+    and yellow. (Light and inks mix differently and so have different primary
+    colours. In photography, we use yellow, cyan and magenta!)
+
+The colours are as per Table~\ref{tab:Mode8ColourCodes}:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l}
+\toprule
+\textbf{Colour} & \textbf{GRB (Binary)} & \textbf{Value (Decimal)}  \\
+\midrule
+%
+Black & 000 & 0 \\
+Blue  & 001 & 1 \\
+Red   & 010 & 2 \\
+Magenta & 011 & 3 \\
+Green & 100 & 4 \\
+Cyan & 101 & 5 \\
+Yellow & 110 & 6 \\
+White & 111 & 7 \\
+%
+\bottomrule
+\end{tabular}
+\caption{Mode 8 Colour Codes}
+\label{tab:Mode8ColourCodes}
+\end{table}
+
+So given the following bit pattern in mode 8:
+
+\begin{lstlisting}[frame=none,numbers=none]
+Green byte = 0x0x 1x1x 
+Red byte   = 1001 1110
+\end{lstlisting}
+
+and ignoring the flash bits (shown as `x' above)and combining the
+    appropriate GRB bits from each byte we get the results shown in Table~\ref{tab:Mode8ColourBits}:
+
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l l}
+\toprule
+\textbf{Bits (in each byte)} & \textbf{GRB (Binary)} & \textbf{Colour}  \\
+\midrule
+%
+76 & 010 & Red \\
+54 & 001 & Blue \\
+32 & 111 & White \\
+10 & 110 & Yellow \\
+%
+\bottomrule
+\end{tabular}
+\caption{Mode 8 Colour Bits.}
+\label{tab:Mode8ColourBits}
+\end{table}
+
+The flash bits are strange. At the beginning of each scan line, the
+    flashing is turned off until such time as a flash bit is set -{} this turns
+    flashing on until the next flash bit which is set is found. This turns
+    flash off again -{} so the flash bits act like a toggle turning flash on and
+    off each time a set bit is found.
+
+\begin{note}
+Most books I have read on the subject totally ignore the flash
+      bits after this discussion -{} I am going to go into it in much more
+      depth. Well that was a lie, I'm not!
+\end{note}
+
+\section{That calculation again!}
+\label{ch8-calculation}%\hyperlabel{ch8-calculation}%
+
+Have you had a good think about calculating screen addresses for
+    pixels then? Better still, have you thought about the problem I hinted at
+    above? What is the problem then?
+
+If each word of the screen memory holds data for either 8 or 4
+    pixels, then how can we calculate the correct address for each pixel,
+    because it is (now) obvious that the address for the first 8 pixels in
+    each row will be the same in mode 4 (or 4 pixels in mode 8) so our
+    wonderful calculation above needs a bit of tweaking to make it work
+    correctly.
+
+In mode 4, the screen address changes every 8 pixels across. So
+    where x is 0 to 7, the screen address is the same, for x = 8 to 15 it is
+    the next word of memory and so on. The word that the x pixel lives in is
+    found by the calculation, but the actual pixel within that group of 8
+    pixels is not found. Follow?
+
+Assume row zero and pixel 2, this gives screen address =
+
+$base~address + (0 * scan~width) + INT(2 / 4)$
+
+or
+
+$base~address + 0 + 0$
+
+or
+
+$base~address$
+
+This is the same address for pixel 0 through pixel 7. For pixels 8
+    to 15 it will be as follows (using 8 in the calculation):
+
+$base~address + (0 * scan~width) + INT(8 / 4)$
+
+or
+
+$base~address + 2$
+
+so we know the memory word, but not the actual bits within it.
+    Remember bits 7 = pixel 0, bit 6 = pixel 1 and so on down (up?) to bit 0
+    for pixel 7. How do we get to a value between 0 and 7 from any x value? If
+    we AND the x value with 7 that will give us a value between 0 and 7 won't
+    it -{} lets see:
+
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{r c}
+\toprule
+\textbf{X} & \textbf{X AND 7} \\
+\midrule
+%
+0 & 0 \\
+1 & 1 \\
+2 & 2 \\
+3 & 3 \\
+4 & 4 \\
+5 & 5 \\
+6 & 6 \\
+7 & 7 \\
+8 & 0 \\
+9 & 1 \\
+10 & 2 \\
+%
+\bottomrule
+\end{tabular}
+\caption{Truth Table for X AND 7}
+\label{tab:TruthTableForXAnd7}
+\end{table}
+
+And so on. Are these the correct values for the bits in the word
+    that we want? Try this and see if we get the results shown in Table~\ref{tab:Xand7PlusBitsRequired}:
+
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{c c}
+\toprule
+\textbf{X AND 7} & \textbf{Correct Bit} \\
+\midrule
+%
+0 & 7 \\
+1 & 6 \\
+2 & 5 \\
+3 & 4 \\
+4 & 3 \\
+5 & 2 \\
+6 & 1 \\
+7 & 0 \\
+%
+\bottomrule
+\end{tabular}
+\caption{X AND 7 plus the Bits Required}
+\label{tab:Xand7PlusBitsRequired}
+\end{table}
+
+Not quite it would appear, but we could always subtract $(x~AND~7)$
+    from 7 couldn't we? That would give the correct answer. So a solution is
+    at hand. If we subtract the result of $(x~AND~7)$ from 7, we get the correct
+    bit number in each byte of the calculated memory word. Yippee (or is it -{}
+    read on.)
+
+Not quite, I'm afraid. If we have the memory address, we can extract
+    the current contents -{} we must preserve the other 7 pixels when we plot
+    this one remember -{} so we need to mask out the same bit in each byte of
+    the screen word. If we used the subtraction method identified above, we
+    would needs bucket loads of testing and masking to figure out which bit is
+    required. We need another method. Before we get to that, how exactly shall
+    we preserve the current pixels?
+
+Remember that a pixel is defined by a single bit in the green byte
+    and the corresponding bit in the red byte of the screen word. To set a
+    pixel we must first set its two bits to zero (or black) and then set the
+    two bits according to the requested colour. This turns out to be quite
+    simple.
+
+First create a mask where the bit to be changed in the red and green
+    bytes are set to zero and every other bit is set to 1. If we AND this mask
+    word with the screen word we effectively set that one pixel to black. So
+    far so good. Next set a new mask where the single bit in each byte is the
+    requested green or red bit and all the rest are zero. If we now OR this
+    word with the screen word we have set the pixel to our requested colour.
+    Too many words, lets have an example.
+
+Our screen shows the following colours in the first 8 pixels:
+
+\begin{lstlisting}[frame=none,numbers=none]
+red green green black black white red white
+\end{lstlisting}
+
+This means that we have the following two bit values for each pixel:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+01 10 10 00 00 11 01 11
+\end{lstlisting}
+
+Which means that we have the following word in memory:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+01100101 10000111 = $6587
+\end{lstlisting}
+
+Now let us assume that we want to colour the first pixel (currently
+    red) to white. So our mask to clear that bit (bit 7 in each byte) needs to
+    be set to
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+01111111 01111111 = $7f7f
+\end{lstlisting}
+
+Now we AND this word with the screen word to get the following
+   :
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+01100101 00000111 = $6507
+\end{lstlisting}
+
+Note now that the first pixel has been set to 00 (bit 7 from both
+    bytes) so it has effectively been set to black.
+
+Next we need a white pixel so the colour mask for white must have a
+    1 in bit 7 of each byte. The rest must be zero to preserve the current
+    colours of all the other pixels. Our mask must be:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+10000000 10000000 = $8080
+\end{lstlisting}
+
+So if we now OR this into the (new) screen word -{} currently \$6507 -{}
+    we get the following:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+11100101 10000111 = $E587
+\end{lstlisting}
+
+Taking all the bits into colour values we get this:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+11 10 10 00 00 11 01 11
+\end{lstlisting}
+
+which translates back to the following colours:
+
+white green green black black white red white
+
+Success, we have preserved all other pixels and set the first one to
+    white. Now we know how to do it to one pixel, it is the same for all the
+    other 7, but the masks need to be changed for each pixel. How?
+
+If we decide to change pixel 0 (as above) the masks are \$7f7f and
+    \$8080. This is easy. If we want pixel 1 to be changed the masks are
+    rotated one bit to the right becoming \$bfbf and 4040 and so on. Look again
+    at our table above where we show the result of $(x~AND~7)$ and the correct
+    bit in the screen word -{} notice that if we assume that pixel 0 is being
+    changed we can rotate the masks by $(x~AND~7)$ bits to get the correct masks
+    for whichever pixel we try to set, as Table~\ref{tab:BitmapsForMode4PixelMasking} shows:
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{c c l l}
+\toprule
+\textbf{Pixel} & \textbf{X AND 7} & \textbf{AND Mask} & \textbf{OR Mask} \\
+\midrule
+%
+0 & 0 & 01111111 & G0000000 R0000000 \\
+1 & 1 & 10111111 & 0G000000 0R000000 \\
+2 & 2 & 11011111 & 00G00000 00R00000 \\
+3 & 3 & 11101111 & 000G0000 000R0000 \\
+4 & 4 & 11110111 & 0000G000 0000R000 \\
+5 & 5 & 11111011 & 00000G00 00000R00 \\
+6 & 6 & 11111101 & 000000G0 000000R0 \\
+7 & 7 & 11111110 & 0000000G 0000000R \\
+%
+\bottomrule
+\end{tabular}
+\caption{Bitmaps for Mode 4 pixel masking.}
+\label{tab:BitmapsForMode4PixelMasking}
+\end{table}
+
+\begin{note}
+I have only shown one byte of the AND mask, the other byte is
+      identical as we are masking out the same bit in each byte.
+\end{note}
+
+Looking at the table, we see that the result of $(X~AND~7)$ is the
+    pixel we need to set in the screen. If we start with a mask suitable for
+    pixel 0 and ROTATE it to the right by $(X~AND~7)$ bits, we get the correct
+    mask for that pixel. This also works for our colour mask as well. Things
+    sometimes become clear when you switch to binary, especially in graphics
+    situations!
+
+We now have the basics for a mode 4 `pixel setting' routine. Lets
+    try it out.
+
+Assume that we want to set the colour of any pixel on the screen to
+    any of the 4 colours we want in mode 4. We can actually use any of the
+    mode 8 colours because only bits 2 and 1 will be used. This means that a
+    mode 8 colour of blue (value 001) will result in a mode 4 value black
+    (value 00) being set for the appropriate pixel. This is exactly how
+    SuperBasic would handle it.
+
+We will use the registers as follows:
+
+\begin{lstlisting}[firstnumber=1,]
+D1.W = x (across)
+D2.W = y (down)
+D3.W = colour (0 to 7)
+\end{lstlisting}
+
+Here's the code in all its glory:
+
+\begin{lstlisting}[firstnumber=1,caption={Mode 4 Screen Plotting},label={lst:Mode4ScreenPlotting}]
+*======================================================================
+* In D3 bit 2 is green and bit 1 is red, we don't need any other bits, 
+* so get rid of them now. Then shift the Green bit into bit 15 of D4 
+* and the red into bit 7 of D3 ...
+*======================================================================
+start       bra     plot_init       ; Call start+4 to initialise things
+
+plot_4      bsr.s   calc            ; Get A1 = screen address
+            andi.w  #6,d3           ; D3 = 00000000 00000GR0
+            lsl.w   #6,d3           ; D3 = 0000000G R0000000
+            move.w  d3,d4           ; D4 = 0000000G R0000000
+            lsl.w   #7,d4           ; D4 = GR000000 00000000
+            or.w    d4,d3           ; D3 = GR00000G R0000000
+            andi.w  #$8080,d3       ; D3 = G0000000 R0000000
+
+*======================================================================
+* D3.W is now set to a colour mask for pixel 0. This is where we want 
+* to start. Now we need to build a mask to clear out pixel 0 as well. 
+* This is easy - use the value from the table above. Then we can start 
+* rotating them into the correct position as detailed above.
+*======================================================================
+            move.w  #$7f7f,d2       ; AND mask = 10000000 10000000
+            andi.w  #7,d1           ; (x AND 7) in d1
+            ror.w   d1,d2           ; Build correct AND mask
+            ror.w   d1,d3           ; Build correct OR mask (colour)
+            and.w   d2,(a1)         ; AND out the changing pixel
+            or.w    d3,(a1)         ; OR in the (new) colour
+            moveq   #0,d0           ; No errors
+            rts                     ; All done
+
+*======================================================================
+* Calculate the screen address for the x and y values passed in D1 and
+* D2. Trashes A1, D4 and D5.
+* The routine plot_init must have been called to initialise the screen 
+* addresses and scan line widths BEFORE calling this routine.
+*======================================================================
+calc        lea     scr_base,a1     ; Storage for screen base address
+            move.l  (a1)+,d0        ; Fetch the screen base address
+            move.w  (a1),d6         ; And the scan line size
+            movea.l d0,a1           ; Save it
+
+*======================================================================
+* D1.W = x across value
+* D2.W = y down value
+* D3.W = ink colour required
+* D6.W = scan line size
+* A1.L = screen base address
+*======================================================================
+            move.w  d2,d5           ; Copy y value (down)
+            ext.l   d5              ; We get a long result next ...
+            mulu    d6,d5           ; Multiply by scan_line size
+            adda.l  d5,a1           ; A1 = correct scan line address
+
+            move.w  d1,d4           ; Copy x value
+            lsr.w   #2,d4           ; D4 = INT(x / 4)
+            bclr    #0,d4           ; Even address = green byte
+            adda.w  d4,a1           ; A1 = correct screen word address
+            rts                     ; Done
+
+*======================================================================
+* This routine must be called once before using the plot routines. It
+* initialises the screen base address and scan line width from the 
+* channel definition block for SuperBasic channel #0.
+*======================================================================
+plot_init   suba.l  a0,a0           ; Channel id for #0 is always 0
+            lea     scr_base,a1     ; Parameter passed to extop routine
+            lea     extop,a2        ; Actual routine to call
+            moveq   #sd_extop,d0    ; Trap code
+            moveq   #-1,d3          ; Timout
+            trap    #3              ; Do it
+            tst.l   d0              ; OK?
+            bne.s   done            ; No, bale out D1 = A1 = garbage
+
+got_them    move.w  d1,-(a7)        ; Need to check qdos, save scan_line
+            moveq   #mt_inf,d0      ; Trap to get qdos version
+            trap    #1              ; Get it (no errors)
+            move.w  (a7)+,d1        ; Retrieve scan_line value
+            andi.l  #$ff00ffff,d2   ; Mask the dot in QDOS "1.03" etc
+            cmpi.l  #$31003034,d2   ; Test "1?03" where? = don't care
+            bcs.s   too_old         ; Less than 1.03 is too old
+
+save        move.w  d1,(a1)         ; Store the scan_line size
+
+done        rts                     ; Finished
+
+too_old     move.w  #128,d1         ; Must be 128 bytes
+            bra.s   save            ; Save D1 and exit
+
+extop       move.l  $32(a0),(a1)+   ; Scan_line length - stored
+            move.w  $64(a0),d1      ; Screen base - not stored
+            moveq   #0,d0           ; No errors
+            rts                     ; done
+
+*======================================================================
+* Set aside some storage space to hold the screen base and scan_line 
+* width. This saves having to calculate it every time we plot a pixel.
+*======================================================================
+scr_base    ds.l    1
+scan_line   ds.w    1
+\end{lstlisting}
+
+And that is the end of the code. To use the above in your assembly
+    language programs simply call plot\_init once to set up the screen base and
+    scan line widths, then call plot\_4\program{Plot\_4} as often as you like. Easy
+    stuff.
+
+To test this code out from SuperBasic, ALCHP (or RESPR) some heap
+    and LBYTES the code file to that address and CALL it. This initialises the
+    system by calling plot\_init. Now, simply CALL address, x, y, colour and
+    the points will be plotted. Make sure you are in mode 4 or the results may
+    be a bit crazy! An example program follows:
+
+\begin{lstlisting}[firstnumber=1,]
+1000  PLOT_INIT = RESPR(256): REMark Enough space for plot_8 as well!
+1005  PLOT_4 = PLOT_INIT + 4
+1010  LBYTES flp1_plot_bin, PLOT_INIT
+1015  CALL PLOT_INIT
+1020  FOR across = 0 to 100
+1025    FOR down = 0 to 100
+1030      CALL PLOT_4, across, down, RND(0 to 7)
+1035    END FOR down
+1040  END FOR across
+\end{lstlisting}
+
+\section{Problems}
+\label{ch8-problems}%\hyperlabel{ch8-problems}%
+
+Ok, so what, if anything is wrong with the plot\_4\program{Plot\_4} routine? The
+    answer is that there is no checking to see if the x and y values are out
+    of range. If you try to plot say pixel 2000,494 the chances are that it
+    would corrupt something in memory (probably a system variable) with either
+    immediate or later results.
+
+It is probably easy to check the x value (or across) because there
+    are 8 pixels per word in mode 4 so multiplying the scan line width (in
+    bytes) by 4 should give the maximum resolution across. Indeed, on my QXL,
+    this works out. My scan line is 160 bytes and the maximum resolution is
+    640 across by 480 down. 160 times 4 is indeed 640. Unfortunately, I cannot
+    think or find a method of calculating the maximum display resolution in
+    the `downward' direction.
+
+It may be true that all current display resolutions that are 640
+    across must be 480 down, but is this true or not? It appears not. A quick
+    check with the demo version of QPC 2 (an old demo version at that) shows
+    that It can have the resolutions listed in Table~\ref{tab:QPCScreenDimensions} ( across by down):
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l l}
+\toprule
+\textbf{X (Across)} & \textbf{Y (Down)} \\
+\midrule
+%
+512 & 256 \\
+640 & 400 \\
+640 & 480 \\
+800 & 600 \\
+1024 & 768 \\
+1152 & 864 \\
+1280 & 1024 \\
+1600 & 1200 \\
+%
+\bottomrule
+\end{tabular}
+\caption{QPC Screen Dimensions}
+\label{tab:QPCScreenDimensions}
+\end{table}
+
+So we can already see that detecting a 640 pixels across resolution
+    leads to a decision about the downward resolution, is it 400 or
+    480?
+
+I feel the need to be told if there is a way, simple and effective
+    and which works on all machines, whether they are black box QLs or Q40s or
+    emulators, to tell the maximum screen resolution. Anyone got any ideas? If
+    so, Dilwyn will be glad to print the article you are about to write!!
+
+\section{Exercise}
+\label{ch8-exercise}%\hyperlabel{ch8-exercise}%
+
+For this exercise, I want you to write a mode 8 plot routine in a
+    manner similar to the plot\_4\program{Plot\_4} routine shown above. Here are some hints
+   :
+\begin{itemize}[itemsep=0pt]
+
+\item{}Avoid the flash bits like the plague. Simply mask them out and
+        set them to zero.
+
+
+\item{}The calc routine works for mode 8 as well. No need to change
+        it.
+
+
+\item{}The mask for pixel 0's colour needs to be GF000000
+        RB000000.
+
+
+\item{}The mask to clear pixel 0 needs to be 01111111 00111111
+        (\$7f3f).
+
+\end{itemize}
+
+The algorithm is as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Calculate the screen address by calling calc. Sets A1 = screen
+        address.
+
+
+\item{}Mask out all but bits 0, 1 and 2 of D3.W This is the pixel
+        colour. D3 = GRB.
+
+
+\item{}Shift D3.W LEFT by 6 bits.
+
+
+\item{}Copy D3.W to D4.W
+
+
+\item{}Shift D4 left by 7 bits.
+
+
+\item{}\opcode{ANDI.W D4.W} with \$8000 to preserve only bit 15 = G.
+
+
+\item{}\opcode{ANDI.W D3.W} with \$C0 to zero the G bit currently in bit
+        8.
+
+
+\item{}\opcode{OR.W D4} into D3 to give the correct colour mask for pixel
+        0.
+
+
+\item{}\opcode{ANDI.W D1} with 6 to get the correct number of rotates (6 makes
+        it even which it must be because we need to rotate two bits for each
+        pixel.)
+
+
+\item{}Rotate right, the two mask words, the correct number of
+        bits.
+
+
+\item{}\opcode{AND.W} the mask with the screen word.
+
+
+\item{}\opcode{OR.W} the colour mask with the screen word.
+
+
+\item{}Clear D0 and return.
+
+\end{itemize}
+
+The results of (x and 6) are as follows:
+
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{r c}
+\toprule
+\textbf{X} & \textbf{X AND 6} \\
+\midrule
+%
+0 & 0 \\
+1 & 0 \\
+2 & 2 \\
+3 & 3 \\
+4 & 4 \\
+5 & 4 \\
+6 & 6 \\
+7 & 6 \\
+8 & 0 \\
+9 & 0 \\
+10 & 2  \\
+%
+\bottomrule
+\end{tabular}
+\caption{Truth Table for X AND 6}
+\label{tab:TruthTableForXAnd6}
+\end{table}
+
+And so on. Because we are using two bits of the green and red bytes
+    to represent our colour, we need to always rotate by an even
+    number.
+
+To test it all out, add the code to the end of the original file
+    which has plot\_4\program{Plot\_4} in it and change the first two lines from this:
+
+\begin{lstlisting}[firstnumber=1,]
+start       bra     plot_init
+plot_4      bsr.s   calc
+\end{lstlisting}
+
+to the following:
+
+\begin{lstlisting}[firstnumber=1,]
+start       bra     plot_init
+plot_4      bra     plot_4
+plot_8      bra     plot_8
+\end{lstlisting}
+
+This means that plot\_init is the start address, plot\_4 is at address
+    + 4 and plot\_8 has been inserted at start address + 8, as follows:
+
+\begin{lstlisting}[firstnumber=1,language={}]
+1000  PLOT_INIT = RESPR(256): REMark Enough space for plot_8 as well!
+1005  PLOT_4 = PLOT_INIT + 4
+1010  PLOT_8 = PLOT_INIT + 8
+1010  LBYTES flp1_plot_bin, PLOT_INIT
+1015  CALL PLOT_INIT
+\end{lstlisting}
+
+Have fun.
+
+\section{Answer}
+\label{ch8-answers}%\hyperlabel{ch8-answers}%
+\program{Plot\_8}
+\begin{lstlisting}[firstnumber=1,caption={Mode 8 Screen Plotting},label={lst:Mode8ScreenPlotting}]
+plot_8   bsr.s   calc            ; Get A1 = screen address
+         andi.w  #7,d3           ; D3 = 00000000 00000GRB
+         lsl.w   #6,d3           ; D3 = 0000000G RB000000
+         move.w  d3,d4           ; D4 = 0000000G RB000000
+         lsl.w   #7,d4           ; D4 = GRB00000 00000000
+         andi.w  #$8000,d4       ; D4 = G0000000 00000000
+         andi.w  #$00C0,d3       ; D3 = 00000000 RB000000
+         or.w    d4,d3           ; D3 = G000000G RB000000
+         move.w  #$7f3f,d2       ; AND mask = 01111111 00111111
+         andi.w  #6,d1           ; (x AND 6) in d1
+         ror.w   d1,d2           ; Build correct AND mask
+         ror.w   d1,d3           ; Build correct OR mask (colour)
+         and.w   d2,(a1)         ; AND out the changing pixel
+         or.w    d3,(a1)         ; OR in the (new) colour
+         moveq   #0,d0           ; No errors
+         rts                     ; All done
+\end{lstlisting}
+
+\section{Coming Up...}
+\label{ch8-the-end}%\hyperlabel{ch8-the-end}%
+
+That's all about the QL screen for the moment. Coming up in the next chapter
+    , we will start to take a look at subroutines in Assembly Language and
+    build a (hopefully) useful subroutine library which will allow us to
+    include them in any new programs we write. 
+

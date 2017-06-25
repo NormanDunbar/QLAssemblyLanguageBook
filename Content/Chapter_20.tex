@@ -1,0 +1,214 @@
+\chapter{The Pointer Environment}
+
+\section{Introduction}
+\label{ch20-intro}%hyperlabel{ch20-intro}%
+
+Well for many years now I've been avoiding this moment, but it has finally arrived.
+I am starting to learn all about programming the PE in assembly language. You are coming
+along for the ride! I'm sure that along the way I'll be making as many, if not more,
+errors than I usually do and someone out there who knows far more than me, will correct me
+as we go along. As I always say, you should learn from your mistakes!\footnote{Or mine!} 
+
+\section{The Pointer Environment}
+\label{ch20-the-pe}%hyperlabel{ch20-the-pe}%
+
+There are two parts to the PE\index{Pointer Environment}, PTR\_GEN\program{PTR\_GEN} and WMAN\program{WMAN} -{} the Pointer environment and the
+Window Manager. To slip easily into programming, we shall start off with a small and
+perfectly useless pointer only program, so the Window Manager stuff will not be
+used.
+
+In order to run the program you should have \program{PTR\_GEN} loaded. If you are running
+SMSQ/E then it is built in to the operating system. If you are running a `normal' QL then
+you will need to load it. I suspect most -{} if not all -{} users still with us will have a
+copy, however, if not, Dilwyn's Web Site will have a copy to download.
+
+Ok, lets dive straight in with our next to useless program, beginning with a host of
+equates.
+
+\begin{lstlisting}[firstnumber=1,caption={Simple PE Program - Part 1}]
+me          equ     -1                 ; The current job id
+timeout     equ     -1                 ; Infinite timeout
+openOld     equ     0                  ; Open Old Exclusive device
+iop_pinf    equ     $70                ; Get PE information
+iop_outl    equ     $7a                ; Outline a primary window
+iop_rptr    equ     $71                ; Read the pointer
+termVec     equ     $01                ; When to return from IOP_RPTR
+\end{lstlisting}
+
+The final equate above tells the call to \pe{IOP\_RPTR} when to return back to the code in
+our program. It is 8 bits long and each bit has special meaning, as follows:
+\begin{table}[htbp]
+\centering
+\begin{tabular}{l p{0.8\textwidth}}
+\toprule
+\textbf{Bit} & \textbf{Description} \\
+\midrule
+%
+0 & Return when a key or button is pressed in the window. Also, request window resize \\
+1 & Return when a key or button is pressed (subject to auto repeat). Also request window move \\
+2 & Return when a key or button is released in the window \\
+3 & Return when the pointer moves from the given co-ordinates in the window \\
+4 & Return when the pointer moves out of the window \\
+5 & Return when the pointer is inside the window \\
+6 & Pointer hit the window edge \\
+7 & Window Request \\
+%
+\bottomrule
+\end{tabular}
+\caption{The termination vector}
+\label{tab:TerminationVector}
+\end{table}
+
+Bits 0 and 1 look a bit funny and are used in conjunction with bit 7 to indicate a
+window request. If bit 7 is set then the rest should be zero except bit 0 or 1 -{} one of
+these should be set. If bit 0 is set the pointer is the resize one and if bit 1 is set it
+is the window move pointer. If both are unset, the Window Required pointer will be
+displayed. With bit 7, the topmost window of the pile if hit and selected. More on this
+later in the series.
+
+Our termination vector is set to have bit zero turned on only. This means when a
+mouse button is pressed or any key is pressed while the pointer is in the window we create
+later, the call to \pe{IOP\_RPTR} will return.
+
+As this is a job, we need a standard job header and as we have seen this so many
+times before, I shall not insult your intelligence by explaining it yet again!
+
+\begin{lstlisting}[firstnumber=last,caption={Simple PE Program - Part 2}]
+            bra.s   start
+            dc.l    0
+            dc.w    $4afb
+            dc.w    15
+            dc.b    'PTR_GEN Test v1'
+\end{lstlisting}
+
+Next we have a few definitions of channel names, window sizes and space for the
+Pointer Record that we get back from a call to \pe{IOP\_RPTR}. First of all, a channel to a
+console is required.
+
+\begin{lstlisting}[firstnumber=last,caption={Simple PE Program - Part 3}]
+conChan     dc.w    4
+            dc.b    'con_'
+\end{lstlisting}
+
+Once we have it open, we redefine it to be 200 wide, 100 deep and centred in the
+middle of a 512 by 256 `standard' window using the following block of 4 words.
+
+\begin{lstlisting}[firstnumber=last,caption={Simple PE Program - Part 4}]
+conDef      dc.w    200,100,156,78
+\end{lstlisting}
+
+The next 24 bytes are used by the \pe{IOP\_RPTR} call and it stores the pointer record.
+There is more on this later on in the text.
+
+\begin{lstlisting}[firstnumber=last,caption={Simple PE Program - Part 5}]
+ptrRec      ds.w    12
+\end{lstlisting}
+
+This is where we start the main code. It's pretty simple as you can see and all we
+basically do here is open a console device, redefine it as mentioned above, set a border
+of one pixel in red and finally clear the screen (to black paper by default)  If anything
+gives an error we simply kill the job and exit.
+
+\begin{lstlisting}[firstnumber=last,caption={Simple PE Program - Part 6}]
+start       moveq   #IO_OPEN,d0        ; Open a channel
+            moveq   #me,d1             ; Channel required for this job
+            moveq   #openOld,d3        ; Device exists
+            lea     conChan,a0         ; Define device to open
+            trap    #2                 ; Do it
+            tst.l   d0                 ; Ok?
+            bne.s   exit               ; No, exit
+
+            moveq   #sd_wdef,d0        ; Redefine open window
+            moveq   #2,d1              ; Border colour is red
+            moveq   #1,d2              ; Border width is one pixel
+            moveq   #timeout,d3        ; Infinite timeout
+            lea     conDef,a1          ; Console definition block
+            trap    #3                 ; Do it
+            tst.l   d0                 ; Ok?
+            bne.s   exit               ; NO, exit
+
+            moveq   #sd_clear,d0       ; CLS
+            moveq   #timeout,d3        ; Infinite timeout
+            trap    #3                 ; Do it
+            tst.l   d0                 ; Ok
+            bne.s   exit               ; No, exit
+\end{lstlisting}
+
+That's about all the main setting up that we have to do. We now have a channel open
+redefined and a nice border showing. The next stage is to look for the PE, if it isn't
+found, we have a problem and simply exit.
+
+\begin{lstlisting}[firstnumber=last,caption={Simple PE Program - Part 7}]
+FindPE      moveq   #iop_pinf,d0       ; Get PE Information
+            moveq   #timeout,d3        ; Infinite timeout
+            trap    #3                 ; Do it
+            tst.l   d0                 ; Ok?
+            bne.s   exit               ; No, exit
+\end{lstlisting}
+
+So far so good. If the PE exists, we now need to make sure that our window is
+outlined. This indicates to the PE that the window is to be `managed'  It also defines the
+limits of the `hit area' where a hit or do or keypress will be registered by our program.
+This gets a better explanation later in the series.
+
+\begin{lstlisting}[firstnumber=last,caption={Simple PE Program - Part 8}]
+GotPE       moveq   #iop_outl,d0       ; OUTLN our window
+            move.l  #$00020002,d1      ; Shadow size of 2 
+            moveq   #0,d2              ; Don't preserve window contents
+            moveq   #timeout,d3        ; Infinite timeout
+            lea     conDef,a1          ; Window size without shadow
+            trap    #3,                ; Do it
+            tst.l   d0                 ; Ok?
+            bne.s   exit               ; No, exit
+\end{lstlisting}
+
+The shadow size is added to the sized defined in our console definition block but
+the shadow is outside of the hit area for our window. Now we read the pointer. The call to
+\pe{IOP\_RPTR} will not return unless the timeout expires or an event happens that has been set
+in the termination vector to cause a return. We are looking for a button or keypress while
+the pointer is inside out window.
+
+\begin{lstlisting}[firstnumber=last,caption={Simple PE Program - Part 9}]
+Pointer     moveq   #iop_rptr,d0       ; Read the Pointer
+            moveq   #0,d1              ; Set pointer co-ordinates 0,0
+            moveq   #termVec,d2        ; Return on button or keypress
+            moveq   #timeout,d3        ; Infinite timeout
+            lea     ptrRec,a1          ; Storage for pointer record
+            trap    #3                 ; Do it
+            moveq   #0,d0              ; We ignore CHANNEL NOT OPEN
+errors
+\end{lstlisting}
+
+When the user click in the window with the mouse, either button will do, or presses
+a key, the call to \pe{IOP\_RPTR} will return having filled the pointer record with useful
+information. We are not bothering with that here in this first simple demo. We are also
+ignoring the possibility of A0 pointing at a channel that is closed because by the time we
+get here, we have carried out lots of actions on it -{} so it should still be open!
+
+The next part of the code simply kills off our job reclaiming any resources it
+allocated and closing channels etc.
+
+\begin{lstlisting}[firstnumber=last,caption={Simple PE Program - Part 10}]
+exit        move.l  d0,d3              ; Save any error codes
+            moveq   #MT_FRJOB,d0       ; Kill a job
+            moveq   #timeout,d1        ; The job to kill is this one
+            trap    #1                 ; Kill me
+            bra.s   exit               ; We never get here...
+\end{lstlisting}
+
+That is all there is to this small demonstration. When assembled and run, you should
+see a 200 by 150 window centered on screen (well on a standard QL screen anyway) cleared
+to show black paper with a single pixel red border and a shadow down the right and bottom
+borders. It is waiting for you to move the pointer into. When you do it will change to an
+arrow and will remain as an arrow while you move it around. Click a button or press a key
+while the pointer is in our window and the job will kill itself.
+
+So there we are, a very simple pointer Environment program. More next time as we
+extend our programming knowledge of the PE. See you then.
+
+\section{Coming Up...}
+\label{ch20-the-end}%hyperlabel{ch20-the-end}%
+
+That's it then, a very quick and useless introduction to the Pointer Environment
+code. Next time, we shell delve a little deeper and investigate the Pointer Record to see
+what it can tell us.

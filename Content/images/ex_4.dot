@@ -1,0 +1,16 @@
+digraph structs {
+    rankdir=LR
+    //label="EX With Two Pipes";
+    pad="0.3";
+    //bgcolor=grey77;
+    node [shape=record fillcolor=yellowgreen style=filled];
+    structA7 [label="<f0> A7.L"];
+    structS  [label="<cmd> $00.W | <o_chid> $nnnn.L | <i_chid> $nnnn.L | <ch> $02.W"];
+    structP [label="<cmd> Command String size | <o_chid> Output Pipe channel ID | <i_chid> Input Pipe channel ID | <ch> Number of open channels" style=filled fillcolor=thistle];
+    structA7:f0 -> structS:ch;
+    edge [style="dashed" dir=back];
+    structS:cmd -> structP:cmd;
+    structS:o_chid -> structP:o_chid
+    structS:i_chid -> structP:i_chid
+    structS:ch -> structP:ch;
+}

@@ -1,0 +1,1307 @@
+\chapter{Subroutines}
+
+\section{Introduction}
+\label{ch9-intro}%\hyperlabel{ch9-intro}%
+
+Here we are in part 9 of the series on assembly language for the QL and what we
+    will look at today are subroutines.
+
+\section{Subroutines}
+\label{ch9-subroutines}%\hyperlabel{ch9-subroutines}%
+
+A subroutine is simply a piece of code that you call lots of times
+    within your program. Because it is called so many times, you extract the
+    working code, move it somewhere safe and add an \opcode{RTS} at the end. This is
+    your subroutine -{} in its draft form!
+
+Where the code used to be in the main source, now simply has a 
+\lstinline{BSR sub_routine} in its place. The more times a routine is called, the bigger
+    the saving in your typing and memory usage in the final program. Another
+    major advantage of using subroutines is that you only need to change or
+    correct them once -{} of course, if you make a mistake then every call to
+    that subroutine is flawed as well!
+
+For example, in a program you have written, you might find that you
+    write the same piece of code numerous times to clear the screen, something
+    like that shown in \lstlistingname~\ref{lst:ExampleOfRepetitiveCode}:
+
+\begin{lstlisting}[firstnumber=1,caption={Example of Repetitive Code},label={lst:ExampleOfRepetitiveCode}]
+    start   blah blah blah
+       :
+       :
+        move.l  channel_id,a0       ; First channel id
+        moveq    #sd_clear,d0       ; CLS
+        moveq    #infinite,d3       ; Infinite timeout
+        trap     #3                 ; CLS title window
+       :
+       :
+        move.l  other_channel_id,a0 ; Another channel id
+        moveq    #sd_clear,d0       ; CLS
+        moveq    #infinite,d3       ; Infinite timeout
+        trap     #3                 ; CLS title window
+       :
+       :
+        move.l  another_id,a0       ; And another channel id
+        moveq    #sd_clear,d0       ; CLS
+        moveq    #infinite,d3       ; Infinite timeout
+        trap     #3                 ; CLS title window
+       :
+       :
+        rts                         ; All done
+\end{lstlisting}
+
+and so on. The above code looks duplicated and where you have
+    duplication, you can usually -{} but not always -{} extract the duplicate code
+    to a subroutine. We can now rewrite the code above as follows:
+
+\begin{lstlisting}[firstnumber=1,caption={Example of Non-repetitive Code},label={lst:ExampleOfNonRepetetiveCode}]
+start   blah blah blah
+       :
+       :
+        move.l  channel_id,a0       ; First channel id
+        bsr     cls
+       :
+       :
+        move.l  other_channel_id,a0 ; Another channel id
+        bsr     cls
+       :
+       :
+        move.l  another_id,a0       ; And another channel id
+        bsr     cls
+       :
+       :
+        rts                         ; All done
+
+*-------------------------------------------------------------------
+* Subroutine to clear the SCR or CON channel whose ID is held in A0.
+*-------------------------------------------------------------------
+cls     moveq    #sd_clear,d0       ; CLS
+        moveq    #-1,d3             ; Infinite timeout
+        trap     #3                 ; CLS title window
+        rts
+\end{lstlisting}
+
+The code that does the setting up of the various parameters for the
+    system call to clear a channel has been extracted and placed at the end
+    all by itself. An \opcode{RTS} instruction has been added to allow us to go back to
+    where we came from. The second piece of code is easier (?) to read and
+    will be smaller when finished.
+
+So that is all there is to it. If you remember back to the boring
+    part of this series (what do you mean `which boring part?') where I
+    discussed the inner workings of the \opcode{BSR} instruction, you will remember
+    that \opcode{BSR} stacks the address of the instruction that will be executed next
+    (after the \opcode{BSR}), jumps to the address given and continues executing from
+    there until it finds an \opcode{RTS} instruction.
+
+The \opcode{RTS} instruction stop the program in its tracks, sets the PC (2
+    points if you can remember what PC stands for ...) to the address that was
+    stacked and proceeds to execute from there again. Those of you who are
+    ahead of me at this point will realise that the \opcode{RTS} instruction takes the
+    top 4 bytes off of the stack \emph{regardless} of what they are. If they are a
+    valid return address then fine, no problems. If, on the other hand, they
+    are some data, then who knows what will happen when the \opcode{RTS} is
+    executed.
+
+For this reason, it is very important that your stack should be
+    exactly the same on the way out of a subroutine as it was on the way in.
+    Don't do something like that shown in \lstlistingname~\ref{lst:ExampleOfAMessedUpStack}, for example:
+
+\begin{lstlisting}[firstnumber=1,caption={Example of a Messed up Stack!},label={lst:ExampleOfAMessedUpStack}]
+start   blah blah blah
+       :
+       :
+        move.l  channel_id,a0       ; First channel id
+        bsr     cls
+       :
+       :
+        rts
+
+*---------------------------------------------------------------------
+* BROKEN subroutine to clear the SCR or CON channel whose ID is in A0.
+*---------------------------------------------------------------------
+cls     move.l   d0,-(a7)           ; Preserve D0 until later
+        moveq    #sd_clear,d0       ; CLS
+        moveq    #-1,d3             ; Infinite timeout
+        trap     #3                 ; CLS title window
+        rts                         ; Program explodes here!
+\end{lstlisting}
+
+In this example, the old value of D0.L is on the stack on top of the
+    return address. When the \opcode{RTS} instruction is executed it doesn't know (or
+    care) about what is on the stack, it just grabs the top 4 bytes and sets
+    the PC to that `address'. (You get 2 points if you remembered PC = Program
+    Counter!)
+
+\section{Building A Library}
+\label{ch9-build-library}%\hyperlabel{ch9-build-library}%
+
+As you progress with assembly language programming, you may find
+    that you build up a lot of subroutines in your programs. What to do with
+    them all?
+
+Why not build yourself a library of routines that you can include in
+    every program that needs them. This way, you have a full set of tried and
+    tested bits of code -{} which you should document somewhere -{} that can be
+    reused over and over again. The rest of this article will help you on your
+    way by building a number of useful (well, I have found them to be useful
+    over the years) subroutines that you can use.
+
+\section{Documentation}
+\label{ch9-documentation}%\hyperlabel{ch9-documentation}%
+
+As with all good things, documentation is a must. If you have a
+    large number of useful routines then they should be documented somewhere.
+    This will allow you to look for a routine in your library and from that,
+    find out its input \& output parameters and which file it lives
+    in.
+
+A suitable template that you could use for each subroutine is as
+    follows:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+*---------------------------------------------------------------------
+* NAME
+* DEPENDENCY (1)
+* DEPENDENCY (2)
+* PURPOSE
+* INPUTS
+* OUTPUTS
+*---------------------------------------------------------------------
+\end{lstlisting}
+
+The above looks very like comments in a source file -{} this implies
+    that we could add the documentation to the source file and then run a
+    utility program to extract the details and store them in a text file -{}
+    which you can edit and/or print as desired.
+
+Having a standard header above each subroutine also implies that you
+    could write a utility program to scan the entire library and ask you which
+    ones you want to include in your output file -{} which will be you source
+    file for your next masterpiece -{} before extracting them all and writing
+    them to this file.
+
+As for the subroutines themselves, I mentioned above that they exist
+    in a draft form when you simply extract the code from the `wordy' source
+    and add an \opcode{RTS} to the end. This is fine, but it could be that you need to
+    preserve certain registers so that the code calling the subroutine doesn't
+    need to keep saving and restoring them. The updates required are:
+
+Check which registers will be used by the code explicitly -{} save
+    them before and restore them after the main part of the subroutine
+    code.
+
+Check which system calls are made by the subroutine and look up the
+    QDOSMSQ documentation to see which registers are trashed by the system
+    call. Add these registers to the save and restore routines.
+
+Save the registers as the first line of code in the subroutine and
+    restore them as the line immediately before the \opcode{RTS} (or as near to the \opcode{RTS} as possible).
+
+Always have the subroutine return an error code and/or the flags set
+    to signal if an error occurred or not.
+
+An actual example is shown in \lstlistingname~\ref{lst:ASubroutineExample}:
+
+\begin{lstlisting}[firstnumber=1,caption={A Subroutine Example},label={lst:ASubroutineExample}]
+*---------------------------------------------------------------------
+* NAME          CLS
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       To clear a screen/console channel.
+* DESCRIPTION   Clears the screen channel whose ID is supplied in A0.
+* INPUTS:
+*               A0.L = channel ID
+* OUTPUTS:
+*               D0 = Error code
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+cls             move.l   d1/d3/a1,-(a7) ; Corrupted by SD_CLEAR
+                moveq    #sd_clear,d0   ; SD_CLEAR defined in GWASL
+                moveq    #-1,d3         ; Infinite timeout
+                trap     #3             ; CLS the window
+                move.l   (a7)+,d1/d3/a1 ; Restore corrupted registers
+                tst.l    d0             ; Set Z flag if all ok
+                rts
+\end{lstlisting}
+
+In the above example, I have extended the `cls' code from our
+    original subroutine as follows:
+\begin{itemize}[itemsep=0pt]
+
+\item{}-{} I have added a documentation header comment.
+
+
+\item{}-{} I have preserved D3 because I use it in the code
+        myself.
+
+
+\item{}-{} I have preserved D1 and A1 because the QDOSMSQ documentation
+        states that these two registers are `undefined' on return from the
+        system trap \trap{SD\_CLEAR}.
+
+
+\item{}-{} I have restored all 3 of these registers before the
+        \opcode{RTS}.
+
+
+\item{}-{} I have added a \lstinline{TST.L D0} instruction to set the Z flags
+        according to whether an error was detected or not.
+
+\end{itemize}
+
+Note that although D0 is used by the code and by the system call, I
+    have not preserved it. This is quite simply because I use D0 to return any
+    error codes back to the caller. As I have documented its corruption in the
+    header, I assume that the user of the subroutine will read this and know
+    all about it!
+
+Bullet proofing the code like this helps to reduce unexpected bugs
+    in your programs when you forget to save a register and after a subroutine
+    call, assume it still has the same value as before. I know, I have been
+    there. Of course, there is not much you can do to prevent the
+    documentation you use from being wrong (been there too) but at least you
+    did your best!
+
+\section{The Subroutine Library}
+\label{ch9-the-library}%\hyperlabel{ch9-the-library}%
+
+Onwards with the code for my (useful) subroutines.
+
+\section{STR\_COPY}
+\program{STR\_COPY}
+\label{ch9-STR_COPY}%\hyperlabel{ch9-STR_COPY}%
+
+\begin{lstlisting}[firstnumber=1,caption={STR\_COPY}]
+*---------------------------------------------------------------------
+* NAME          STR_COPY
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       Copy the string at (A2) over the string at (A1).
+* DESCRIPTION   Copy the string whose address is passed in A2 over the
+*               string whose address is passed in A1 thus overwriting
+*               the old contents of the receiving string.
+* INPUTS:
+*               A1.L = Address of the receiving string
+*               A2.L = Address of the sending string
+* OUTPUTS:
+*               A1.L = Address of the receiving string (preserved)
+*               A2.L = Address of the sending string (preserved)
+*---------------------------------------------------------------------
+str_copy    movem.l d0/a1-a2,-(a7)  ; Preserve working register
+            move.w  (a2)+,d0        ; Get size of 'from' string
+            move.w  d0,(a1)+        ; Set new size of 'to' string
+            bra.s   sc_next         ; Skip the dbra stuff first time
+sc_moveb    move.b  (a2)+,(a1)+     ; Move a single byte
+sc_next     dbra    d0,sc_moveb     ; And the rest
+            movem.l (a7)+,d0/a1-a2  ; Restore working registers
+            rts                     ; Exit
+\end{lstlisting}
+
+\section{STR\_APPEND}
+\program{STR\_APPEND}
+\label{ch9-STR_APPEND}%\hyperlabel{ch9-STR_APPEND}%
+
+\begin{lstlisting}[firstnumber=1,caption={STR\_APPEND}]
+*---------------------------------------------------------------------
+* NAME          STR_APPEND
+*---------------------------------------------------------------------
+* DEPENDENCY    STR_COPY
+* PURPOSE       Append string at (A2) to the end of string at (A1).
+* DESCRIPTION   Copy the string whose address is passed in A2 to the
+*               end of the string whose address is passed in A1. The 
+*               old contents of both strings will be preserved - 
+*               except A1 which will be extended of course!
+* INPUTS:
+*               A1.L = Address of the receiving string
+*               A2.L = Address of the sending string
+* OUTPUTS:
+*               A1.L = Address of the receiving string (preserved)
+*               A2.L = Address of the sending string (Preserved)
+*---------------------------------------------------------------------
+str_append  movem.l  d0/a1-a2,-(a7) ; Save the working register
+            move.w  (a2)+,d0        ; Size of 'from' string
+            move.w  (a1),d1         ; Size of 'to' string
+            add.w   d0,(a1)+        ; New size of 'to' string
+            adda.w  d1,a1           ; New 'to' string end position
+            bra.s   sc_next         ; Copy bytes over using STR_COPY
+                                    ; D0 is restored by STR_COPY
+                                    ; STR_APPEND exits via STR_COPY.
+\end{lstlisting}
+
+\section{STR\_REVERSE}
+\program{STR\_REVERSE}
+\label{ch9-STR_REVERSE}%\hyperlabel{ch9-STR_REVERSE}%
+
+\begin{lstlisting}[firstnumber=1,caption={STR\_REVERSE}]
+*---------------------------------------------------------------------
+* NAME          STR_REVERSE
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       Reverse the bytes in the string at (A1).
+* DESCRIPTION   Reverses the bytes in the string with address (A1).
+* INPUTS:
+*               A1.L = Address of the string to be reversed
+* OUTPUTS:
+*               A1.L = Address of the string to be reversed (Preserved)
+*---------------------------------------------------------------------
+str_reverse move.l  d0-d1/a1-a2,-(a7)   ; Save working registers
+            move.l  a1,a2               ; Copy start address
+            move.w  (a1)+,d0            ; Fetch length word
+            beq.s   sr_quit             ; Nothing to do
+            adda.w  d0,a2               ; Near the end of the string
+            addq.l  #1,a2               ; The last char in the string
+            lsl.w   #1,d0               ; D0 = INT(D0/2)
+            bra.s   sr_next             ; Skip the first one for DBRA
+sr_loop     move.b  (a2),d1             ; Fetch the last character
+            move.b  (a1),(a2)           ; Move the first byte to last
+            move.b  d1,(a1)+            ; Move the last byte to first
+            subq.l  #1,a2               ; And adjust last
+sr_next     dbra    d0,sr_loop          ; And do the rest
+sr_quit     movem.l (a7)+,d0-d1/a1-a2   ; Restore the working registers
+            rts
+\end{lstlisting}
+
+\section{STR\_INSERT}
+\program{STR\_INSERT}
+\label{ch9-STR_INSERT}%\hyperlabel{ch9-STR_INSERT}%
+
+\begin{lstlisting}[firstnumber=1,caption={STR\_INSERT}]
+*---------------------------------------------------------------------
+* NAME          STR_INSERT
+*---------------------------------------------------------------------
+* DEPENDENCY    STR_APPEND
+* PURPOSE       Insert string at (A2) into string at (A1) at pos D0.W.
+* DESCRIPTION   Inserts the string with address at (A2) into the string
+*               with address (A1) at the position passed in D0.W so the
+*               first character in the inserted string is at (A1,D0.W)
+*               after the insertion. (0 is the very first character!)
+*               If D0 >= length (A1) then call STR_APPEND.
+* INPUTS:
+*               A1.L = Address of the receiving string
+*               A2.L = Address of the string to be inserted
+*               D0.W = Position (starting at 0) where to insert before
+* OUTPUTS:
+*               D0 = Error code
+*               A1.L = Address of the receiving string (preserved)
+*               A2.L = Address of the string to be inserted (preserved)
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+str_insert  cmp.w   d0,(a1)             ; Are we appending perhaps?
+            bge     str_append          ; Yes, easy case to deal with!
+            tst.w   d0                  ; Is there anything in D0?
+            bge.s   si_ok               ; Yes, negatives are bad!
+            moveq   #-15,d0             ; Bad parameter
+            rts                         ; Z is unset, D0 = error code
+
+si_ok       movem.l d1/a1-a4,-(a7)      ; Save those workers
+            move.l  a1,a3               ; A3 = Address of A1 string
+            adda.w  (a1),a3             ; Plus the size ...
+            addq.l  #2,a3               ; A3 = last char of string +1
+            move.l  a3,a4               ; A4 = new last char afterwards
+            adda.w  (a2),a4             ; Add the extra length
+            addq.l  #2,a4               ; And now we are there (+1)
+            move.w  (a2),d1             ; Size of inserted string
+            bra.s   si_dnext            ; Skip dbra
+si_dmove    move.b  -(a3),-(a4)         ; Move a byte
+si_dnext    dbra    d1,si_dmove         ; Do the rest
+            move.w  (a2),d1             ; Refetch the inserted length
+            adda.w  d1,a2               ; A2 nearly at the last char
+            addq.w  #2,a2               ; One past the last character
+            bra.s   si_inext            ; Skip dbra stuff
+si_imove    move.b  -(a3),-(a4)         ; Insert a byte
+si_inext    dbra    d1,si_imove         ; Insert the rest
+            movem.l (a7)+,d1/a1-a4      ; Restore those workers
+            clr.l   d0                  ; No errors
+            rts
+\end{lstlisting}
+
+\section{STR\_COMP}
+\program{STR\_COMP}
+\label{ch9-STR_COMP}%\hyperlabel{ch9-STR_COMP}%
+
+\begin{lstlisting}[firstnumber=1,caption={STR\_COMP}]
+*---------------------------------------------------------------------
+* NAME          STR_COMP
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       To compare two strings for exact equality
+* DESCRIPTION   Compare the strings at (A1) and (A2) for equality.
+*               Numbers in the string are considered as well.
+*               Equivalent to 'IF (A1$ = A2$)'
+* INPUTS:
+*               A1.L = First string
+*               A2.L = Second string
+* OUTPUTS:
+*               D0 = Result of comparison.
+*                    -1 = A1 string is < A2 string
+*                     0 = A1 string = A2 string
+*                    +1 = A1 string > A2 string
+*               A1.L = First string (preserved)
+*               A2.L = Second string (preserved)
+*---------------------------------------------------------------------
+str_comp    movem.l a0-a2,-(a7)         ; Must preserve workers
+            moveq   #2,d0               ; Case &  numbers considered
+sc_params   move.l  a1,a0               ; Uses different registers
+            move.l  a2,a1               ; So swap them over
+            move.w  UT_CSTR,a2          ; Fetch the vector address
+            jsr     (a2)                ; Compare strings using ROM
+            movem.l (a7)+,a0-a2         ; Restore working registers
+            tst.l  d0                   ; Make sure Z is set/unset
+            rts
+\end{lstlisting}
+
+\section{STR\_COMPI}
+\program{STR\_COMPI}
+\label{ch9-STR_COMPI}%\hyperlabel{ch9-STR_COMPI}%
+
+\begin{lstlisting}[firstnumber=1,caption={STR\_COMPI}]
+*---------------------------------------------------------------------
+* NAME          STR_COMPI
+*---------------------------------------------------------------------
+* DEPENDENCY    STR_COMP
+* PURPOSE       To compare two strings for approximate equality
+* DESCRIPTION   Compare the strings at (A1) and (A2) for equality with
+*               numbers considered but not letter case.
+*               Equivalent to 'IF (A1$ == A2$)'
+* INPUTS:
+*               A1.L = First string
+*               A2.L = Second string
+* OUTPUTS:
+*               D0 = Result of comparison.
+*                    -1 = A1 string is < A2 string
+*                     0 = A1 string == A2 string
+*                    +1 = A1 string > A2 string
+*               A1.L = First string (preserved)
+*               A2.L = Second string (preserved)
+*---------------------------------------------------------------------
+str_compare movem.l a0-a2,-(a7)         ; Must preserve workers
+            moveq   #3,d0               ; Numbers + Case insignificant
+            bra     sc_params           ; Jump into STR_COMP
+\end{lstlisting}
+
+\section{FILE\_CLOSE}
+\program{FILE\_CLOSE}
+\label{ch9-FILE_CLOSE}%\hyperlabel{ch9-FILE_CLOSE}%
+
+\begin{lstlisting}[firstnumber=1,caption={FILE\_CLOSE}]
+*---------------------------------------------------------------------
+* NAME          FILE_CLOSE
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       Close the channel passed in A0
+* DESCRIPTION   Close the file channel with QDOS ID in A0. To prevent
+*               any original QL systems from serious problems, checks
+*               for #0 being closed and ignores it.
+* INPUTS:
+*               A0.L = Channel ID to be closed
+* OUTPUTS:
+*               D0 is preserved as IO_CLOSE does not return errors
+*               except NOT OPEN and we ignore these here! The Z flag 
+*               is indeterminate after this subroutine.
+*               A0.L is returned undefined to avoid channel reuse.
+*---------------------------------------------------------------------
+file_close  cmpa.l  #0,a0               ; Test for SuperBasic #0
+            beq.s   fc_exit             ; Ignore it
+            move.l  d0,-(a7)            ; Preserve the worker
+            moveq   #io_close,d0        ; Prepare to close it
+            trap    #2                  ; Close it
+            move.l  (a7)+,d0            ; Restore the worker
+fc_exit     rts
+\end{lstlisting}
+
+\section{FILE\_OPEN}
+\program{FILE\_OPEN}
+\label{ch9-FILE_OPEN}%\hyperlabel{ch9-FILE_OPEN}%
+
+\begin{lstlisting}[firstnumber=1,caption={FILE\_OPEN}]
+*---------------------------------------------------------------------
+* NAME          FILE_OPEN
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       To open a file like 'OPEN #3,filename'
+* DESCRIPTION   Opens a file in mode 0 (old exclusive device) The 
+*               filename is passed in A0. The current job assumes
+*               ownership of the channel. May need a TRAP #4 before 
+*               calling if the filename is relative A6 when called.
+* INPUTS:
+*               A0.L = Pointer to filename
+* OUTPUTS:
+*               A0.L = Channel id.
+*               D0 = Error code
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+file_open       movem.l d1-d3,-(a7)     ; Those workers need saving
+                moveq   #0,d3           ; Old exclusing device mode
+fo_params       moveq   #IO_OPEN,d0     ; Trap code
+                moveq   -1,d1           ; Current job owns the channel
+                trap #2                 ; Open it
+                movem.l (a7)+,d1-d3     ; Restore workers
+                tst.l   d0              ; Make sure Z is set/unset
+                rts
+\end{lstlisting}
+
+\section{FILE\_OPENIN}
+\program{FILE\_OPENIN}
+\label{ch9-FILE_OPENIN}%\hyperlabel{ch9-FILE_OPENIN}%
+
+\begin{lstlisting}[firstnumber=1,caption={FILE\_OPENIN}]
+*---------------------------------------------------------------------
+* NAME          FILE_OPENIN
+*---------------------------------------------------------------------
+* DEPENDENCY    FILE_OPEN
+* PURPOSE       To open a file like 'OPEN_IN #3,filename'
+* DESCRIPTION   Opens a file in mode 1 (old shared device) The 
+*               filename is passed in A0. The current job assumes
+*               ownership of the channel. May need a TRAP #4 before 
+*               calling if the filename is relative A6 when called.
+* INPUTS:
+*               A0.L = Pointer to filename
+* OUTPUTS:
+*               A0.L = Channel id.
+*               D0 = Error code
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+file_openin     movem.l d1-d3,-(a7)     ; Those workers need saving
+                moveq   #1,d3           ; Old shared device mode
+                bra     fo_params       ; Do the rest via FILE_OPEN
+\end{lstlisting}
+
+\section{FILE\_OPENNEW}
+\program{FILE\_OPENNEW}
+\label{ch9-FILE_OPENNEW}%\hyperlabel{ch9-FILE_OPENNEW}%
+
+\begin{lstlisting}[firstnumber=1,caption={FILE\_OPENNEW}]
+*---------------------------------------------------------------------
+* NAME          FILE_OPENNEW
+*---------------------------------------------------------------------
+* DEPENDENCY    FILE_OPEN
+* PURPOSE       To open a file like 'OPEN_NEW #3,filename'
+* DESCRIPTION   Opens a file in mode 2 (new exclusive device) The 
+*               filename is passed in A0. The current job assumes
+*               ownership of the channel. May need a TRAP #4 before 
+*               calling if the filename is relative A6 when called.
+* INPUTS:
+*               A0.L = Pointer to filename
+* OUTPUTS:
+*               A0.L = Channel id.
+*               D0 = Error code
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+file_opennew    movem.l d1-d3,-(a7)     ; Those workers need saving
+                moveq   #2,d3           ; New exclusive device mode
+                bra     fo_params       ; Do the rest via FILE_OPEN
+\end{lstlisting}
+
+\section{FILE\_OPENOVER}
+\program{FILE\_OPENOVER}
+\label{ch9-FILE_OPENOVER}%\hyperlabel{ch9-FILE_OPENOVER}%
+
+\begin{lstlisting}[firstnumber=1,caption={FILE\_OPENOVER}]
+*---------------------------------------------------------------------
+* NAME          FILE_OPENOVER
+*---------------------------------------------------------------------
+* DEPENDENCY    FILE_OPEN
+* PURPOSE       To open a file like 'OPEN_OVER #3,filename'
+* DESCRIPTION   Opens a file in mode 3 (new overwrite device) The
+*               filename is passed in A0. The current job assumes
+*               ownership of the channel. May need a TRAP #4 before 
+*               calling if the filename is relative A6 when called.
+* INPUTS:
+*               A0.L = Pointer to filename
+* OUTPUTS:
+*               A0.L = Channel id.
+*               D0 = Error code
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+file_openover   movem.l d1-d3,-(a7)     ; Those workers need saving
+                moveq   #3,d3           ; New overwrite device mode
+                bra     fo_params       ; Do the rest via FILE_OPEN
+\end{lstlisting}
+
+\section{FILE\_OPENDIR}
+\program{FILE\_OPENDIR}
+\label{ch9-FILE_OPENDIR}%\hyperlabel{ch9-FILE_OPENDIR}%
+
+\begin{lstlisting}[firstnumber=1,caption={FILE\_OPENDIR}]
+*---------------------------------------------------------------------
+* NAME          FILE_OPENDIR
+*---------------------------------------------------------------------
+* DEPENDENCY    FILE_OPEN
+* PURPOSE       To open a file like 'OPEN_DIR #3,devicename'
+* DESCRIPTION   Opens a file in mode 4 (directory) The filename is
+*               passed in A0. The current job assumes ownership of 
+*               the channel. May need a TRAP #4 before calling if the 
+*               filename is relative A6 when called.
+* INPUTS:
+*               A0.L = Pointer to filename
+* OUTPUTS:
+*               A0.L = Channel id.
+*               D0 = Error code
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+file_opendir    movem.l d1-d3,-(a7)     ; Those workers need saving
+                moveq   #4,d3           ; Directory mode
+                bra     fo_params       ; Do the rest via FILE_OPEN
+\end{lstlisting}
+
+\section{FILE\_GET\_HEAD}
+\program{FILE\_GET\_HEAD}
+\label{ch9-FILE_GET_HEAD}%\hyperlabel{ch9-FILE_GET_HEAD}%
+
+\begin{lstlisting}[firstnumber=1,caption={FILE\_GET\_HEAD}]
+*---------------------------------------------------------------------
+* NAME          FILE_GET_HEAD
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       To read the 64 bytes header for a file. (already open)
+* DESCRIPTION   Reads a 64 byte file header for the open file with ID
+*               in A0.L into the buffer  whose address is passed
+*               in A1.L. This buffer must be at least 64 bytes long!
+* INPUTS:
+*               A0.L = Channel ID
+*               A1.L = Address of 64 byte buffer to put header into
+* OUTPUTS:
+*               D0 = Error code
+*               D1 = Size of header read into buffer
+*               A0 = Channel id (preserved)
+*               A1 = Address of buffer (preserved)
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+file_get_head   movem.l d2-d3/a0-a1,-(a7) ; Save working registers
+                moveq   #FS_HEADR,d0    ; Get trap code
+                moveq   #64,d2          ; Buffer size
+fgh_rest        moveq   #-1,d3          ; Infinity is a big thing
+                trap    #3              ; Do it
+                movem.l (a7)+,d2-d3/a0-a1 ; Restore workers
+                tst.l   d0              ; Set flags
+                rts                     ; Return to caller
+\end{lstlisting}
+
+\section{FILE\_SET\_HEAD}
+\program{FILE\_SET\_HEAD}
+\label{ch9-FILE_SET_HEAD}%\hyperlabel{ch9-FILE_SET_HEAD}%
+
+\begin{lstlisting}[firstnumber=1,caption={FILE\_SET\_HEAD}]
+*---------------------------------------------------------------------
+* NAME          FILE_SET_HEAD
+*---------------------------------------------------------------------
+* DEPENDENCY    FILE_GET_HEAD
+* PURPOSE       To write a 64 bytes header for a file. (already open)
+* DESCRIPTION   Writes a 64 byte file header for the open file with ID
+*               in A0.L from the buffer whose address is passed in
+*               A1.L. This buffer must be at least 64 bytes long!
+* INPUTS:
+*               A0.L = Channel ID
+*               A1.L = Address of 64 byte buffer holding the header
+* OUTPUTS:
+*               D0 = Error code
+*               D1 = Size of header written from buffer
+*               A0 = Channel id (preserved)
+*               A1 = Address of buffer (preserved)
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+file_set_head   movem.l d2-d3/a0-a1,-(a7) ; Save working registers
+                moveq   #FS_HEADS,d0    ; Get trap code
+                bra     fgh_rest        ; Do rest via FILE_GET_HEAD
+\end{lstlisting}
+
+\section{PRINT}
+\program{PRINT}
+\label{ch9-PRINT}%\hyperlabel{ch9-PRINT}%
+
+\begin{lstlisting}[firstnumber=1,caption={PRINT}]
+*---------------------------------------------------------------------
+* NAME          PRINT
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       To send the string at (A1) to the channel in A0.
+* DESCRIPTION   This routine prints a QDOS string (word then bytes) to
+*               the channel ID passed in A0. The string starts at A1.
+* INPUTS:
+*               A0.L = Channel ID
+*               A1.L = Address of a QDOS format string to be printed.
+* OUTPUTS:
+*               D0 = Error code
+*               A0 = Channel id (preserved)
+*               A1 = Address of buffer (preserved)
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+print           move.l a1, -(a7)        ; Preserve the buffer address
+                movea.w ut_mtext,a2     ; Print a string utility
+                jsr     (a2)            ; Print it
+                move.l  (a7)+,a1        ; Restore the buffer address
+                tst.l   d0              ; Check for errors
+                rts
+\end{lstlisting}
+
+\section{LINE\_FEED}
+\program{LINE\_FEED}
+\label{ch9-LINE_FEED}%\hyperlabel{ch9-LINE_FEED}%
+
+\begin{lstlisting}[firstnumber=1,caption={LINE\_FEED}]
+*---------------------------------------------------------------------
+* NAME          LINE_FEED
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       To send a linefeed character to the channel in A0.
+* DESCRIPTION   This routine prints a linefeed character to the channel
+*               ID passed in A0.
+* INPUTS:
+*               A0.L = Channel ID
+* OUTPUTS:
+*               D0 = Error code
+*               A0 = Channel id (preserved)
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+line_feed       movem.l d1/a1,-(a7)     ; Preserve registers 
+                moveq   #io_sbyte,d0    ; Send one byte to channel
+                moveq   #linefeed,d1    ; Byte to send = linefeed
+                moveq   #infinite,d3    ; Timeout
+                trap    #3              ; Do it
+                movem.l (a7)+,d1/a1     ; Restore
+                tst.l   d0              ; Set Z if errors
+                rts
+\end{lstlisting}
+
+\section{INPUT}
+\program{INPUT}
+\label{ch9-INPUT}%\hyperlabel{ch9-INPUT}%
+
+\begin{lstlisting}[firstnumber=1,caption={INPUT}]
+*---------------------------------------------------------------------
+* NAME          INPUT
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       To obtain input from the user via the channel ID in A0.
+* DESCRIPTION   This routine allows the user to type into a buffer
+*               (which is part of this subroutine) up to a maximum of
+*               256 bytes. A channel ID in A0 is used.
+* INPUTS:
+*               A0.L = Channel ID
+* OUTPUTS:
+*               D0 = Error code
+*               D1.W = Number of characters typed EXCLUDING ENTER 
+*                      if D1.W = 0, user simply pressed ENTER.
+*               A0 = Channel id (preserved)
+*               A1 = Start of buffer (word count of string user typed)
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+input       movem.l d2-d3,-(a7)         ; Preserve working registers
+            lea     i_buffer+2,a1       ; Our buffer address plus 2
+            move.l  a1,-(a7)            ; Save it on the stack
+            moveq   #io_fline,d0        ; Input some bytes (inc LF)
+            moveq   #256,d2             ; Buffer size maximum
+            moveq   #infinite,d3        ; Inifinite timeout
+            trap    #3
+
+            move.l  (a7)+,a1            ; Restore buffer pointer
+            subq.w  #1,d1               ; Subtract LF character
+            move.w  d1,-(a1)            ; Save length and set A1
+            movem.l (a7)+,d2-d3         ; Restore those workers
+            tst.l   d0                  ; Did it all work?
+            rts
+
+i_buffer    ds.w    128+1               ; 256 chars + 1 word
+\end{lstlisting}
+
+\section{JOB\_HEADER}
+\program{JOB\_HEADER}
+\label{ch9-JOB_HEADER}%\hyperlabel{ch9-JOB_HEADER}%
+
+\begin{lstlisting}[firstnumber=1,caption={JOB\_HEADER}]
+*---------------------------------------------------------------------
+* NAME          JOB_HEADER
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       Code required to define a QDOSMSQ job header.
+* DESCRIPTION   Defines a job header ready to be filled in by the user.
+*               The user will fill in his/her own jobname between the 
+*               quotes and the assembler will do the rest.
+* INPUTS:      None.
+* OUTPUTS:     None.
+*---------------------------------------------------------------------
+start       bra.s   prog_start          ; Short jump to program start
+            dc.l    0                   ; Spare. 
+            dc.w    $4afb               ; Job id must be at location 6
+prog_name   dc.w    prog_start-prog_name-2  ; Length of job name
+            dc.b    ''                  ; YOUR JOBNAME HERE
+
+prog_start  PUT YOUR CODE HERE
+\end{lstlisting}
+
+\section{MEM\_ALLOC}
+\program{MEM\_ALLOC}
+\label{ch9-MEM_ALLOC}%\hyperlabel{ch9-MEM_ALLOC}%
+
+\begin{lstlisting}[firstnumber=1,caption={MEM\_ALLOC}]
+*---------------------------------------------------------------------
+* NAME          MEM_ALLOC
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       Allocate an area of memory on the heap.
+* DESCRIPTION   Allocate an area of memory, size as per D0.L, and
+*               return the address of the allocated area in A0.L. D0 
+*               is set to any error code and the Z flag will be set if
+*               no errors occurred, reset otherwise.
+* INPUTS:
+*               D0.L = Size, in bytes, of memory area to be allocated
+* OUTPUTS:
+*               A0.L = Base address of the memory area allocated
+*               D0 = Error code
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+mem_alloc       movem.l d1-d3/a1-a3,-(a7)   ; Save working registers
+                move.l  d0,d1               ; Space required in D1
+                moveq   #MT_ALCHP,d0        ; Set the trap
+                moveq   #-1,d2              ; For the current job
+                trap    #1                  ; Do it
+                movem.l (a7)+,d1-d3/a1-a3   ; Restore working registers
+                tst.l   d0                  ; Set flags
+                rts
+\end{lstlisting}
+
+\section{MEM\_DEALLOC}
+\program{MEM\_DEALLOC}
+\label{ch9-MEM_DEALLOC}%\hyperlabel{ch9-MEM_DEALLOC}%
+
+\begin{lstlisting}[firstnumber=1,caption={MEM\_DEALLOC}]
+*---------------------------------------------------------------------
+* NAME          MEM_DEALLOC
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       Deallocate an already allocated area of memory
+* DESCRIPTION   Deallocate a previously allocated area of memory, the 
+*               address of which is passed in A0.L.
+* INPUTS:
+*               A0.L = Address of area to deallocate
+* OUTPUTS:
+*               A0.L = zero to avoid using the memory again!
+*               D0 = Error code
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+mem_dealloc     movem.l d1-d3/a1-a3,-(a7)   ; Save working registers
+                moveq   #MT_RECHP,d0        ; Set the trap
+                trap    #1                  ; Do it
+                movem.l (a7)+,d1-d3/a1-a3   ; Restore registers
+                suba.l  a0,a0               ; Blank the memory address
+                tst.l   d0                  ; Set flags
+                rts
+\end{lstlisting}
+
+\section{SCR\_MODE}
+\program{SCR\_MODE}
+\label{ch9-SCR_MODE}%\hyperlabel{ch9-SCR_MODE}%
+
+\begin{lstlisting}[firstnumber=1,caption={SCR\_MODE}]
+*---------------------------------------------------------------------
+* NAME          SCR_MODE
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       Check the mode & set if required
+* DESCRIPTION   Checks for the mode passed in D0 and if not correct, 
+*               change to that mode.
+* INPUTS:
+*               D0.B = 4 or 8 for required mode
+* OUTPUTS:
+*               D0 = Error code
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+scr_mode        move.l   d1-d2/d7/a3,-(a7)  ; Save working registers
+                move.b   d0,d7              ; Save required mode
+                cmpi.w   #4,d7              ; Is mode 4 required?
+                bne.s    scrm_8             ; Nope.
+                clr.b    d7                 ; Mode 4 requires 0
+scrm_8          moveq    #mt_dmode,d0
+                moveq    #-1,d1             ; Read current mode
+                moveq    #-1,d2             ; Read current display type
+                trap     #1                 ; Do it
+                tst.l    d0                 ; Did it work?
+                bne.s    scrm_exit          ; No, bale out
+                cmp.b    d1,d7              ; Correct mode?
+                beq.s    scrm_exit          ; Don't set mode if ok
+                moveq    #mt_dmode,d0       ; Else, set it
+                move.b   d7,d1              ; Get the mode from D7
+                trap     #1                 ; Set mode
+                move.l   (a7)+,d1-d2/d7/a3  ; Restore registers
+                tst.l    d0                 ; Set Z flag if ok
+scrm_exit       rts
+\end{lstlisting}
+
+\section{CLS}
+\program{CLS}
+\label{ch9-CLS}%\hyperlabel{ch9-CLS}%
+
+\begin{lstlisting}[firstnumber=1,caption={CLS}]
+*---------------------------------------------------------------------
+* NAME          CLS
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       To clear a screen/console channel.
+* DESCRIPTION   Clears the screen channel whose ID is supplied in A0.
+* INPUTS:
+*               A0.L = channel ID
+* OUTPUTS:
+*               D0 = Error code
+*               A0.L = channel ID (preserved)
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+cls             move.l   d1/d3/a1,-(a7) ; These are corrupted
+                moveq    #sd_clear,d0   ; CLS
+                moveq    #-1,d3         ; Infinite timeout
+                trap     #3             ; CLS the window
+                move.l   (a7)+,d1/d3/a1 ; Restore corrupted registers
+                tst.l    d0             ; Set Z flag if ok
+                rts
+\end{lstlisting}
+
+\section{SCR\_PAPER}
+\program{SCR\_PAPER}
+\label{ch9-SCR_PAPER}%\hyperlabel{ch9-SCR_PAPER}%
+
+\begin{lstlisting}[firstnumber=1,caption={SCR\_PAPER}]
+*---------------------------------------------------------------------
+* NAME          SCR_PAPER
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       Set the PAPER colour for the given channel ID.
+* DESCRIPTION   Sets the paper colour for the screen channel whose ID 
+*               is passed in A0, to the colour code supplied in D0.W.
+* INPUTS:
+*               D0.W = colour code for paper colour
+*               A0.L = Channel ID.
+* OUTPUTS:
+*               D0 = Error code
+*               A0.L = channel ID (preserved)
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+scr_paper       move.l   d1/d3/a1,-(a7) ; These will be corrupted
+                move.w   d0,d1          ; Get the paper colour
+                moveq    #sd_clear,d0   ; CLS
+                moveq    #-1,d3         ; Infinite timeout
+                trap     #3             ; Set PAPER colour (not STRIP)
+                move.l   (a7)+,d1/d3/a1 ; Restore corrupted registers
+                tst.l    d0             ; Set Z flag if all ok
+                rts
+\end{lstlisting}
+
+\section{SCR\_PAPER\_SB}
+\program{SCR\_PAPER\_SB}
+\label{ch9-SCR_PAPER_SB}%\hyperlabel{ch9-SCR_PAPER_SB}%
+
+\begin{lstlisting}[firstnumber=1,caption={SCR\_PAPER\_SB}]
+*---------------------------------------------------------------------
+* NAME          SCR_PAPER_SB
+*---------------------------------------------------------------------
+* DEPENDENCY    SCR_PAPER
+* DEPENDENCY    SCR_STRIP
+* PURPOSE       Set the PAPER & STRIP colour for the given channel ID.
+* DESCRIPTION   Sets the paper & strip colour for the screen channel 
+*               whose ID is passed in A0, to the colour code supplied 
+*               in D0.W. Works like SuperBasic's PAPER command.
+* INPUTS:
+*               D0.W = colour code for paper & strip colour
+*               A0.L = Channel ID.
+* OUTPUTS:
+*               D0 = Error code
+*               A0.L = channel ID (preserved)
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+scr_paper_sb    move.w  d0,d1           ; Save the colour 
+                bsr     scr_paper       ; Set the paper colour
+                bne.s   spsb_exit       ; Tets for errors
+                move.w  d1,d0           ; Get the colour code again
+                bsr     scr_strip       ; Set the strip colour
+scsb_exit       rts
+\end{lstlisting}
+
+\section{SCR\_INK}
+\program{SCR\_INK}
+\label{ch9-SCR_INK}%\hyperlabel{ch9-SCR_INK}%
+
+\begin{lstlisting}[firstnumber=1,caption={SCR\_INK}]
+*---------------------------------------------------------------------
+* NAME          SCR_INK
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       Set the INK colour for the given channel ID.
+* DESCRIPTION   Sets the ink colour for the screen channel whose ID is 
+*               passed in A0, to the colour code supplied in D0.W.
+* INPUTS:
+*               D0.W = colour code for ink colour
+*               A0.L = Channel ID.
+* OUTPUTS:
+*               D0 = Error code
+*               A0.L = channel ID (preserved)
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+scr_ink         move.l   d1/d3/a1,-(a7) ; These will be corrupted
+                move.w   d0,d1          ; Get the ink colour
+                moveq    #sd_clear,d0   ; CLS
+                moveq    #-1,d3         ; Infinite timeout
+                trap     #3             ; Set INK colour
+                move.l   (a7)+,d1/d3/a1 ; Restore registers
+                tst.l    d0             ; Set Z flag if all ok
+                rts
+\end{lstlisting}
+
+\section{SCR\_STRIP}
+\program{SCR\_STRIP}
+\label{ch9-SCR_STRIP}%\hyperlabel{ch9-SCR_STRIP}%
+
+\begin{lstlisting}[firstnumber=1,caption={SCR\_STRIP}]
+*---------------------------------------------------------------------
+* NAME          SCR_STRIP
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       Set the STRIP colour for the given channel ID.
+* DESCRIPTION   Sets the strip colour for the screen channel whose ID 
+*               is passed in A0, to the colour code supplied in D0.W.
+* INPUTS:
+*               D0.W = colour code for strip colour
+*               A0.L = Channel ID.
+* OUTPUTS:
+*               D0 = Error code
+*               A0.L = channel ID (preserved)
+*               Z flag set if no errors, unset otherwise.
+*---------------------------------------------------------------------
+scr_strip       move.l  d1/d3/a1,-(a7)  ; These will be corrupted 
+                move.w  d0,d1           ; Get the paper colour
+                moveq   #sd_clear,d0    ; CLS
+                moveq   #-1,d3          ; Infinite timeout
+                trap    #3              ; Set STRIP colour (not PAPER)
+                move.l  (a7)+,d1/d3/a1  ; Restore corrupted registers
+                tst.l   d0              ; Set Z flag if all ok
+                rts
+\end{lstlisting}
+
+\section{COLOURS}
+\program{COLOURS}
+\label{ch9-COLOURS}%\hyperlabel{ch9-COLOURS}%
+
+\begin{lstlisting}[firstnumber=1,caption={COLOURS}]
+*---------------------------------------------------------------------
+* NAME          COLOURS
+*---------------------------------------------------------------------
+* DEPENDENCY    None
+* PURPOSE       Define names for the various QDOSMSQ colours
+* DESCRIPTION   Not really a subroutine, a set of equates which define
+*               names for the 8 colours available on a 'standard'
+*               QDOSMSQ machine.
+* INPUTS:      None
+* OUTPUTS:     None
+*---------------------------------------------------------------------
+black           equ     0
+blue            equ     1
+red             equ     2
+magenta         equ     3
+green           equ     4
+cyan            equ     5
+yellow          equ     6
+white           equ     7
+\end{lstlisting}
+
+
+\section{The Librarian}\program{The Librarian}
+\label{ch9-librarian}%\hyperlabel{ch9-librarian}%
+
+Ok, so there you have a few of my favourite routines, all you need
+    now is a librarian to sort them out for you. Ok, I give up, here is one
+    for you -{} this is very basic and not super at all (sorry for that pun) it
+    is up to you to expand on this if you want.
+
+Some suggestions would be:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Make PE aware?
+
+
+\item{}Add better/some error trapping.
+
+
+\item{}Save the dependencies so that the user need not enter them
+        manually.
+
+
+\item{}Check what has just been entered with what has already been
+        entered to avoid duplications.
+
+
+\item{}Reduce the number of file open/closes etc (On the Library
+        file)
+
+
+\item{}Convert to assembler -{} Ha, now you're quaking in your boots
+       !
+
+\end{itemize}
+
+I have omitted line numbers from the following listing.
+
+\begin{lstlisting}[firstnumber=1,language={}]
+CLS
+Output = 3
+INPUT 'Library name: ' LibraryName$
+INPUT 'Output file name: '; Output$
+OPEN_NEW #Output, Output$
+:
+REPeat main_loop
+    INPUT 'Routine name (ENTER to quit): '; Name$
+    IF (Name$ = '')
+        EXIT MainLoop
+    END IF
+    ExtractName Name$
+END REPeat MainLoop
+:
+CLOSE #Output
+PRINT "Done."
+STOP
+:
+:
+DEF PROCedure ExtractName(ReqdName$)
+    LOCal A$, Library, FoundName$
+    Library = Output + 1
+    OPEN_IN #Library, LibraryName$
+    REPeat LibLoop
+        IF (EOF #Library)
+            EXIT LibLoop
+        END IF
+        INPUT #Library, A$
+        IF (A$(1 TO 6) == "* NAME")
+            FoundName$ = A$(17 TO)
+            IF (FoundName$ == ReqdName$)
+                PRINT "Found subroutine: " & ReqdName$
+                GetDependencies(Library)
+                ExtractCode(Library)
+                CLOSE #Library
+                RETurn
+            ENDIF
+        END IF
+    END REPeat LibLoop
+    PRINT "Cannot find: " & ReqdName$
+END DEFine ExtractName
+:
+:
+DEF PROCedure GetDependencies(Channel)
+    LOCal A$
+    REPeat DependLoop
+        IF (EOF #Channel)
+            RETurn
+        END IF
+        INPUT #Channel, A$
+        IF (A$(1 TO 12) == "* DEPENDENCY")
+            IF (A$(17 TO 20) == "None")
+                PRINT "No dependencies"
+                Return
+            END IF
+            PRINT "Dependency required: " & A$(17 TO)
+        END IF
+        IF (A$(1 TO 9) == "* PURPOSE"
+            RETurn
+        END IF
+    END REPeat DependLoop
+END DEFine GetDependencies
+:
+:
+DEF PROC ExtractCode(Channel)
+    LOCal A$
+    REPeat FindCodeLoop
+        IF (EOF #Channel)
+            RETurn
+        END IF
+        INPUT #Channel, A$
+        IF (A$(1 TO 5) == "*----"
+            EXIT FindCodeLoop
+        END IF
+    END REPeat FindCodeLoop
+    REPeat WriteCodeLoop
+        IF (EOF #Channel)
+            RETurn
+        END IF
+        INPUT #Channel, A$
+        IF (A$(1 TO 5) == "*----"
+            EXIT WriteCodeLoop
+        END IF
+        PRINT #Output, A$
+    END REPeat WriteCodeLoop
+    PRINT "Extracted."\\
+END DEFine ExtractCode
+\end{lstlisting}
+
+\subsection{So how does this lot work?}
+\label{ch9-how-it-works}%\hyperlabel{ch9-how-it-works}%
+
+After asking for your details etc, it simply enters a loop asking
+      you for the next routine to be extracted. This name is passed to
+      ExtractName which opens the library file and scans it looking for all
+      those lines which start `* NAME'. Once it finds one, it tests to see if
+      this line includes the name you are looking for.
+
+Note that this version of the program assumes you are using
+      \emph{exactly} the same format in your comments as I am above and as per the
+      following description:
+\begin{itemize}[itemsep=0pt]
+
+\item{}Column 1 = An asterisk, the comment marker for most assemblers
+          I have used.
+
+\item{}Column 2 = A space.
+
+
+\item{}Columns 3 to 16 = Parameter name, eg NAME, DEPENDENCY
+          etc.      
+
+\item{}Columns 17 onwards = Parameter details etc.
+
+\end{itemize}
+
+If the name found is the same as the one you requested, the
+      dependencies are extracted and listed. You are advised to note these
+      dependencies and enter them as the next routine to extract. Try not to
+      duplicate names etc as the program doesn't test for duplicates.
+
+Once all dependencies have been listed, The code is extracted and
+      written to the output file.
+
+A sample session follows:
+
+\begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
+Library name: Win1_GWASL_Library_lib
+Output file name: Win1_source_MyNextProject_asm
+Routine name (ENTER to quit): Colours
+Found subroutine: COLOURS
+No dependencies
+Extracted.
+
+Routine name (ENTER to quit): Scr_paper_sb
+Found subroutine: SCR_PAPER_SB
+Dependency required: SCR_PAPER
+Dependency required: SCR_STRIP
+Extracted.
+
+Routine name (ENTER to quit): Scr_paper
+Found subroutine: SCR_PAPER
+No dependencies
+Extracted.
+
+Routine name (ENTER to quit): SCR_STRIP
+Found subroutine: SCR_STRIP
+No dependencies
+Extracted.
+
+Routine name (ENTER to quit):
+Done.
+\end{lstlisting}
+
+So there you have it and now you can enhance it as required to
+      suit your own purposes. Remember, my version expects the comments to be
+      in the format given above. Additionally, no comments are written to the
+      output file but you can easily amend the code in ExtractCode to do the
+      needful. Enjoy.
+
+\section{Coming Up...}
+\label{ch9-the-end}%\hyperlabel{ch9-the-end}%
+
+In the next chapter we shall be looking at the thorny subject of
+    coding single and doubly linked lists in assembler.
+

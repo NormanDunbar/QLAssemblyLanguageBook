@@ -1,0 +1,150 @@
+\chapter{Dedication}
+
+This book is dedicated initially to my wife Alison, who has
+    tolerated my need to 'play' with computers for many many years. She
+    doesn't understand how or why I can work with computers all day, then come
+    home and still want to 'play' with them in my free time. It's a woman
+    thing -{} they just don't understand :o)
+
+This book is also dedicated to small army of dedicated users of the
+    Sinclair QL computer. It's been around since 1984 and celebrated its 25th
+    birthday in 2009. Here's hoping it can manage another 25 years.
+
+Actually, I wouldn't mind another 25 years myself!
+\setcounter{secnumdepth}{5}
+\addtocontents{toc}{\protect\setcounter{tocdepth}{5}\ignorespaces}
+\setcounter{tocdepth}{5}
+\setcounter{secnumdepth}{-1}
+\addtocontents{toc}{\protect\setcounter{tocdepth}{-1}\ignorespaces}
+\setcounter{tocdepth}{-1}
+
+\chapter{Where did this book come from?}
+
+The various chapters in this book were originally published in the
+    QL Today magazine. The magazine has been running for over 16 years since
+    the demise of all the other QL based commercial magazines on the market at
+    the time. This one has now survived longer than all the commercial
+    offerings -{} so we must be doing something right!
+
+Dilwyn Jones, the then temporary editor (he lasted 9 and a bit years
+    -{} we have a strange definition of 'temporary' in the QL world) originally
+    contacted me back in the mid 1990's and asked me to put together a couple
+    of articles on beginning assembly language programming. Little knowing how
+    long it would last, I agreed and started writing.
+
+Unfortunately, I never had the opportunity to really plan what I was
+    going to do and I think I bit off a bit more than I could chew at the time
+    (I'm still in the same position today!) so the 'flow' of the following
+    chapters may not be quite as nice as it could have been. On the other
+    hand, had I planned it all in fine detail, I still wouldn't have started
+    writing the first chapter.
+
+The lack of planning has led to a number of articles in the series
+    being prefixed by quite a few bug reports outlining problems and downright
+    errors in the article (or articles) that went before. While this is good
+    for increasing my 'word count', it's not good for the reader. The
+    following chapters have been 'bug fixed' so that you should be able to
+    trust what you read in each chapter.
+
+Where other readers of QL Today have made comments on the articles,
+    these are included -{} if appropriate -{} at the relevant place.
+
+Hopefully, you will find the following useful.
+\setcounter{secnumdepth}{5}
+\addtocontents{toc}{\protect\setcounter{tocdepth}{5}\ignorespaces}
+\setcounter{tocdepth}{5}
+\setcounter{secnumdepth}{-1}
+\addtocontents{toc}{\protect\setcounter{tocdepth}{-1}\ignorespaces}
+\setcounter{tocdepth}{-1}
+
+\chapter{Preface}
+\label{introduction}\hyperlabel{introduction}%
+
+Learning QL Assembly Language at home, by yourself, is never going to
+  be easy, I know, it's how I learned. There are not many places you can go to
+  (at least where I live) to learn this sort of thing. Most computer courses
+  are all about learning Windows or Microsoft Office or similar. Not much call
+  for Assembly Language then!
+
+However, all that stops right here! You are still learning by
+  yourself, but you are not alone! Reading through back issues of QL Today (or
+  QL Toady as it is affectionately known after a slight spelling mistake in a
+  posting to the ql-{}users mailing list) is never going to be easy -{} especially
+  if you are on holiday and have limited luggage allowance. To this end, I
+  have taken my original articles from years gone by, tidied them up a bit
+  (ok, a lot!) and combined them into this book.
+
+Hopefully I have also fixed all the original errors and included all
+  the good advice from my loyal reader(s), especially George Gwilt who seems
+  to read everything I write and then comes up with better ways of doing
+  things. For this, I am eternally grateful -{} thanks George. I might have
+  fixed the spelling mistakes and bad grammer as well -{} time will tell.
+
+\section{Conventions}
+\label{preface-conventions}\hyperlabel{preface-conventions}%
+
+The following conventions are used in this book:
+
+If I am presenting code to you then it will appear in the text as
+    follows:
+
+\begin{lstlisting}[firstnumber=1,]
+return_d7   move.l  bv_rip(a6),a1       ; Because we had no parameters passed
+            moveq   #2,d1               ; Size of stack space required
+            move.w  bv_chrix,a2         ; Routine to allocate maths stack space
+            jsr     (a2)                ; Go get some space NO ERRORS OCCUR!
+            move.l  bv_rip(a6),a1       ; New top of stack
+            subq.l  #2,a1               ; Make space for our integer result
+            move.w  d7,0(a6,a1.l)       ; Stack the result
+            move.w  #3,d4               ; Signal word result on stack
+            move.l  a1,bv_rip(a6)       ; Store new top of stack for SuperBasic
+            clr.l   d0                  ; No errors
+            rts                         ; Return result to SuperBasic
+\end{lstlisting}
+
+Items of special note or tips will appear as follows:
+\begin{DBKadmonition}{warning}{Warning}
+
+This is a \textbf{warning}. These will
+      advise to of areas where you need to be careful not to cause serious
+      problems.
+\end{DBKadmonition}
+\begin{DBKadmonition}{warning}{Important}
+
+This is \textbf{important}. These will
+      advise to of areas where you need to be careful not to cause
+ \emph{really} serious problems.
+\end{DBKadmonition}
+\begin{DBKadmonition}{}{Note}
+
+This is a \textbf{note}. Notes point out
+      something that might not be too obvious, or that I think you should know
+      about.
+\end{DBKadmonition}
+
+\section{Getting Help}
+\label{preface-getting-help}\hyperlabel{preface-getting-help}%
+
+There are lots of places you can get help when struggling with
+    Assembly Language:
+\begin{itemize}[itemsep=0pt]
+
+\item{}QL Today magazine at http://www.qltoday.com.
+
+
+\item{}The ql-{}users mailing list, subscribe at
+        http://lists.q-{}v-{}d.com/listinfo.cgi/ql-{}users-{}q-{}v-{}d.com.
+
+
+\item{}The qdosmsq forums at
+        http://qdosmsq.dunbar-{}it.co.uk/forum.
+
+
+\item{}Online QDOS/SMSQ documentation at
+        http://qdosmsq.dunbar-{}it.co.uk.
+
+
+\item{}QDOS/SMSQ Documentation from Jochen Merz.
+        http://smsq.j-{}m-{}s.com/.
+
+\end{itemize}

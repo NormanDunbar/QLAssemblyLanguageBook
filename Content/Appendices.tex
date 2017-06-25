@@ -1,0 +1,456 @@
+\begin{appendix}
+
+\chapter{How this book Evolved}
+\label{appendix-a-how-it-was-done}%\hyperlabel{appendix-a-how-it-was-done}%
+
+This book started life on my PC as text files -{} one for each chapter, well, for a while it did. Eventually, I decided to convert to creating the files directly in \program{DocBook}Docbook format as my main source code, and \emph{those} were converted to text format prior to sending them off to Dilwyn and/or Geoff for inclusion in the QL Today magazine.
+
+These initial non-DocBook text files were manually edited to wrap paragraphs and listings and warnings etc in the appropriate \program{DocBook}Docbook syntax. It's quite amazing how much more difficult it is to change text into \program{DocBook}Docbook than the other way around!
+
+Once all the chapters were Docbook'd, I ran them through a validator to ensure that they were indeed valid XML \emph{and} valid \program{DocBook}Docbook.
+
+The validated chapters were gathered together into a `book' -{} as defined by \program{DocBook}Docbook -{}
+and the raw XML processed by a utility named \program{Publican}Publican which allowed me to create numerous different output formats from the same input source file. Sadly, I had a few problems with \program{Publican}Publican - it's a great tool, don't get me wrong, and they even have a version for Windows (it's free too!) but it wasn't really what I needed. I decided to go for a proper system instead. (I still use \program{Publican}Publican for other work.)
+
+\subsection*{Enter \LaTeX{}}
+
+\LaTeX{}\program{\LaTeX{}} is a text processing system as opposed to a PDF generator, it is much used by scientists around the world, amongst others. If it's good enough for CERN, it's good enough for me.
+
+This actual book that you are reading now was slightly different. It was further processed by a utility called dblatex\program{dblatex} to produce  \LaTeX{}\program{\LaTeX{}} format source text and converted into a book by the \program{TeXstudio}TeXstudio application.
+
+I think you'll agree that using \LaTeX{}\program{\LaTeX{}} creates a far nicer version of PDF etc. That version of the book was released into the wild around Christmas 2014. 
+
+Since then, I have manually gone through all the different chapter files to remove the old DocBook\program{DocBook} conversion routines etc, and replace them with plain \LaTeX{}\program{\LaTeX{}} ones instead. This reduced the amount of code that I had to have lying around. The final result is a set of plain \LaTeX{}\program{\LaTeX{}} source files.
+
+These source files were collected together and merged into a \LaTeX{}\program{\LaTeX{}} template designed for books, the \emph{Legrand Orange Book}, which I modified quite a lot to produce the wonderfully typeset version of the pdf book that you are reading. 
+
+There's a lot of work goes into this you know! ;-)
+
+\chapter{Debugging with QMON2}
+\label{debugging-with-qmon2}%\hyperlabel{debugging-with-qmon2}%
+
+Many years ago while still working on the Project - QLTdis\program{QLTdis} - I had a small problem. \opcode{ADDX} and \opcode{SUBX} were being decoded as \opcode{ADD} or \opcode{SUB}  when I tested a file containing \opcode{ADDX} and
+\opcode{SUBX} instructions. What was going wrong? Well the original code looked like the
+following:
+
+\begin{lstlisting}[firstnumber=1,caption={QLTdis Broken Code}]
+dtype_24    btst    #8,d0           ; If bit 8 is 0, can't be ADDX/SUBX
+            beq.s   t24_not_t30     ; Easy bit done
+            move.w  d0,d4           ; Need D4 to hold the op-code
+
+            andi.w  #$00c0,d0       ; Mask bits 7 & 6 of the op-code
+            cmpi.w  #$00c0,d0       ; Both set?
+            bne.s   t24_not_t30     ; No, skip over type 30 stuff
+\end{lstlisting}
+
+As the original programmer of this code, when I read through it, everything
+seemed fine -{} as it always does -{} but obviously, something was amiss. What to do?
+
+The rest
+of this exciting article, is a brief foray into the art of debugging using
+QMON2\program{QMON2}.
+
+QMON2\program{QMON2} is Tony Tebby's original disassembler/monitor tool which allows a QDOSMSQ
+job code or SuperBasic extension or CALLed code to be debugged by single
+stepping through the guts of the code until you find the bit that isn't doing
+what it is supposed to be doing.
+
+I have been using QMON2\program{QMON2} to help me debug code for years and although I don't use
+it as often as I should perhaps, I do happen to like it quite a lot. It seems,
+unfortunately, that it is no longer available in its English format as Digital
+Precision still hold the rights to the program -{} as far as I am aware -{} but in
+Germany, you can get a copy from Jochen. Actually, you can get a copy from
+Jochen in any country in the world, provided you are able to read and understand
+German manuals.
+
+QMON2\program{QMON2} is fine, but as we don't yet have anything like a source code debugger on
+the QL, it is a bit difficult to figure out where to put breakpoints in your
+code so that you don't spend ages single stepping through code you know works to
+find the bit that doesn't work.
+
+George Gwilt has provided a little help here, so not only does he supply you
+with a neat little assembler but he also gives you help in debugging as well.
+
+When you have assembled the code for QLTdis\program{QLTdis} there is a listing file created with
+the \_LST extension, but another file is created with a \_SYM extension. This file
+holds the goodies we need to debug.
+
+The SYM file is binary and holds a list of all your equates in it, plus a list
+of all the program labels and their offset from the start of the program. So, if
+you think that you have a bug in a specific routine, all you have to do is
+decode the SYM file to extract the routine's offset from the start of the
+program and set a breakpoint at that place in the code. The problem is, how
+exactly do you decode the binary file?
+
+George does not document the SYM file format, so you could assemble a few
+routines and see if you can make any sense of the binary file, but there is a
+much easier way. Simply by running the SYM\_BIN program supplied with GWASL\program{Gwasl} you
+feed it a SYM file and it spits out a text file holding all the data you will
+ever need. The output file is named the same as the SYM file but with a further
+\_LST extension, so I have `dev2\_source\_qltdis\_sym\_lst' as my file.
+
+The following is a small extract from this file on my system. Yours may well
+look different, but don't worry if it does. The first part of the file matches
+up with my equates:
+
+\begin{lstlisting}[firstnumber=1,caption={QLTdis Symbol List}]
+CON_ID                        EQU   $00000000
+CON_ID2                       EQU   $00000004
+PRT_ID                        EQU   $00000008
+PC_ADDR                       EQU   $0000000C
+PC_END                        EQU   $00000010
+BLACK                         EQU   $00000000
+RED                           EQU   $00000002
+GREEN                         EQU   $00000004
+WHITE                         EQU   $00000007
+LINEFEED                      EQU   $0000000A
+OOPS                          EQU   $FFFFFFFF
+ERR_NC                        EQU   $FFFFFFFF
+INFINITE                      EQU   $FFFFFFFF
+ME                            EQU   $FFFFFFFF
+\end{lstlisting}
+
+Then we get to the nitty gritty, the labels I have used in my source code and
+their offsets from the start of the program. The first one is my label `start'
+and it is actually the very first instruction in the file, so it has offset
+zero. Following on are all the other labels I used.
+
+\begin{lstlisting}[firstnumber=1,caption={QLTdis Symbol List}]
+START                         EQU   *+$00000000
+QLTDIS                        EQU   *+$00000010
+JOB_INIT                      EQU   *+$0000003E
+EXIT                          EQU   *+$0000003A
+
+.... a few dozen lines removed for brevity!
+
+DTYPE_23                      EQU   *+$00000B9A
+DTYPE_24                      EQU   *+$00000BAC
+
+.... another few dozen lines removed for brevity!
+
+\end{lstlisting}
+
+
+We can see that regardless of the start address of the program when loaded
+into memory (by QMON2\program{QMON2} or JMON2\program{JMON2}) we can still work out where the code for the
+DTYPE\_24 routine, for example, starts simply by adding \$0BAC to the actual start
+address of the program.
+
+The following is a small session showing how I debugged through my DTYPE\_24
+routine to fix the above mentioned problem. 
+
+So, to set the scene, I have edited the source code for the type 24
+instructions, assembled QLTdis\program{QLTdis} and produced a new listing of the
+SYM file. I've looked through the listing and found that my entry point for
+DTYPE\_24 is at offset \$0BAC. I then start up JMON2\program{JMON2} (in this case, but QMON2\program{QMON2} is
+exactly the same):
+
+\begin{lstlisting}[firstnumber=1,caption={Debugging QLTdis with Jmon2}]
+jmon 'win1_source_qltdis_qltdis_bin'
+\end{lstlisting}
+
+If you try this and get an error, make sure you have LRESPR'd the JMON\_BIN code
+for JMON2\program{JMON2} or the QMON\_BIN code for QMON2\program{QMON2} depending on which one you want to use.
+
+When the monitor appears, the very first instruction in the job has already been
+executed, so I could be anywhere in the job file. Because I have written the
+code myself, I know what the very first instruction is, it is \opcode{BRA.S QLTDIS}.
+Because I know this, I know that the instruction I am looking at must be the
+code at label `QLTDIS'.
+
+If I was debugging some other code that I did not have the original nicely
+commented source files for, then I would not know where I was in the actual job,
+or extension, as the first instruction could have sent me off into any location
+in its own code or even into the ROM.
+
+In this case I have jumped from label `START' to label `QLTDIS' and there are
+quite a few bytes between the two labels. QMON2\program{QMON2} is showing me a register dump and
+the address of, the op-{}code word and the next instruction to be executed. For
+the sake of brevity, I've omitted the register dump itself.
+
+\begin{lstlisting}[frame=none,numbers=none,]
+1A0EB8 6100 BSR.L $1A0EE6
+\end{lstlisting}
+
+So, I'm somewhere in the code for QLTdis\program{QLTdis}, but where. I know I'm at the
+instruction at address \$1A0EB8 but what is the start address of the job itself?
+
+The QMON2\program{QMON2} command `C' will calculate an address and the option `S' will display
+the start address of the job.
+
+\begin{lstlisting}[frame=none,numbers=none,]
+QMON> C S
+001A0EA8    1707688
+\end{lstlisting}
+
+This is the Hexadecimal and decimal values for the start of the QLTdis job I'm
+trying to debug. How can I be sure? Try disassembling the start address for a
+couple of instructions:
+
+\begin{lstlisting}[frame=none,numbers=none,]
+QMON> DI S 5
+1A0EA8 600E BRA.S $1A0EB8
+1A0EAA 0000 ORI.B #0,D0
+1A0EAE 4AFB ILLEGAL
+1A0EB0 0006 ORI.B #$4C,D6
+1A0EB4 5464 ADDQ.W #2,-(A4)
+\end{lstlisting}
+
+The first line is the one to look at, it shows a branch to address \$1A0EB8 that
+QMON2\program{QMON2} was showing me originally as the second instruction to be executed. So, the
+`S' value does appear to be my label for `START' and this is what I want.
+
+So, I know that the routine I want to check out is `DTYPE\_24' and that it is at
+an offset of \$0BAC from start, what address is this? Again using the C command
+to calculate an address, I do this:
+
+\begin{lstlisting}[frame=none,numbers=none,]
+QMON> C S+$0BAC
+001A1A54    1710676
+\end{lstlisting}
+
+I now know where my routine starts, again, to check that it is so, I can
+disassemble the first few instructions:
+
+\begin{lstlisting}[frame=none,numbers=none,]
+QMON> DI S+$0BAC 5
+1A1A54 0800 BTST #$8,D0
+1A1A54 6732 BEQ.S $1A1A8C
+1A1A54 3800 MOVE.W D0,D4
+1A1A54 0240 ANDI.W $C0,D0
+1A1A54 0800 CMPI.W $C0,D0
+\end{lstlisting}
+
+This looks remarkably like the correct code to me, so I can now set a breakpoint
+at this address and let QMON2\program{QMON2} tell me when I get there. Of course, if I was
+debugging someone else's code, I wouldn't have a handy list of offsets into the
+program, so I would have to run through it step by step by step until I found
+out where the code I wanted to check was. Once I'd reached that stage, I would
+make a note of the address and calculate the offset from the start so that I
+could easily set a breakpoint there on my next foray into the debugging
+session. It's much easier when you have the source!
+
+Anyway, I set a breakpoint as follows using the `B' command.
+
+\begin{lstlisting}[frame=none,numbers=none,]
+QMON> B S+$0BAC
+BRP 1A1A54
+\end{lstlisting}
+
+I could also have simply used the calculated address from earlier by typing `B
+\$1A1A54' which would have had the same effect. Note that if I set a break point
+at the same address it will delete the breakpoint at that address. The `B'
+command is a toggle.
+
+Again, this is what my code originally looked like when I was debugging the fix
+for this instruction type:
+
+\begin{lstlisting}[firstnumber=1,caption={QLTDis Broken Code}]
+dtype_24    btst    #8,d0           ; If bit 8 is 0, can't be ADDX/SUBX
+            beq.s   t24_not_t30     ; Easy bit done
+            move.w  d0,d4           ; Need D4  with the op-code
+
+            andi.w  #$00c0,d0       ; Mask bits 7 & 6 of the op-code
+            cmpi.w  #$00c0,d0       ; Both set?
+            bne.s   t24_not_t30     ; No, skip over type 30 stuff
+\end{lstlisting}
+
+Now I'm ready to go, so I simply type the QMON2\program{QMON2} go command which is `G'.
+
+\begin{lstlisting}[frame=none,numbers=none,]
+QMON> G
+\end{lstlisting}
+
+The `G' command means, Go until you hit a breakpoint or finish the program. It
+causes the program to run at nearly full speed. This means I get all the clear
+screens and prompts etc that I would normally get when running the program
+without the debugger. I therefore need to enter a start address and so on to get
+the disassembler to start working.
+
+I have already loaded a file of assembled \opcode{ADDX} and \opcode{SUBX} instructions into an
+area of memory that I allocated with ALCHP and I have its address written down
+on paper -{} my own memory is a bit random these days.
+
+After I have typed in the start and end addresses (and the printer device) I
+return to the QMON prompt with a register dump and the address, hex code and
+decoded instruction for the next instruction to be executed:
+
+\begin{lstlisting}[frame=none,numbers=none,]
+At brp SR 0000 --0----- SSP 00028480
+D0-D3 0000D300 01BC0924 0000003C FFFFFFFF
+D4-D7 0013FFFF 00000000 00000003 0013D300
+A0-A3 004C0016 001A1601 001A11DD 001A1130
+A4-A7 001A2362 001A11DD 0013A3C8 001A32Fa
+1A1A54 0800 BTST #$8,D0
+QMON>
+\end{lstlisting}
+
+Taking the above a section at a time, we have this first:
+
+\begin{lstlisting}[frame=none,numbers=none,]
+At brp SR 0000 --0----- SSP 00028480
+\end{lstlisting}
+
+This is telling me that I'm stopped at a breakpoint -{} `at brp' -{} and the
+contents of the status register in hex -{} 0000. Next to that is the interrupt
+mask value -{} 0 then 5 dashes showing the current state of the CCR flags. As all
+are showing dashes, none of the flags are set. Finally, there is the current
+value of the `alternative' stack pointer. In this case I'm running in user mode,
+so I can see the SSP (supervisor stack pointer) value. 
+
+Below the status line is a register dump showing the current values of all data
+and address registers.
+
+\begin{lstlisting}[frame=none,numbers=none,]
+D0-D3 0000D300 01BC0924 0000003C FFFFFFFF
+D4-D7 0013FFFF 00000000 00000003 0013D300
+A0-A3 004C0016 001A1601 001A11DD 001A1130
+A4-A7 001A2362 001A11DD 0013A3C8 001A32Fa
+\end{lstlisting}
+
+In my case I have the registers split over two lines each for data and address
+values. This depends on the width of the channel to which QMON2\program{QMON2} is writing the
+register dump.
+
+Below the register dump is the address, the op-{}code word and the disassembled
+instruction for the next instruction to be executed. Under that is the QMON2\program{QMON2}
+prompt.
+
+\begin{lstlisting}[frame=none,numbers=none,]
+1A1A54 0800 BTST #$8,D0
+QMON>
+\end{lstlisting}
+
+Back to the debugging session. I want to know what is causing my \opcode{ADDX}
+instructions to be decoded as \opcode{ADD}. So, I have my source listing for Type\_24
+instructions, and because I've hit the breakpoint I set, I know that an \opcode{ADDX} is
+coming through the type\_24 decoding routine before jumping into the type\_30
+decode -{} or is it? I need to find out.
+
+The register dump shows me the op-{}code in D0.W and also in D7.W, it is \$D300
+which is \opcode{ADDX D0,D1}. The op-{}code in binary is as follows, the bit numbers are in
+HEX above the individual bits themselves:
+
+\begin{lstlisting}[frame=none,numbers=none,]
+   C    8    4    0
+1101 0011 0000 0000
+\end{lstlisting}
+
+Lets trace through the code and see what happens. Remember that the next
+instruction to be executed is showing just above the QMON prompt, so when I
+enter the `T' for Trace command, I will be executing the instruction \opcode{BTST
+\#8,D0}. Let's do it.
+
+\begin{lstlisting}[frame=none,numbers=none,]
+QMON> T
+ SR 0000 --0----- SSP 00028480
+1A1A58 6732 BEQ.S $1A1A8C
+QMON>
+\end{lstlisting}
+
+I'm not showing the register dumps, unless there is anything of interest in the
+registers.
+
+We have tested bit 8 of D0 and found that it is not zero because the Z flag is
+not showing in the list of flags. This has to be an \opcode{ADDX}, \opcode{ADD} or an \opcode{ADDA.L}
+instruction (see the table in my explanation of type\_24 decoding above). Let's
+step again.
+
+\begin{lstlisting}[frame=none,numbers=none,]
+QMON> T
+ SR 0000 --0----- SSP 00028480
+1A1A5A 3800 MOVE.W D0,D4
+QMON>
+\end{lstlisting}
+
+Nothing of interest here, step again:
+
+\begin{lstlisting}[frame=none,numbers=none,]
+QMON> T
+ SR 0008 --0-N--- SSP 00028480
+1A1A5C 0240 ANDI.W #$C0,D0
+QMON>
+\end{lstlisting}
+
+Now it's starting to get interesting, the `N' flag is showing after we moved
+D0.W to D4.W -{} this shows that the most significant bit of the new value in D4.W
+is set and thus the value in D4.W is negative (if using signed arithmetic!).
+This is how QMON2\program{QMON2} displays flags which have been set, the flag letter is
+displayed on the `SR' line.
+
+Step again:
+
+\begin{lstlisting}[frame=none,numbers=none,]
+QMON> T
+ SR 0004 --0--Z-- SSP 00028480
+D0-D3 00000000 01BC0924 0000003C FFFFFFFF
+D4-D7 Ommitted
+A0-A3 Ommitted
+A4-A7 Ommitted
+1A1A60 0C40 CMPI.W #$C0,D0
+QMON>
+\end{lstlisting}
+
+So, we have set the Z flag because D0.W is now holding zero (Although D0.L is
+holding zero, the upper word was already zero only the lower word has changed
+because the instruction just executed \opcode{AND}ed a word value with DO.W.) The next
+instruction is waiting to be executed so lets do it. Step again:
+
+\begin{lstlisting}[frame=none,numbers=none,]
+QMON> T
+ SR 0009 --0-N--C SSP 00028480
+1A1A64 6626 BNE.S $1A1A8C
+QMON>
+\end{lstlisting}
+
+It looks like we are going to take the branch as the Zero flag is not set. Lets
+remind ourselves of what the original source code looked like again:
+
+\begin{lstlisting}[firstnumber=1,caption={QLTdis Broken Code}]
+dtype_24    btst    #8,d0           ; If bit 8 is 0, can't be ADDX/SUBX
+            beq.s   t24_not_t30     ; Easy bit done
+            move.w  d0,d4           ; Need D4 with the op-code word
+
+            andi.w  #$00c0,d0       ; Mask bits 7 & 6 of the op-code
+            cmpi.w  #$00c0,d0       ; Both set?
+            bne.s   t24_not_t30     ; No, skip over type 30 stuff
+\end{lstlisting}
+
+So you can see where we have single stepped through the above code, and we are
+just about to jump to label `T24\_NOT\_T30' because this instruction is not a
+type\_30. Except, we know that it is an \opcode{ADDX} instruction because that is what I
+was testing, and \opcode{ADDX} is a type\_30, so what have I done wrong?
+
+I have tested bits 7 and 6 and found them both to be zero (because the Z flag
+was set after I stepped through the \opcode{ANDI.W \$C0,D0} instruction. This means that
+the jump should not be taken to T24\_NOT\_T30 because I have not yet ascertained
+that the instruction is not an \opcode{ADDX}. With bits 7 and 6 set to 00, I could be
+looking at \opcode{ADDX} or \opcode{ADD}. I should not be taking the jump until I have further
+tested the value in bits 5 and 4 as per my algorithm above.
+
+This could be why the \opcode{ADDX} is being decoded as \opcode{ADD}, because I have the wrong
+condition in my test. In order to fix this, I have to change the source code,
+re-{}assemble and try my test again. I do this without the QMON2\program{QMON2} first of all and
+if it still fails, I can use QMON2\program{QMON2} to try and find out why again. I need to give
+the current job a `G' instruction and then I can ESC from the decoding and exit
+the program.
+
+I shall go do that and report back. Hang on here for a bit ......
+
+Ok, I'm back. I made the change from \opcode{BNE.S} to \opcode{BEQ.S} and it worked fine. So
+it looks like I have correctly identified the bug. I need more testing though
+to make sure I cover all possible op-{}codes. I have followed up my \opcode{ADDX} testing
+by passing test files which have \opcode{ADD}, \opcode{ADDA}, \opcode{ADDQ} and \opcode{ADDI} instructions, along
+with assorted \opcode{SUB} variants and all appears to be working well.
+
+So there you have it, an example of how I manage to get my code wrong and how I
+can use the tools available to try to sort it out. As I mentioned earlier, QMON2
+is available from Jochen for a small fee, but only if you understand German
+manuals.
+
+Laurence (Lau) Reeves has a different version of QMON2\program{QMON2}, written by himself,
+which fixes some bugs but I don't know if this is widely available or if it
+comes with a manual. Perhaps he could be persuaded to part with it or make it
+available -{} who knows. I'm not sure if he ever wrote a manual for it though.
+
+\end{appendix}

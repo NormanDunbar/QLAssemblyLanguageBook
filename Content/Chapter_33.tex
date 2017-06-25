@@ -1,0 +1,751 @@
+\chapter{LibGen -{} Library Generator -{} Part 4}
+
+\section{Introduction}
+\label{ch33-intro}%\hyperlabel{ch33-intro}%
+
+In the previous chapter, we ended up with an application that was getting
+    somewhere. But it's not finished yet. This issue we will look at what
+    happens when the user requests that we load a symbol file. In this
+    article, as before, we shall add code gradually, starting simple and
+    getting more complicated as we go on.
+
+\section{Gwasl Update}
+\label{ch33-gwasl-update}%\hyperlabel{ch33-gwasl-update}%
+
+George has updated gwasl to version 2.05
+    to fix a slight bug in error handling. To be sure you have the latest
+    version, please download it from \href{http://gwiltprogs.info/gwaslp08.zip}{http://gwiltprogs.info/\-gwaslp08.zip}.
+    We will be using this version from now on.
+
+\section{Errata}
+\label{ch33-errata}%\hyperlabel{ch33-errata}%
+
+In the previous edition, Volume 17 Issue 2 dated December 2012 to
+    February 2013, George Gwilt spotted a couple of errors in my code.
+
+In the IW\_PRINT sub-{}routine, at label
+ IWP\_PRINT, we have the following:
+
+\begin{lstlisting}[firstnumber=1,]
+iwp_prnt moveq #io_sstrg,d0
+         move.w (a3)+,d2
+         beq.s iwp_exit
+\end{lstlisting}
+
+The code is incorrect in that it introduces a bug. If there is no
+    string to print, the code exits directly to iwp\_exit where D0 is tested
+    and the condition codes set. Unfortunately, this means that the condition
+    codes will be set to reflect the fact that D0 is currently sitting with
+    the value \#IO\_SSTRG and not an error code. This is a bad thing!
+
+The code above must be changed as follows:
+
+\begin{lstlisting}[firstnumber=1,]
+iwp_prnt move.w (a3)+,d2
+         beq.s iwp_exit
+         moveq #io_sstrg,d0
+\end{lstlisting}
+
+In this corrected version, D0 will contain zero on return from the
+    previous trap and thus, on early exit to IWP\_EXIT,
+    the condition codes will be set to reflect this zero value, and the code
+    will assume that all is well, which it is. The window has been cleared and
+    nothing has been printed -{} which is exactly what is desired.
+
+Also in the sub-{}routine IW\_INPUT, on page 22, I
+    have a comment near the bottom of the page that details a bug in the
+    documentation for the WM\_ENAME vector. The comment is
+    incorrect and should be removed. This has arisen due to a misunderstanding
+    of the documentation, on my part.
+
+I assumed that when the docs mentioned that the condition codes
+    would be set, that what they really meant was that D0 would be set. A
+    completely incorrect assumption on my part. However, I wrote the library
+    routine with that assumption in mind. As it turned out, after an exchange
+    of emails with George, the manual is correct and I am wrong.
+
+If you leave the code the way it is, D0 will be set to negative,
+    zero or positive as I originally misunderstood the manual to say. It does
+    no harm, but the comments itself is wrong and should be removed as there
+    is not a bug in the manual.
+
+This also means that on page 21, the first line of the note, where
+    it says that ``D0 will be zero if ENTER was pressed...to terminate the
+    edit.'', it is wrong. That whole paragraph can simply be ignored. Typpex it
+    out if you must! ;-{})
+
+My apologies for these problems, and my thanks to George for his
+    assistance in resolving my issues.
+
+George also pointed out that in the routines
+ CP\_STRING and AP\_STRING, where
+    the test for a zero length string is made, it is not necessary as the DBF
+    instruction will detect this and do nothing anyway. What George says is
+    true, but I tend to like to be explicit in my code. To this end, you can,
+    if you wish to save a couple of bytes and clock cycles, remove the BEQ.S
+    CS\_EXIT and/or BEQ.S AS\_EXIT instructions from near the start of these
+    routines.
+
+George further pointed out my use of the BLT instruction as opposed
+    to the BMI command. Once I checked my documentation, I discovered that
+    George is correct -{} although the conditions under which BLT wouldn't work
+    are unlikely, I have decided to correct the code. There are three
+    occasions where the instruction BLT.S xx\_EXIT, where xx is a two letter
+    prefix, should be changed to BMI.S xx\_exit instead. They three locations
+    are in the routines at SYM\_HIT,
+ LIB\_HIT and BIN\_HIT. Please
+    change all three BLT instructions to BMI.
+
+What's the difference? Well, my code is looking for a negative
+    number, and if found, currently bales out via the BLT instruction. How do
+    you determine whether a number is negative or not? The N flag tells you.
+    If the N flag is set, the number in question is negative, otherwise, it is
+    positive.
+
+The BMI instruction checks the N flag and branches accordingly. The
+    BLT instruction, on the other hand, will branch only if the N flag is set
+    and the V (overflow) flag is not set, or, if the V flag is set and the N
+    flag is not.
+
+And finally, here's a couple I spotted myself. Unfortunately,
+    because I'm running on QPC with a virtual) 68020, the following two bugs
+    don't cause an exception, however, running on a standard QL, they
+    would.
+
+The code at LI\_UNAV and
+ LI\_AVAIL currently looks like this:
+
+\begin{lstlisting}[firstnumber=1,]
+li_unav  move.l #$11111111,ws_litem+li_libfile(a1)
+         bra.s li_rdrw
+...
+li_avail move.l #$01011101,ws_litem+li_libfile(a1)
+
+li_rdrw  moveq #-1,d3
+         jmp wm_ldraw(a2) 
+\end{lstlisting}
+
+The problem is, LI\_LIBFILE is an odd value -{} it's \$03. Although A1.L
+    and WS\_LITEM are both guaranteed to be even, the effective address of the
+    MOVE.L is an odd address. As I mentioned, this works perfectly well on QPC
+    with its 68020 processor, but the 68008 in our bare bones QLs will raise
+    an address exception. We need to change the code as follows:
+
+\begin{lstlisting}[firstnumber=1,]
+li_unav  move.b #wsi_mkun,ws_litem+li_libfile(a1)  Make Libfile unavailable
+         move.w #$1111,ws_litem+li_load(a1)        Make Load and Save unavailabe
+         move.b #wsi_mkun,ws_litem+li_binfile(a1)  Make Binfile unavailable
+         bra.s li_rdrw
+...
+li_avail move.b #wsi_mkav,ws_litem+li_libfile(a1)  Make Libfile available
+         move.b #wsi_mkav,ws_litem+li_load(a1)     Make Load available, Save stays Unavailable
+         move.b #wsi_mkav,ws_litem+li_binfile(a1)  Make Binfile available
+
+li_rdrw  moveq #-1,d3
+         jmp wm_ldraw(a2) 
+\end{lstlisting}
+
+\section{Another Library}
+\label{ch33-another-library}%\hyperlabel{ch33-another-library}%
+
+The processing for the Load and Save loose items requires a bit
+    of file processing. I have a library for this, as you might expect. So,
+    without any further ado, here it is. Mine is called
+ \nolinkurl{win1_source_qltoday_openfiles_asm} at the moment, and
+    is simply included as a plain source file, it's not a proper library yet.
+    If you save your file in a different place, please be sure to change the
+    name in the `in' command.
+
+\begin{lstlisting}[firstnumber=1,]
+;=====================================================================
+; This file contains useful utilities for opening files etc.
+; It's just crying out to become a library! ;-)
+;---------------------------------------------------------------------
+; F_OPEN      - Open a file. Old Exclusive mode.
+; F_OPEN_IN   - Open a file for input. Old Shared mode.
+; F_OPEN_NEW  - Open a new file. New Exclusive mode.
+; F_OPEN_OVER - Open overwrite. New Overwrite mode.
+; F_OPEN_DIR  - Open a directory. Open Directory mode.
+; F_CLOSE     - Close any open file.
+; F_SYNC      - Flush buffers to device.
+; F_POS_ABS   - Set absolute file position.
+; F_POS_REL   - Set relative file position.
+;=====================================================================
+; Entry Registers.
+;
+; Unless otherwise specified, all routines use the following registers
+; on entry:
+;
+; A0.L Pointer to QDOSSMQ string defining the file name.
+;---------------------------------------------------------------------
+; Exit Registers.
+;
+; Unless otherwise specified, all routines exit with the following
+; register usage. Any register not listed will be preserved by the
+; routines.
+;
+; D0.L Error code. Zero = no errors.
+; A0.L Channel id.
+; Flags - Z set to reflect the value in D0.
+;=====================================================================
+
+io_openx      equ 0   SuperBasic OPEN
+io_open_in    equ 1   SuperBasic OPEN_IN
+io_open_new   equ 2   SuperBasic OPEN_NEW
+io_open_over  equ 3   SuperBasic OPEN_OVER
+io_open_dir   equ 4   No SuperBasic equivalent.
+
+
+;=====================================================================
+; F_OPEN - Open an existing file.
+;=====================================================================
+f_open
+        move.l d3,-(a7)        Save D3
+        moveq #io_openx,d3     IO Open code
+        bra.s f_open_all       Go do it, and exit.
+
+
+;=====================================================================
+; F_OPEN_IN - Open a file for input.
+;=====================================================================
+f_open_in
+        move.l d3,-(a7)
+        moveq #io_open_in,d3
+        bra.s f_open_all
+
+
+;=====================================================================
+; F_OPEN_NEW - Craete a new file.
+;=====================================================================
+f_open_new
+        move.l d3,-(a7)
+        moveq #io_open_new,d3
+        bra.s f_open_all
+
+
+;=====================================================================
+; F_OPEN_OVER - Open a file, overwriting existing contents.
+;=====================================================================
+f_open_over
+        move.l d3,-(a7)
+        moveq #io_open_over,d3
+        bra.s f_open_all
+
+
+;=====================================================================
+; F_OPEN_DIR - Open a device directory.
+;=====================================================================
+f_open_dir
+        move.l d3,-(a7)
+        moveq #io_open_dir,d3
+
+
+;=====================================================================
+; F_OPEN_ALL - general purpose working "open" routine.
+;=====================================================================
+f_open_all
+        movem.l d1-d2/a1,-(a7) Save working registers
+        moveq #io_open,d0      IO_OPEN trap code
+        moveq #-1,d1           File is for this job
+;                              D3 already set
+;                              A0 already set
+        trap #2                Do it
+        movem.l (a7)+,d1-d2/a1 Restore working registers
+        move.l (a7)+,d3        Plus D3 from above
+        tst.l d0               Set Z flag
+        rts                    Done
+\end{lstlisting}
+
+The first few routines are all to do with opening files. All that
+    they do is set the required open mode in D3 then branch down to doing all
+    the hard work at f\_open\_all. D3 is also preserved by the individual
+    routines as we need to keep it safe from changes.
+
+On arrival at f\_open\_all, we preserve all the
+    other working registers and call out to QDOSMSQ to open the file for us.
+    On return, A0 holds the channel id and D0 any potential error codes. After
+    restoring all the working registers, and D3, we set the flags according to
+    D0's error code and exit.
+
+\begin{lstlisting}[firstnumber=1,]
+;=====================================================================
+; F_CLOSE - Close any open file.
+;=====================================================================
+; Entry Registers:
+;
+; A0.L Channel Id
+;---------------------------------------------------------------------
+; Exit Registers:
+;
+; D0.L Error code (channel not open)
+; A0.L Corrrupted.
+; Flags Z set according to D0.
+;=====================================================================
+f_close
+        moveq #io_close,d0     Close file trap code
+        trap #2                Do it
+        tst.l d0               Set Z flag
+        rts                    Done
+\end{lstlisting}
+
+The f\_close routine simply closes the channel
+    id passed in A0, and returns with any errors in D0 and the Z flag set
+    accordingly.
+
+\begin{lstlisting}[firstnumber=1,]
+;=====================================================================
+; F_POS_ABS - Set the current file position pointer to an absolute
+;          position in the file.
+;=====================================================================
+; Entry Registers:
+;
+; D1.L File position required.
+; A0.L Channel Id.
+;---------------------------------------------------------------------
+; Exit Registers:
+;
+; D0.L Error code.
+; D1.L New file position.
+; Flags Z set according to D0.
+;=====================================================================
+f_pos_abs
+        moveq #fs_posab,d0     Abs position trap code
+        bra.s f_pos_all        Do it
+
+
+;=====================================================================
+; F_POS_REL - Set the file position to a new location relative to the
+;          current location.
+;=====================================================================
+; For register usages, see F_POS_ABS above.
+;=====================================================================
+f_pos_rel
+        moveq #fs_posre,d0     Relative position trap code
+
+
+;=====================================================================
+; F_POS_ALL - General do it all file positioning routine.
+;=====================================================================
+f_pos_all
+        movem.l d3/a1,-(a7)    Preserve working registers
+        moveq #-1,d3           Timeout
+;                              D0 already set to trap code
+;                              D1 already set to file location
+;                              A0 already set to channel id
+        trap #3                Do it
+        movem.l (a7)+,d3/a1    Restore registers
+        tst.l d0               Set Z flag
+        rts                    Done
+
+
+;=====================================================================
+; F_FLUSH - Flush a file's slave blocks to disc.
+;=====================================================================
+; Entry Registers:
+;
+; A0.L Channel Id.
+;---------------------------------------------------------------------
+; Exit Registers:
+;
+; D0.L Error code.
+; Flags Z set according to D0.
+;=====================================================================
+f_flush
+        movem.l d1/d3/a1,-(a7) Preserve working registers
+        moveq #fs_flush,d0     Trap code
+        moveq #-1,d3           Timeout
+;                              A0 already set to channel id
+        trap #3                Do it
+        movem.l (a7)+,d1/d3/a1 Restore registers
+        tst.l d0               Set flags
+        rts                    Done
+\end{lstlisting}
+
+The above routines carry out useful file flushing and positioning
+    facilities. As ever, the channel id is passed in A0, and for the file
+    positioning routines, a file location in D1.L. After preserving the
+    working registers, the routines simply call out to QDOSMSQ to do the hard
+    work before restoring any working registers and exiting with the Z flag
+    set according to the error code in D0.
+
+The following one line needs to be added to the end of
+ \nolinkurl{libgen_asm} to include the above library of useful
+    file handling routines.
+
+\begin{lstlisting}[firstnumber=1,]
+         in  win1_source_qltoday_openfiles_asm
+\end{lstlisting}
+
+It should be added after the existing line that includes my
+ \nolinkurl{pe_utilities_asm} source file.
+
+\section{Load Processing}
+\label{ch33-lib-gen-processing}%\hyperlabel{ch33-lib-gen-processing}%
+
+When the user hits the Load loose item, the file named as the
+    Symbol file, is opened for reading. It is then processed in two
+    passes.
+
+The first pass simply counts the number of \emph{code offset
+ }lines that will be added to the menu. This is done by looking
+    along the entire line of text read in, for the appearance of the
+    characters `*+' as these two indicate that the entry is for a code offset
+    rather than an equate. If we find what we are looking for, so we increment
+    the counter. Any errors cause an immediate return with the Z flag
+    indicating success or failure.
+
+The second pass resets the file position back to the start, and
+    begins reading again. This time, for each entry that represents a code
+    offset, we extract the label name from the entry, and add it to the buffer
+    allocated for the application menu. Again, in the event of an error, we
+    return with the Z flag holding the success or failure status.
+
+If all is well, then at end of file, the file will be closed and the
+    buffer added to the application sub-{}window as a menu, All items in the
+    menu will be \emph{selected} by default. If the file loads
+    correctly, the "Save" loose item will be enabled and the Load loose item
+    will be reset to available.
+
+I did consider reading the \nolinkurl{_sym} file directly
+    and bypassing the need to create a \nolinkurl{_sym_lst} file. I
+    got as far as diagnosing the internal structure of a
+ gwasl \nolinkurl{_sym} file and even
+    worked out a fairly simple manner of processing the load requirements.
+    Unfortunately, George advised that I stick with the
+ \nolinkurl{_sym_lst} file as it is identical whether the original
+ \nolinkurl{_sym} file was created with
+ gwasl or gwass -{} as
+    these produce a different \nolinkurl{_sym} file format.
+
+I did a quick test using gwass instead of
+ gwasl and sure enough, the
+ \nolinkurl{_sym} files are different. Equally, the
+ \nolinkurl{_sym_lst} files are also different, so I need to scan
+    each line read in from the file looking for the special characters I want
+    instead of just checking a specific location in the line. Never mind, this
+    way, if George changes things, LibGen will
+    still work.
+
+\section{LibGen Code}
+
+As with the other hit routines, we start off quite simple. The
+    following code is all that is required as the main Load loose item hit
+    routine:
+
+\begin{lstlisting}[firstnumber=1,]
+;---------------------------------------------------------------------
+; LOAD loose item action routine.
+;---------------------------------------------------------------------
+afun0_4  movem.l d5-d7/a0-a4,-(a7) Preserve important registers.
+         bsr load_hit              Do it all.
+         movem.l (a7)+,d5-d7/a0-a4 Restore important registers.
+         move.w #$0101,ws_litem+li_load(a1) Only works because li_load is even!
+         bra li_rdrw               Load = available, Save = available.
+
+;---------------------------------------------------------------------
+; This code carries out all the nasty work for a hit on the Load
+; loose item. It is called from afun0_4 above.
+;---------------------------------------------------------------------
+load_hit bsr.s ld_pass_1           Count the entries for the menu
+         bne.s ld_exit             Oops, an error occurred
+         bsr ld_pass_2             Build the menu
+         
+ld_exit  rts                       Done, D0 = error or not
+
+;---------------------------------------------------------------------
+; Load file, pass 1, open the symbol file and count the code offsets.
+;---------------------------------------------------------------------
+ld_pass_1
+         moveq #0,d0
+         rts
+
+;---------------------------------------------------------------------
+; Load file, pass 2, build the menu, close the symbol file.
+;---------------------------------------------------------------------
+ld_pass_2
+         moveq #0,d0
+         rts
+\end{lstlisting}
+
+The main meat of the hit code is yet to be written, however,
+    assembling the above and executing it shows that when the Load loose
+    item is hit, both it and the Save one become available. Nothing will
+    happen if you now hit or do the Save loose item because it still has a
+    dummy hit routine that does nothing, other than to reset the loose item to
+    available. If you have a slow QL, you might see the Save loose item
+    flash as it has its status reset from selected to available.
+
+An important point to note. The setting of the two loose items to
+    available by a single MOVE.W instruction only works because ws\_litem is
+    defined as even, its value is \$40 and, as I already know that li\_load is
+    also even, then the MOVE.W works. If either of these (or for that matter,
+    A1) were odd, there would be an address exception on a standard QL, but
+    not on QPC. If you ever wish to add extra loose items to this utility, and
+    want to be extra safe, then change the single MOVE.W above, to the
+    following:
+
+\begin{lstlisting}[firstnumber=1,]
+         move.b #wsi_mkav,ws_litem+li_load(a1) Make Load available.
+         move.b #wsi_mkav,ws_litem+li_save(a1) Make Save available.
+\end{lstlisting}
+
+We need to add a couple of helper routines next, and then, we can
+    hook them up to ld\_pass\_1 replace the dummy code we
+    have there at present.
+
+As we have to scan each line of the \nolinkurl{_sym_lst}     file for the characters `*+' in both passes, it's probably wise to extract
+    the code to a separate sub-{}routine. However, there's a slight problem. In
+    the first pass we are simply counting entries so that we can allocate the
+    correct amount of memory to build the menu, while in pass 2 we have to
+    extract all the names and offsets to actually use in the menu. What to
+    do?
+
+The answer is simple, if we set an address register to the address
+    of a sub-{}routine to carry out the required work, we can use the JSR (An)
+    instruction each time we find the required text. That way, each pass will
+    set the register to a different address and whatever code is at that
+    address when we find a line containing a code offset, will be executed.
+    Simple!
+
+The following code is our equivalent of INSTR. You should type it in
+    just above where ld\_pass\_2 is currently
+    located.
+
+\begin{lstlisting}[firstnumber=1,]
+;=====================================================================
+; LD_INSTR - scans each line of the buffer at (A1) looking for the 
+;            characters '*+' and if found, calls the code at the 
+;            address in A2.
+;=====================================================================
+; Entry Registers:
+;
+; A1.L Buffer to search. Normal QDOS format of word and bytes.
+; A2.L Address of code to be called on a "find". Zero if nothing.
+;---------------------------------------------------------------------
+; Exit Registers:
+;
+; A1.L Address in buffer of the character after the '*' we looked for,
+;      if found. Points at the '+'. If not found, one past the buffer
+;      end if not found.
+;
+; D0.L  0 = Found the '*+'.
+;      -1 = Not found.
+;      -ve = Appropriate error.   
+;
+; Flags Z set according to D0.
+;=====================================================================
+ld_instr moveq #0,d0               Need D0.L to be zero
+         move.w (a1)+,d0           Grab the word count
+         beq.s ldi_done            Unlikely, but you never know!
+         bra.s ldi_next            Decrement before comparing
+
+ldi_scan cmpi.b #'*',(a1)+         Compare and increment
+ldi_next dbeq d0,ldi_scan          Try again or drop out
+
+;---------------------------------------------------------------------
+; If we get here we have either found a '*' or we haven't. If D0.W is
+; -1 then we didn't find it. Otherwise the Z flag should be set.
+;---------------------------------------------------------------------
+         bne.s ldi_exit            Bale out, D0 = -1 = not found
+         cmpi.b #'+',(a1)          Compare, but don't increment
+         bne.s ldi_next            Keep searching (unlikely!)
+
+;---------------------------------------------------------------------
+; Found '*+' if A2 is non-zero, call the code addressed in A2.
+;---------------------------------------------------------------------
+         cmpa.l #0,a2              Anything to execute?
+         beq.s ldi_exit            No, bale out D0 = 0 = found
+         jsr (a2)                  Yes, call the code
+
+;---------------------------------------------------------------------
+; A not found means we arrive here with D0.W = -1 instead of D0.L. We
+; must extend D0.W to a long or the calling code will barf! 
+;---------------------------------------------------------------------
+ldi_exit ext.l d0                  Must exit with error code in D0.L
+
+ldi_done rts                       Done
+\end{lstlisting}
+
+As you can see it's quite simple. We are passed a buffer address in
+    A1.L and a code address in A2.L. D0 is set to the word count for the size
+    of the data in the buffer, and then we enter a loop to search for the
+    required `*' character in the buffer. If we hit the end of the buffer, D0
+    will be -{}1 and the Z flag will not be set, so we exit directly to the RTS
+    instruction at ldi\_done which means we return -{}1 as a
+    flag that we didn't find anything.
+
+Note that in the event that we don't find the `*' we are looking
+    for, D0.L holds the value \$0000FFFF. The calling code adds 1 to D0.L to
+    determine if it was a not found or some other error, so we have to make
+    sure that D0.L holds \$FFFFFFFF.
+
+The code at ldi\_exit does this, but also does
+    it when we have found it, whether or not we call any code in A2, so in
+    that case, it's an un-{}required instruction. However, it does nicely set
+    the flags for us so we don't have to TST.L D0 on the way out.
+
+If we do find an `*' character, we exit from the bottom of the loop
+    with the condition codes set to `eq' (the same condition as the 'cc' part
+    of the DBcc instruction) so we know we found it. A1.L is pointing at the
+    character after the `*' and we hope that it is a `+'. If it is not a plus,
+    then we skip back into the loop to see if there are any more `*'
+    characters. This is unlikely in a \nolinkurl{_sym_lst} file, but
+    you never can be too sure!
+
+Assuming the character at A1.L is a plus, we check if A2.L is zero
+    and of so, exit setting D0 to zero to indicate found. If A2.L holds some
+    other value, we call the code pointed to by A2.L and, on return, make sure
+    the flags are set according to any potential error codes in D0, and
+    exit.
+
+We are now ready to write the code to replace the dummy code at
+ ld\_pass\_1.
+
+\begin{lstlisting}[firstnumber=1,]
+ld_pass_1 
+         lea sym_buffer,a0         File name
+         bsr f_open_in             File must exist already for reading
+         bne sui                   Error exit, dramatic and fatal!
+
+         moveq #0,d7               Counter register
+         lea ld_p1_count,a2        Call back code to do the counting
+
+p1_entry moveq #128,d2             Size of buffer space. (Preserved)
+         moveq #-1,d3              Timeout (Preserved)
+\end{lstlisting}
+
+The main entry point to pass attempts to open the file who's name is
+    currently stored in the sym file buffer. If it fails to open for any
+    reason, I'm afraid the application simply dies. This is not ideal and in a
+    commercia" quality application this would simply be unacceptable. I only
+    do it here to reduce space in the magazine.
+\begin{DBKadmonition}{}{Note}
+
+I know how irritating it can be for a program to just vanish.
+      During testing I had a bug that caused the program to quit whenever a
+      line didn't contain an asterisk. The reason was that D0.L held \$0000FFFF
+      and not \$FFFFFFFF on exit from ld\_instr.
+\end{DBKadmonition}
+
+The next step is to zero D7 which is acting as our counter. The
+    whole of D7.L is set to zero although the code only requires the low word.
+    A2.L is loaded with the address of the callback routine that does the
+    counting for us. Every time there's a hit in the data read from the
+ \nolinkurl{_sym_lst} file, we jump to the code whose address is
+    held in A2.L. On this pass, it simply counts. (See below.)
+
+P1\_entry is the second entry point to this
+    code. There's no point duplicating huge chunks of code, and as pass 1 and
+    pass 2 are both required to read the file, and scan each line of text read
+    from it, we can use the code in pass 1 as part of pass 2.
+ P1\_entry will be where pass 2 joins in with the
+    fun.
+
+At this point, we have everything initialised for pass 1. The buffer
+    length for IO\_FLINE is set as is the timeout. These two registers are
+    preserved through the calls to IO\_FLINE so can be initialised once only,
+    prior to the start of the main loop for each pass.
+
+\begin{lstlisting}[firstnumber=1,]
+p1_loop  lea p1_buffer+2,a1        We need to reinitialise the each time
+;                                  A0.L already has the channel id
+;                                  D2.W already has the buffer size
+;                                  D3 already holds the timeout
+         moveq #io_fline,d0        The trap code we desire
+         trap #3                   Read up to 128 bytes ending with a lf
+         tst.l d0                  Errors?
+         beq.s p1_not_eof          No, all ok, skip
+
+p1_eof   cmpi.l #-10,d0            Was it EOF?
+         bne sui                   No, error, die horribly!
+         bra.s p1_exit             Must be EOF, all done for pass 1
+
+p1_not_eof
+         subq.w #1,d1              Lose the terminating lf character
+         beq.s p1_next             Nothing to do here, empty line
+         lea p1_buffer,a1          Buffer address again
+         move.w d1,(a1)            Make into QDOSMSQ string
+\end{lstlisting}
+
+The first part of the main loop sets A1.L to the third character of
+    the buffer we will use to read each line of data from the
+ \nolinkurl{_sym_lst} file into. IO\_FLINE fetches
+ \emph{bytes}, not a QDOSMSQ string with a word count, so we
+    cannot simply point A1 at the start of the buffer.
+
+We call IO\_FLINE to read some text up to a maximum of 128 bytes, but
+    normally terminating with a linefeed character. On return, if D0.L is EOF,
+    we exit as this concludes pass 1. If D0.L is holding any other error code,
+    the application simply takes the easy way out and dies horribly.
+
+The number of characters read, including the linefeed is returned in
+    D1.W from which, we subtract 1 to lose the trailing linefeed. We skip to
+    the end of the loop if the length is now zero as we can't scan an empty
+    string. If there is work to do, we reset A1.L to the word count at the
+    start of the buffer and store the length word, now not including the
+    linefeed. We are now ready to scan the fresh data in the buffer.
+
+\begin{lstlisting}[firstnumber=1,]
+         bsr.s ld_instr            Scan for the required characters
+         beq.s p1_next             We found it, do next line of data
+         addq.l #1,d0              Minus 1 was not found
+         bne sui                   Oh dear, some other error. Die
+
+p1_next  bra.s p1_loop             Let's go round again
+
+p1_exit  moveq #0,d0               No errors. We come here from EOF only
+         rts
+\end{lstlisting}
+
+The above code calls the `instr' code to look for the two desired
+    characters. If found, D0.L will be zero on return. In that case, we skip
+    to the bottom of the main loop ready to go round again. If D0.Lholds minus
+    1 then that indicates not found, which isn't an error, so we will also go
+    around again until we hit EOF. Any other errors cause the application to
+    die horribly as usual. (I really don't like that!)
+
+\begin{lstlisting}[firstnumber=1,]
+p1_buffer
+         ds.w 65                   128 bytes + a word count
+\end{lstlisting}
+
+The code above reserves a 65 word buffer which allows for 128
+    characters and a word count. This will be ample for our needs.
+
+We must also write the call back routine that does the pass 1
+    counting.
+
+\begin{lstlisting}[firstnumber=1,]
+;=====================================================================
+; LD_P1_COUNT - called from LD_INSTR during pass 1 when we find the 
+;               required '*+' characters in the buffer. All we do is
+;               increment a counter, in D7.W.
+;=====================================================================
+; Entry Registers:
+;
+; D7.W Counter of hits so far.
+; A1.L Pointer into search buffer. Points at the '+' character.
+; A2.L Address of ld_p1_counter.
+;---------------------------------------------------------------------
+; Exit Registers:
+;
+; D7.w Incremented by one from the entry value.
+; D0.L Zero.
+; Flags Z set.
+;---------------------------------------------------------------------
+ld_p1_count
+         addq.w #1,d7              Simply increment the counter
+         moveq #0,d0               No errors. Sets Z flag.
+         rts
+\end{lstlisting}
+
+The code can be assembled and executed. You are now able to enter a
+    sym file name, and load it. Well, you are able to carry out pass 1 of the
+    load process which does nothing much except count the required entries we
+    will need in the application sub-{}window menu.
+
+\section{Coming Up...}
+\label{ch33-the-end}%\hyperlabel{ch33-the-end}%
+
+The end of the world as we know it!
+

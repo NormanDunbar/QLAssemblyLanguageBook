@@ -1,0 +1,19 @@
+digraph structs {
+    rankdir=LR
+    pad="0.3";
+    //bgcolor=grey77;
+    node [shape=record fillcolor=yellowgreen style=filled];
+//
+    StructRoot [label="<First> First ($1000) | <Prior> Prior ($0000) | Data |Addr $ABCD"];
+    Struct1000 [label="<Next> Next ($2000) | <Prior> Prior ($ABCD) | Data | Addr $1000"];
+    Struct1200 [label="<Next> Next ($0000) | <Prior> Prior ($2000) | Data | Addr $1200"];
+    Struct2000 [label="<Next> Next ($1200) | <Prior> Prior ($1000) | Data | Addr $2000"];
+//
+    StructRoot:First -> Struct1000:Next;
+    Struct1000:Next -> Struct2000:Next;
+    Struct2000:Next -> Struct1200:Next;
+
+    Struct1200:Prior -> Struct2000:Next;
+    Struct2000:Prior -> Struct1000:Next;
+    Struct1000:Prior -> StructRoot:First;
+}
