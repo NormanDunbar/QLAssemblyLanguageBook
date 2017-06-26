@@ -163,7 +163,7 @@ Building is *interesting*. You need to build the pdf a few times to be sure that
 
 -   Finally, running ``pdflatex AssemblyLanguage.tex`` again, adds and styles the index.
 
-The above process is exactly what the ``buildPdf.sh`` script does. :-) 
+The above process is exactly what the ``buildPdf.sh`` and ``buildPdf.cmd`` bash/batch scripts  do. :-) 
 
 Linux
 -----
@@ -186,10 +186,13 @@ To build the pdf in Linux is relatively simple. You need to install a utility na
 
 When you run a build, then any missing *LaTeX* packages will be installed either manually, or you will be prompted to install them individually as the build progresses. It's best to set up the application to automatically install missing packages.
 
-The build process is ........
+Installing MikTeX will install everything you need, including the ``pdflatex`` and ``makeindex`` commands. These should (!) also be correctly installed on your PATH.
 
-**TBA**.
+..  code-block:: none
 
+    cd <top_level_directory>
+    ./buildPdf.sh
 
+When this finishes, and there will be a lot of text scrolling up the screen, the finished book will be found in the file ``AssemblyLanguage.pdf``.
 
 
