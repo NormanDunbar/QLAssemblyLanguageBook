@@ -191,7 +191,7 @@ Installing MikTeX will install everything you need, including the ``pdflatex`` a
 ..  code-block:: none
 
     cd <top_level_directory>
-    ./buildPdf.sh
+    .\buildPdf.cmd
 
 When this finishes, and there will be a lot of text scrolling up the screen, the finished book will be found in the file ``AssemblyLanguage.pdf``.
 
