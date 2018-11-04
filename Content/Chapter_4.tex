@@ -352,23 +352,27 @@ But the actual instruction assembled will be \opcode{ANDI} instead. Again the
           ANDI #data,CCR 
 \end{lstlisting}
 
-This is an instruction that is used to reset or clear some or all of
-    the flags. The flags are reset as follows:
+The size of this instruction is always byte, however, only the lower 5 bits are used. The 
+   three high bits should, for safety, be set to 1 to avoid corrupying bits 5-7 of the CCR 
+   which may be used for "other things" in different processors to the MC68008.
+
+This is an instruction that can be used to clear some or all of
+    the Condition Code flags. The flags are reset as follows:
 \begin{itemize}[itemsep=0pt]
 
-\item{}C is reset if value in bit 0 of the data is a 0.
+\item{}C is cleared if value in bit 0 of the data is a 0. Unchanged otherwise.
 
 
-\item{}V is reset if value in bit 1 of the data is a 0.
+\item{}V is cleared if value in bit 1 of the data is a 0. Unchanged otherwise.
 
 
-\item{}Z is reset if value in bit 2 of the data is a 0.
+\item{}Z is cleared if value in bit 2 of the data is a 0. Unchanged otherwise.
 
 
-\item{}N is reset if value in bit 3 of the data is a 0.
+\item{}N is cleared if value in bit 3 of the data is a 0. Unchanged otherwise.
 
 
-\item{}X is reset if value in bit 4 of the data is a 0.
+\item{}X is cleared if value in bit 4 of the data is a 0. Unchanged otherwise.
 
 \end{itemize}
 
@@ -385,12 +389,12 @@ As above, the flags are reset according to the value in bits 1 -{} 4
    :
 \begin{itemize}[itemsep=0pt]
 
-\item{}T (trace) is reset if the value in bit 15 of the data is
-        0.
+\item{}T (trace) is cleared if the value in bit 15 of the data is
+        0. Unchanged otherwise.
 
 
-\item{}S (supervisor) is rest if the value in bit 13 of the data is
-        0.
+\item{}S (supervisor) is cleared if the value in bit 13 of the data is
+        0. Unchanged otherwise.
 
 \end{itemize}
 
@@ -399,7 +403,7 @@ The value in bits 10, 9 and 8 is \opcode{AND}ed with the current value in the
     level mask.
 
 All unused bits should be one in the data to prevent unpredictable
-    results on different processors.
+    results on different processors. These will be bits 14, 12, 11, 7, 6 and 5.
 
 This instruction can be used to exit from supervisor mode. The
     instructions:
@@ -417,14 +421,14 @@ Would set the QL so that supervisor mode was first switched on (by
 \section{Exclusive OR Instructions}\mc6800x{EOR}
 \label{ch4-eor}%\hyperlabel{ch4-eor}%
 
-Having dealt with the inclusive or instructions above, it is now
-    time for the exclusive or instructions. This has the format:
+Having dealt with the \emph{inclusive or} instructions above, it is now
+    time for the \emph{exclusive or} instructions. This has the format:
 
 \begin{lstlisting}[firstnumber=1,]
           EOR.size Dn,destination
 \end{lstlisting}
 
-Where size can be byte, word or long. Notice this time that \lstinline{EOR source,Dn} is not permitted? I wonder why? (I don't know -{} does anyone?)
+Where size can be byte, word or long. 
 
 This instruction also sets the flags as per the NOT instruction. In
     the truth table for inclusive or, there was a 1 bit set in the result when
@@ -515,14 +519,12 @@ The above code is very simple and assumes that there is exactly 100
     byte to encrypt the data so don't go using it for anything you value, such as your bank account details!
 \end{warning}
 
-\opcode{EOR} has the usual variations:\mc6800x{EORI}
+\opcode{EORI} has the usual variations:\mc6800x{EORI}
 
 \begin{lstlisting}[firstnumber=1,]
           EORI #data,destination
 \end{lstlisting}
 
-You will notice the absence of \lstinline{EORI source,Dn} as mentioned
-    above.
 
 \begin{lstlisting}[firstnumber=1,]
           EORI #data,CCR
@@ -602,11 +604,13 @@ or
 
 For the first two variations above, the data in Dy is affected and
     the size can be byte, word or long. The number of shifts that take place
-    is defined by the value in register Dx or in the immediate data.
+    is defined by the value in register Dx Mod 64 or in the immediate data 
+    where it can only be 1 to 8.
 
 For the final variation, the size must be word only, and the data in
     that address and the address above it, is affected. For this format, there
     can only be a single shift at a time.
+    
 
 What happens is that the data is shifted by a single bit at a time.
     The bit that is shifted `out' of the register is placed into the C and X
@@ -667,10 +671,13 @@ After a shift in either direction the flags are set as follows:
 \item{}Z is set if the result became zero, cleared otherwise.
 
 
-\item{}V is always cleared.
+\item{}V is always cleared for \opcode{LSx}. For \opcode{ASx} V is set 
+        if the most significant bit \emph{changed at any time} during the shift,
+        or is cleared otherwise. (The MSB cannot actually change for an \opcode{ASR} 
+        instruction!)
 
 
-\item{}C is set to the LAST bit shifted out, cleared if the shift count
+\item{}C is set to the LAST bit shifted out, \emph{cleared} if the shift count
         was zero.
 
 
@@ -679,7 +686,8 @@ After a shift in either direction the flags are set as follows:
 
 \end{itemize}
 \mc6800x{ASL}\mc6800x{ASR}
-The arithmetic shifts -{} \opcode{ASL} and \opcode{ASR} -{} preserve the sign of the value by duplicating the previous value of the sign bit in the new sign bit, so
+The arithmetic shifts -{} \opcode{ASL} and \opcode{ASR} -{} preserve the sign of the 
+    value by duplicating the previous value of the sign bit in the new sign bit, so
     everything shifts as above, but the most significant bit of the byte, word
     or long being shifted, is shifted back into itself.
 
