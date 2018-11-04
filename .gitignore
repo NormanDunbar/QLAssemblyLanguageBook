@@ -11,6 +11,7 @@
 *.ptc
 *.xml
 *.toc
+*.synctex.gz
 
 !Readme.pdf
 !AssemblyLanguage.pdf
