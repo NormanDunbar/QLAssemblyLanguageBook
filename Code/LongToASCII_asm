@@ -1,0 +1,83 @@
+;----------------------------------------------------------------------
+; Convert LONG to ASCII.
+;
+; Entry:
+; D3.L = **Unsigned** value to convert.
+; A1.L = Buffer to write ASCII digits to. (Beyond the word count)
+; 
+; Exit:
+; 
+; D0.L = Zero, no errors possible. Z flag set.
+; D1.W = Digits added to buffer.
+; D3.L = Corrupted
+; A1.L = Updated to next free space in the buffer.
+; All other registers are preserved.
+;----------------------------------------------------------------------
+
+LongToASCII
+      movem.l d2/a3,-(a7)    ; Save working registers
+      moveq #0,d1            ; Digits written to buffer counter
+      tst.l d3               ; Zero?
+      beq.s l2a_all_done     ; Yes, take an early exit
+      lea l2a_tens_table,a3  ; Powers of 10
+
+l2a_next_digit
+      move.l (a3)+,d2        ; D2.L is current power of 10
+      bne.s l2a_do_digit     ; Not done yet
+
+l2a_ones
+      move.b d3,d0           ; 'Ones' digit left in D3
+      bra.s l2a_digit_ok     ; Convert the ones digit & exit  ********** TO BE TESTED ***********
+
+l2a_do_digit
+      moveq #0,d0            ; D0.B is current digit
+
+l2a_digit_loop
+      sub.l d2,d3            ; Subtract current power of 10 (10^??)
+      bcs.s l2a_buff_digit   ; Oops, too many subtractions
+      addq.b #1,d0           ; Increase current digit
+      bra.s l2a_digit_loop   ; And try again
+
+l2a_buff_digit
+      add.l d2,d3            ; Add 10^?? back on for the underflow
+      tst.b d0               ; Is this digit a zero ?
+      bne.s l2a_digit_ok     ; No
+      tst.w d1               ; Yes, is it a leading zero ?
+      beq.s l2a_next_digit   ; Yes, ignore it
+
+l2a_digit_ok
+      addi.b #'0',d0         ; Convert to ASCII
+      move.b d0,(a1)+        ; Store in buffer
+      addq.w #1,d1           ; Increment buffered digit counter
+      bra.s l2a_next_digit   ; And do the rest
+
+l2a_all_done
+      tst.w d1               ; Any digits found ?
+      bne.s l2a_non_zero     ; Yes, result is non-zero
+      move.b #'0',(a1)       ; Store a zero
+      moveq #1,d1            ; And set the count
+
+l2a_non_zero
+      movem.l (a7)+,d2/a3    ; Restore working registers
+      moveq #0,d0            ; No errors
+      rts
+
+;----------------------------------------------------------------------
+; A table of all powers of ten, from 10 to 0. This corresponds to the
+; values used when converting an UNSIGNED 32 bit long word to ASCII.
+; 2^32 = 4,294,967,296 values including zero. 0 - 4,294,967,295.
+; 10^9 = 1,000,000,000 so is a big enough 'highest' power to use
+;----------------------------------------------------------------------
+
+l2a_tens_table
+      dc.l 1000000000        ; 10 ^ 9
+      dc.l 100000000         ; 10 ^ 8
+      dc.l 10000000          ; 10 ^ 7
+      dc.l 1000000           ; 10 ^ 6
+      dc.l 100000            ; 10 ^ 5
+      dc.l 10000             ; 10 ^ 4
+      dc.l 1000              ; 10 ^ 3
+      dc.l 100               ; 10 ^ 2
+      dc.l 10                ; 10 ^ 1
+      dc.l 1                 ; 10 ^ 0
+      dc.l 0                 ; End marker

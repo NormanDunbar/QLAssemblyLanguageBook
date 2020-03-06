@@ -1,0 +1,114 @@
+	bra.s start
+	dc.l  0
+	dc.w  $4afb
+
+fname	dc.w  fname_e-fname-2
+	dc.b  "Application Window Test 1"
+fname_e ds.b  0
+	ds.w  0
+
+; We need the various equates files etc.
+
+	in win1_georgegwilt_peass_keys_pe
+	in win1_georgegwilt_peass_qdos_pt
+	in win1_georgegwilt_peass_keys_wwork
+	in win1_georgegwilt_peass_keys_wstatus
+	in win1_georgegwilt_peass_keys_wman
+	in win1_georgegwilt_peass_keys_wdef
+
+id	equ 0			; Offset to channel id storage
+wmvec	equ 4			; Offset to WMAN vector storage
+slimit	equ 8			; Offset to storage for return from IOP_FLIM.
+;				  The storage is X-size, Y-size, X-org, Y-org - all words.
+start	lea (a6,a4.l),a6	; Make A6 point to the job's dataspace
+	bsr op_con		; Open a con channel
+	move.l a0,id(a6)	; And store the channel id
+	moveq #iop_pinf,d0	; Trap to get Pointer Information
+	moveq #-1,d3		; Timeout
+	trap #3 		; Do it
+	tst.l d0		; Is ptr_gen present?
+	bne sui 		; No, bale out via SUI
+	move.l a1,wmvec(a6)	; Yes, store the WMAN vector
+	beq sui 		; Oops! WMAN wasn't actually found
+
+flim	movea.l a1,a2		; The WMAN vector is required in A2
+;				  The channel id is already in A0
+	lea slimit(a6),a1	; Result buffer
+	moveq #iop_flim,d0	; Query maximum size of window
+	moveq #0,d2		; D2 is required to be zero
+;				  D3 is the timeout from the above trap #3
+	trap #3 		; Do it (No errors)
+	tst.l d0		; Did it work?
+	bne sui 		; No, exit via SUI
+
+	subi.l #$C0008,(a1)	; Subtract 12 from the width and 8 from the height
+	lea wd0,a3		; Get the address of window definition
+	move.l #ww0_0,d1	; Get the size of the working definition
+	bsr getsp		; Easy PEasy routine to ALCHP memory and set A0
+	movea.l a0,a4		; Which we save in A4
+	lea wst0,a1		; Status area starts here - thanks to SETW
+	movea.l a1,a0		; Copy to A0
+	moveq #wst0_e-wst0-1,d1 ; How many bytes to clear - 1
+
+st_clr	clr.b (a0)+		; Clear one byte
+	dbf d1,st_clr		; Then the remainder
+	movea.l id(a6),a0	; Get the channel id where we need it
+;				  A1 is the status area address from above
+;				  A3 is the window definition address from above
+;				  A4 is the working definition address from GETSP above
+	move.l wd_xmin+wd_rbase(a3),d1 ; Get the minimum dimensions from definition
+	andi.l #$FFF0FFF,d1	; Mask off any scaling factors - as previously described
+	jsr wm_setup(a2)	; Set up the working definition - no errors
+
+	moveq #-1,d1		; We want to draw the window where the pointer is
+	jsr wm_prpos(a2)	; So position it first as a primary window, then
+	jsr wm_wdraw(a2)	; Draw the contents
+wrpt	jsr wm_rptr(a2) 	; Enter the "read pointer" loop in WMAN
+	beq.s no_err		; Since D0 is zero D4 is non zero
+	bra sui 		; An error occurred exit via SUI
+
+no_err	movea.l (a4),a1 	; Status area address
+	btst #pt__can,wsp_weve(a1) ; Check for CANCEL event
+	bne sui 		; Exit
+
+	bra.s wrpt		; No more events, read pointer again
+
+; Loose item action routine
+
+afun0_0 bset  #pt__can,wsp_weve(a1) ; Set the CANCEL event bit
+	moveq #pt__can,d4	  ; And load the CANCEL event number in D4
+	moveq #0,d0		  ; No errors
+	rts			  ; Exit, and cause an exit from wm_rptr too
+
+; Application sub-window hit routine
+
+ahit0	moveq #0,d4
+	moveq #0,d0
+	rts
+
+; Various helper routines go here...
+
+con	dc.w con_e-con-2	  ; Size of channel definition
+	dc.b 'con'
+con_e	equ *
+
+op_con	lea  con,a0		  ; We want a console
+	moveq #-1,d1		  ; For this job
+	moveq #0,d3		  ; Timeout
+	moveq #io_open,d0
+	trap #2 		  ; Do it
+	rts
+
+; Pull in our window definition file.
+
+	in  win1_source_qltoday_ApplTestWin_asm
+
+; We need George's Easy PEasy code next.
+
+	in  win1_georgegwilt_peass_peas_sym_lst
+	lib win1_georgegwilt_peass_peas_bin
+
+; And finally, George's sprites.
+
+	in  win1_georgegwilt_peass_csprc_sym_lst
+	lib win1_georgegwilt_peass_csprc_bin

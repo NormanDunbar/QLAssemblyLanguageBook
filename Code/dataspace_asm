@@ -1,0 +1,572 @@
+* ta 12,20,40,72; si1; sl1; sr85
+
+*======================================================================*
+* DATASPACE version 1.00					       *
+*								       *
+* Copyright Norman Dunbar February 1991.			       *
+*								       *
+* Changes a task file's dataspace.                                     *
+*======================================================================*
+*								       *
+* AMENDMENTS							       *
+*								       *
+* Buffer flush added so that a file on another disc could be processed *
+* as testing gave 'files open' error when a disc was changed. It would *
+* seem that the close routine does not flush out the buffers straight  *
+* away. Now works fine. 					       *
+*								       *
+* Press any key to kill job message added at end. I was using PTR_GEN  *
+* and WMAN from the Quanta library disc SPECIALS_0 which refresh the   *
+* screen when a switch between jobs takes place, however, this had the *
+* effect of clearing out any error messages from the job as it aborted *
+* The message is now displayed until the user presses any key, then    *
+* the job ends. 						       *
+*								       *
+*======================================================================*
+
+*----------------------------------------------------------------------*
+* EQUATES  Trap #1						       *
+*----------------------------------------------------------------------*
+
+;mt_frjob   equ     $05 		Force remove job
+
+*----------------------------------------------------------------------*
+* EQUATES  Trap #2						       *
+*----------------------------------------------------------------------*
+
+;io_open    equ     $01 		Open a channel
+;io_close   equ     $02 		Close a channel
+
+*----------------------------------------------------------------------*
+* EQUATES  Trap #3						       *
+*----------------------------------------------------------------------*
+
+;io_fbyte   equ     $01 		Fetch one byte
+;io_fline   equ     $02 		Fetch a line ending in LF
+;fs_flush   equ     $41 		Flush a files buffers
+;fs_heads   equ     $46 		Set file header
+;fs_headr   equ     $47 		Read file header
+
+*----------------------------------------------------------------------*
+* EQUATES  Vectors						       *
+*----------------------------------------------------------------------*
+
+;ut_con     equ     $C6 		Open a CON_ channel
+;ut_err     equ     $CC 		Send a message to channel
+;ut_err0    equ     $CA 		Send message to #0 or #1
+;ut_mtext   equ     $D0 		Send text to a channel
+;cn_ftod    equ     $F0 		Convert float to ascii
+
+*----------------------------------------------------------------------*
+* EQUATES  General						       *
+*----------------------------------------------------------------------*
+
+ftyp	   equ	   $05		       Offset to file type
+fdat	   equ	   $06		       Offset to file dataspace
+
+me	   equ	  -$01		       This job
+linefeed   equ	   $0A		       Ascii line feed
+timeout    equ	  -$01		       Infinite timeout
+black	   equ	   $00		       Black ink/paper code
+red	   equ	   $02		       Red ditto
+green	   equ	   $04		       Green ditto
+white	   equ	   $06		       White ditto
+
+*======================================================================*
+* Here be dragons, well the start of the code anyway.....	       *
+*======================================================================*
+
+start	   bra.s   dataspace	       Jump over header
+	   dc.l    0		       Make sure $4AFB is at offset 6
+	   dc.w    $4AFB	       ID word
+
+name	   dc.w    22		       Length of name
+	   dc.b    'Dataspace Version 1.00'
+
+*----------------------------------------------------------------------*
+* Open a console window 					       *
+*----------------------------------------------------------------------*
+
+dataspace  move.w  ut_con,a2
+	   lea.l   con_def,a1	       Console definition block
+	   jsr	   (a2) 	       Open a CON_ channel
+	   tst.l   d0		       Check for errors
+	   bne	   job_end	       And bale out if found
+	   move.l  a0,d7	       Store console id
+
+*----------------------------------------------------------------------*
+* Console is open, sign on					       *
+*----------------------------------------------------------------------*
+
+sign_on    lea.l   name,a1	       Job name
+	   bsr	   write_text	       Print job name
+	   lea.l   copyright,a1        Copyright message
+	   bsr	   write_text	       And copyright message
+
+*----------------------------------------------------------------------*
+* Main loop, keep asking for a filename until ENTER only pressed       *
+*								       *
+* First prompt for filename					       *
+*----------------------------------------------------------------------*
+
+main_loop  move.l  d7,a0	       Console id
+	   lea.l   mess_1,a1
+	   bsr	   write_text	       Enter filename message
+	   bsr	   get_text	       Get filename
+
+*----------------------------------------------------------------------*
+* Then check if it was only ENTER and if so exit the job	       *
+*----------------------------------------------------------------------*
+
+check_end  tst.w   d1		       Finished ?
+	   beq	   any_key	       Yes
+
+*----------------------------------------------------------------------*
+* Otherwise attempt to open the file				       *
+*----------------------------------------------------------------------*
+
+open_file  moveq   #io_open,d0	       Open file
+	   moveq   #me,d1	       For this job
+	   moveq   #0,d3	       For input
+	   move.l  a1,a0	       File name is in buffer
+	   trap    #2
+	   tst.l   d0		       Check errors
+	   beq.s   read_head	       Open was ok
+
+*----------------------------------------------------------------------*
+* Cannot open the file, print its name and the error message	       *
+*----------------------------------------------------------------------*
+
+cant_open  move.l  d0,-(a7)	       Store error code
+	   lea.l   mess_2,a1	       Cannot open message
+	   bsr	   write_text	       Print it
+	   lea.l   input,a1	       File name
+	   bsr	   write_text	       Print filename
+	   lea.l   mess_6,a1	       A colon
+	   bsr	   write_text	       Print it
+	   move.l  (a7)+,d0	       Get error code
+	   move.w  ut_err,a2
+	   jsr	   (a2) 	       Print error message
+
+*----------------------------------------------------------------------*
+* Note, D0 is preserved by UT_ERR, so cannot check for errors	       *
+*----------------------------------------------------------------------*
+
+	   bra.s   main_loop
+
+*----------------------------------------------------------------------*
+* File has been opened ok, read the file header 		       *
+*----------------------------------------------------------------------*
+
+read_head  move.l  a0,d6	       Store file id
+	   moveq   #fs_headr,d0
+	   moveq   #64,d2	       Size of buffer
+	   moveq   #timeout,d3	       Timeout
+	   lea.l   buffer,a1	       Put header here
+	   move.l  a1,a5	       Store buffer
+	   trap    #3		       Go get the file header
+	   tst.l   d0		       Check for errors
+	   beq.s   check_exec	       none
+
+*----------------------------------------------------------------------*
+* Cannot read file header, say so and print the error message	       *
+*----------------------------------------------------------------------*
+
+cant_read  lea.l   mess_3,a1	       Cannot read header message
+	   move.l  d0,-(a7)	       Store error code
+	   bsr	   write_text	       Print message
+	   move.l  (a7)+,d0	       Get error code
+	   move.w  ut_err,a2
+	   jsr	   (a2) 	       Print error message
+	   bra	   main_end	       Skip the rest of the loop
+
+*----------------------------------------------------------------------*
+* Header has been read ok, check if the file is EXECable	       *
+*----------------------------------------------------------------------*
+
+check_exec cmpi.b  #1,ftyp(a5)	       Check file is EXECable
+	   beq.s   current	       It is
+
+*----------------------------------------------------------------------*
+* File is not EXECable, print an error message			       *
+*----------------------------------------------------------------------*
+
+not_exec   lea.l   input,a1	       Filename
+	   bsr	   write_text	       Print filename
+	   lea.l   mess_4,a1	       Not an EXECable file message
+	   bsr	   write_text	       Print the message
+	   bra	   main_end	       Skip rest of the loop
+
+*----------------------------------------------------------------------*
+* File is EXECable, print its current dataspace 		       *
+*----------------------------------------------------------------------*
+
+current    lea.l   mess_5,a1	       Current dataspace is message
+	   bsr	   write_text	       Print it
+
+*----------------------------------------------------------------------*
+* Now get the current dataspace & convert it to ASCII		       *
+*----------------------------------------------------------------------*
+
+	   move.l  fdat(a5),d3	       D3.L is dataspace
+	   lea.l   input+2,a1	       A1.L is output buffer
+	   lea.l   tens_table,a2       Powers of 10
+	   moveq   #0,d1	       D1.W is digit counter (all digits)
+
+next_digit move.l  (a2)+,d2	       D2.L is current power of 10
+	   beq.s   all_done	       But zero is end of table
+	   clr.b   d0		       D0.B is current digit
+
+digit_loop sub.l   d2,d3	       Subtract the current power of 10
+	   blt.s   buff_digit	       Too far
+	   addq.b  #1,d0	       Increase current digit
+	   bra.s   digit_loop	       And try again
+
+buff_digit add.l   d2,d3	       Correct for the overflow
+	   tst.b   d0		       Is this a zero ?
+	   bne.s   not_a_zero	       No
+	   tst.w   d1		       Yes, is it a leading zero ?
+	   beq.s   next_digit	       Yes, ignore it
+
+not_a_zero addi.b  #'0',d0	       Convert to ASCII
+	   move.b  d0,(a1)+	       Store in buffer
+	   addq.w  #1,d1	       Increment total digits
+	   bra.s   next_digit	       And do the rest
+
+*----------------------------------------------------------------------*
+* Check for a result of zero. In this case force a '0' to be printed   *
+*----------------------------------------------------------------------*
+
+all_done   tst.w   d1		       Any digits found ?
+	   bne.s   not_zero	       yes
+	   move.b  #'0',(a1)	       Store a zero
+	   moveq   #1,d1	       And set the count
+
+not_zero   lea.l   input,a1	       The buffer
+	   move.w  d1,(a1)	       Store character count
+
+*----------------------------------------------------------------------*
+* Dataspace is converted, print it out				       *
+*----------------------------------------------------------------------*
+
+	   bsr	   write_text	       Print old dataspace
+
+*----------------------------------------------------------------------*
+* Now prompt for, and read in the required new dataspace	       *
+*----------------------------------------------------------------------*
+
+new	   lea.l   mess_8,a1	       New dataspace message
+	   bsr	   write_text	       Print it
+	   bsr	   get_text	       Get new dataspace
+	   tst.w   d1		       No text ?
+	   beq.s   new		       Try again
+	   move.w  (a1)+,d0	       Get text length
+	   subq.w  #1,d0	       Adjust for dbra
+
+*----------------------------------------------------------------------*
+* Convert from ASCII into binary, ignore leadin (any) spaces and stop  *
+* if a 'K' or 'k' is detected. Reject all other non-digit characters   *
+*----------------------------------------------------------------------*
+
+convert    moveq   #0,d4	       Needs to be a long word
+	   move.l  d4,d5	       D5 is total so far
+
+conv_next  move.b  (a1)+,d4	       Get a byte
+	   cmpi.b  #' ',d4	       Is it a space ?
+	   beq.s   try_next	       Yes, ignore it
+	   cmpi.b  #'k',d4	       Is it 'k'
+	   bne.s   try_K	       no
+
+mul_1024   asl.l   #2,d5	       Yes, multiply by 1024
+	   asl.l   #8,d5	       Can't do it in one go
+	   bra.s   make_even	       And exit
+
+try_K	   cmpi.b  #'K',d4	       Try uppercase
+	   beq.s   mul_1024	       Yes
+
+	   cmpi.b  #'0',d4	       Is it a digit ?
+	   bcs.s   invalid	       No
+	   cmpi.b  #'9',d4	       But it might be
+	   bls.s   mul_10	       Yes it is
+
+*----------------------------------------------------------------------*
+* An invalid digit has been detected, print error message & try again  *
+*----------------------------------------------------------------------*
+
+invalid    lea.l   mess_10,a1	       Invalid digit message
+	   bsr.s   write_text	       Print it
+	   bra.s   new		       try again
+
+*----------------------------------------------------------------------*
+* Multiply D5.L by 10 and add in the digit just read		       *
+*----------------------------------------------------------------------*
+
+mul_10	   asl.l   #1,d5	       D5 = D5 * 2
+	   move.l  d5,d3	       Store for now
+	   asl.l   #2,d5	       Now D5 = D5 * 8
+	   add.l   d3,d5	       And finally D5 = D5 * 10
+	   subi.b  #'0',d4	       Convert byte to (long) binary
+	   add.l   d4,d5	       Total = (total * 10) + digit
+
+try_next   dbra    d0,conv_next        Do rest of digits
+
+*----------------------------------------------------------------------*
+* When finished, the value must be even 			       *
+*----------------------------------------------------------------------*
+
+make_even  addq.l  #1,d5	       Prepare to make even
+	   bclr    #0,d5	       Make dataspace even
+
+*----------------------------------------------------------------------*
+* Now load the header with the new dataspace and set it 	       *
+*----------------------------------------------------------------------*
+
+set_head   move.l  d5,fdat(a5)	       Store in the header
+	   moveq   #fs_heads,d0        Set the file header
+	   moveq   #timeout,d3	       Timeout
+	   move.l  d6,a0	       File id
+	   move.l  a5,a1	       File header
+	   trap    #3		       Go set it
+	   tst.l   d0		       Any errors ?
+	   bne.s   not_set	       Yes
+
+*----------------------------------------------------------------------*
+* Now flush out the file buffers, so that if I change discs I have     *
+* written the header to the current disc. Cannot detect the QDOS error *
+* READ/WRITE failed (try removing the disc and it won't fail or        *
+* produce an error code). It might print a message if it can find an   *
+* open command channel which is not in use. I got it when testing via  *
+* a monitor but not while running on its own.			       *
+*----------------------------------------------------------------------*
+
+flush	   moveq   #fs_flush,d0        Prepare to flush the buffer
+	   moveq   #timeout,d3	       This could take all day
+	   trap    #3		       But do it anyway
+	   tst.l   d0		       And check for errors
+	   beq.s   main_end	       None, do the next file
+
+*----------------------------------------------------------------------*
+* Header not set or flush failed, print error message		       *
+*----------------------------------------------------------------------*
+
+not_set    move.l  d0,-(a7)	       Store error code
+	   lea.l   mess_7,a1	       Cannot set header message
+	   bsr.s   write_text	       Print it
+	   move.l  (a7)+,d0	       Get error code
+	   move.w  ut_err,a2
+	   jsr	   (a2) 	       Print error message
+
+*----------------------------------------------------------------------*
+* Can't trap errors in UT_ERR as D0 is preserved.                      *
+* Close the file & loop to the start				       *
+*----------------------------------------------------------------------*
+
+main_end   move.l  d6,a0	       File id for close
+	   moveq   #io_close,d0
+	   trap    #2		       Close the file
+	   bra	   main_loop	       And see if more to be done
+
+*======================================================================*
+* Here be subroutines. (What no dragons ?)			       *
+*======================================================================*
+
+*----------------------------------------------------------------------*
+* Subroutine to print text to screen				       *
+*								       *
+* ENTRY 							       *
+*								       *
+* D7.L = Channel id						       *
+* A1.L = Pointer to text to print (Word then bytes)		       *
+*								       *
+* EXIT								       *
+*								       *
+* A0.L = channel id						       *
+*----------------------------------------------------------------------*
+
+write_text move.w  ut_mtext,a2	       Print text vector
+	   move.l  d7,a0	       Channel id
+	   jsr	   (a2) 	       Print it
+	   tst.l   d0		       Check errors
+	   bne.s   job_error	       Oops kill job
+	   rts			       Otherwise exit
+
+*----------------------------------------------------------------------*
+* A fatal error has occurred, print it, wait for any key and kill job  *
+* wait for a key allows WMAN & PTR_GEN users to see the message before *
+* WMAN restores the screen.					       *
+*----------------------------------------------------------------------*
+
+job_error  move.l  d7,a0	       Get console id
+	   move.w  ut_err0,a2	       Print error text vector
+	   jsr	   (a2) 	       Print to #0
+
+any_key    move.l  d7,a0	       In case entry is here
+	   lea.l   mess_12,a1	       Press any key message
+	   move.w  ut_mtext,a2	       Don't use WRITE_TEXT in case of errors
+	   jsr	   (a2) 	       Print it
+	   moveq   #io_fbyte,d0        Fetch one byte
+	   moveq   #timeout,d3	       Take all day if you like
+	   trap    #3		       Go get it
+	   moveq   #io_close,d0
+	   trap    #2		       Close console channel
+
+*----------------------------------------------------------------------*
+* This job will self destruct in no time at all 		       *
+*----------------------------------------------------------------------*
+
+job_end    moveq   #mt_frjob,d0        Job is about to die
+	   moveq   #me,d1	       And it is this job
+	   trap    #1		       RIP (there is not return)
+
+*----------------------------------------------------------------------*
+* Subroutine to get some text from the user			       *
+*								       *
+* ENTRY 							       *
+*								       *
+* D7.L = channel id						       *
+*								       *
+* EXIT								       *
+*								       *
+* D1.W = number of bytes read					       *
+* A0.L = channel id						       *
+* A1.L = start of buffer (word then bytes)			       *
+*----------------------------------------------------------------------*
+
+get_text   lea.l   input,a1	       Buffer for the text
+	   move.l  a1,-(a7)	       Store it
+	   addq.l  #2,a1	       Leave room for the length word
+	   moveq   #io_fline,d0
+	   moveq   #42,d2	       Maximum buffer size
+	   moveq   #timeout,d3	       Take as long as you like
+	   trap    #3		       Get some text
+	   tst.l   d0		       Check for errors
+	   bne.s   job_error	       Bale out (stack will be ok)
+	   move.l  (a7)+,a1	       Get buffer start
+	   subq.w  #1,d1	       Remove the line feed
+	   move.w  d1,(a1)	       Store text length
+	   rts			       Exit
+
+*======================================================================*
+* Here be data (still no dragons ?)				       *
+*======================================================================*
+
+*----------------------------------------------------------------------*
+* Definition block for my console channel			       *
+*----------------------------------------------------------------------*
+
+con_def    dc.b    red		       Border colour
+	   dc.b    $02		       Border width
+	   dc.b    green	       Paper & strip colour
+	   dc.b    black	       Ink colour
+	   dc.w    $01C0	       Width = 448
+	   dc.w    $003C	       Height = 60
+	   dc.w    $0020	       X position = 32
+	   dc.w    $0010	       Y position = 16
+
+*----------------------------------------------------------------------*
+* Copyright message, so the world knows my name 		       *
+*----------------------------------------------------------------------*
+
+copyright  dc.w    copy_end-copyright-2
+	   dc.b    linefeed
+	   dc.b    'Copyright Norman Dunbar, Jan 1991.'
+	   dc.b    linefeed
+copy_end
+
+*----------------------------------------------------------------------*
+* Various prompts & error messages				       *
+*----------------------------------------------------------------------*
+
+mess_1	   dc.w    end_1-mess_1-2
+	   dc.b    linefeed
+	   dc.b    'Enter filename'
+	   dc.b    linefeed
+	   dc.b    'or ENTER only to finish : '
+end_1
+
+mess_2	   dc.w    end_2-mess_2-2
+	   dc.b    'Cannot open '
+end_2
+
+mess_3	   dc.w    end_3-mess_3-2
+	   dc.b    'Cannot read file header : '
+end_3
+
+mess_4	   dc.w    end_4-mess_4-2
+	   dc.b    ' is not an EXECable file'
+	   dc.b    linefeed
+end_4
+
+mess_5	   dc.w    end_5-mess_5-2
+	   dc.b    'Current dataspace is : '
+end_5
+
+mess_6	   dc.w    end_6-mess_6-2
+	   dc.b    ' : '
+end_6
+
+mess_7	   dc.w    end_7-mess_7-2
+	   dc.b    'Cannot set file header : '
+end_7
+
+mess_8	   dc.w    end_8-mess_8-2
+	   dc.b    linefeed
+	   dc.b    'Enter new dataspace in bytes, or'
+	   dc.b    linefeed
+	   dc.b    'end with "K" for kilobytes : '
+end_8
+
+mess_9	   dc.w    end_9-mess_9-2
+	   dc.b    ' bytes'
+	   dc.b    linefeed
+end_9
+
+mess_10    dc.w    end_10-mess_10-2
+	   dc.b    'Invalid digit found in input'
+	   dc.b    linefeed
+end_10
+
+mess_11    dc.w    end_11-mess_11-2
+	   dc.b    'Dataspace set.'
+	   dc.b    linefeed
+end_11
+
+mess_12    dc.w    end_12-mess_12-2
+	   dc.b    linefeed
+	   dc.b    'Goodbye, press any key to kill job.....'
+end_12
+
+*----------------------------------------------------------------------*
+* Two buffer areas, one for the file header & one for user input       *
+* note how sneaky I have been, by using DS.W I have forced them both   *
+* to be word aligned. If I had used DC.B they might not have been, and *
+* I would be bound to get an address exception sometime. (it happened) *
+*----------------------------------------------------------------------*
+
+buffer	   ds.w    32		       Buffer is 64 bytes maximum
+input	   ds.w    22		       Size = 41 + ENTER + word count
+
+*----------------------------------------------------------------------*
+* A table of all powers of ten, from 9 to 0. This corresponds to the   *
+* values used when converting an UNSIGNED long word to ASCII.	       *
+* 2^31 = 2,147,483,648						       *
+* 10^9 = 1,000,000,000 so is a big enough 'highest' power to use       *
+*----------------------------------------------------------------------*
+
+tens_table dc.l    1000000000	       10 ^ 9
+	   dc.l    100000000	       10 ^ 8
+	   dc.l    10000000	       10 ^ 7
+	   dc.l    1000000	       10 ^ 6
+	   dc.l    100000	       10 ^ 5
+	   dc.l    10000	       10 ^ 4
+	   dc.l    1000 	       10 ^ 3
+	   dc.l    100		       10 ^ 2
+	   dc.l    10		       10 ^ 1
+	   dc.l    1		       10 ^ 0
+	   dc.l    0		       Table end marker
+
+*----------------------------------------------------------------------*
+* STOP PRESS - dragons are extinct. (Unless you live on Kimodo Island) *
+*----------------------------------------------------------------------*
+
+	   END

@@ -1,0 +1,21 @@
+Start       bra.s     Start2        ; Skip over result area
+Result      dc.l      0             ; Result area
+FirstNumber dc.w      9             ; Assume 9! by default
+
+Start2      lea       Result,a3     ; Where to shove the answer
+            moveq     #0,d0         ; Clear all 32 bits of D0.L
+            move.w    4(a3),d0      ; Fetch FirstNumber
+            bsr.s     Factorial     ; Do it
+FRET_1      move.l    d0,(a3)       ; Shove it !
+            moveq     #0,d0         ; No errors
+            rts                     ; Back to SuperBasic
+
+Factorial   move.w    d0,-(a7)      ; Stack current number
+            subq.w    #1,d0         ; Calculate previous number
+            bne.s     Not_zero      ; Not done unless next number is zero
+FPOP        move.w    (a7)+,d0      ; Retrieve the value of 1 from stack
+            rts                     ; Back to previous call to Factorial
+
+Not_zero    bsr.s     Factorial     ; Lets go round again, and again
+FRET_2      mulu      (a7)+,d0      ; Do the multiplication
+            rts                     ; Exit

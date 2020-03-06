@@ -1,0 +1,31 @@
+;----------------------------------------------------------------------
+; Convert LONG to ASCII.
+;----------------------------------------------------------------------
+; Requires LongToASCII be loaded within short branch range.
+;----------------------------------------------------------------------
+; Entry:
+; D3.L = **Signed** value to convert.
+; A1.L = Buffer to write ASCII digits to. (Beyond the word count)
+; 
+; Exit:
+; 
+; D0.L = Zero, no errors possible. Z flag set.
+; D1.W = Digits added to buffer.
+; D3.L = Corrupted
+; A1.L = Updated to next free space in the buffer.
+; All other registers are preserved.
+;----------------------------------------------------------------------
+
+LongToASCIIs
+      tst.l d3		     ; Is D3.L negative?
+      bpl.s LongToASCII      ; No, stay positive. Never returns here.
+
+l2as_negative
+      move.b #'-',(a1)+      ; Buffer a ex gwasl_gminus sign
+      not.l d3		     ; Invert D3.L (One's compliment)
+      addq.l #1,d3	     ; Make positive (Two's compliment)
+      bsr.s LongToASCII      ; Convert & return here
+      addq.w #1,d1	     ; Account for the minus sign
+      rts
+
+      in win1_libs_LongToASCII_lib

@@ -1,0 +1,1181 @@
+0000 6020                          0 	bra.s start
+0002 0000 0000                     1 	dc.l  0
+0006 4AFB                          2 	dc.w  $4afb
+0008                               3 
+0008 0017                          4 fname	dc.w  fname_e-fname-2
+000A 4170 706C 6963 6174 696F      5 	dc.b  "Application Menu Test 1"
+0021 00                            6 fname_e ds.b  0
+0022                               7 	ds.w  0
+0022                               8 
+0022                               9 ; We need the various equates files etc.
+0022                              10 
+0022                              11 	in win1_georgegwilt_peass_keys_pe
+0022                              12 ; keys_pe
+0022                              13 ; Keys for PE traps
+0022                              14 
+0022                              15 ; Trap #3 routines
+0022                              16 
+0022                              17 iop_flim	equ	$6C
+0022                              18 iop_lblb	equ	$74
+0022                              19 iop_outl	equ	$7A
+0022                              20 iop_pick	equ	$7C
+0022                              21 iop_pinf	equ	$70
+0022                              22 iop_rptr	equ	$71
+0022                              23 iop_rpxl	equ	$72
+0022                              24 iop_rspw	equ	$6E
+0022                              25 iop_slnk	equ	$6F
+0022                              26 iop_spry	equ	$77
+0022                              27 iop_sptr	equ	$7B
+0022                              28 iop_svpw	equ	$6D
+0022                              29 iop_swdf	equ	$7D
+0022                              30 iop_wblb	equ	$73
+0022                              31 iop_wrst	equ	$7F
+0022                              32 iop_wsav	equ	$7E
+0022                              33 iop_wspt	equ	$76
+0022                              34 	in win1_georgegwilt_peass_qdos_pt
+0022                              35 * pointer interface keys and structures
+0022                              36 *
+0022                              37 *	Pointer return event vector bits
+0022                              38 *
+0022                              39 * Altered:
+0022                              40 *  All . -> _
+0022                              41 *  pto.blk -> pto_bblk
+0022                              42 *  ptp.flag -> ptp_flg
+0022                              43 *  binary numbers -> hex numbers
+0022                              44 *  nolist and list expunged
+0022                              45 
+0022                              46 pt_kystk equ	$01	keystroke in window event
+0022                              47 pt_kyprs equ	$02	key still pressed in window event
+0022                              48 pt_keyup equ	$04	key up in window event
+0022                              49 pt_move  equ	$08	pointer move event
+0022                              50 pt_outwn equ	$10	pointer out of window
+0022                              51 pt_inwin equ	$20	pointer in window
+0022                              52 pt_offsc equ	$40	pointer off screen
+0022                              53 *
+0022                              54 * window query events
+0022                              55 *
+0022                              56 pt_wqury equ	$80	window query
+0022                              57 pt_wmove equ	$81	window move
+0022                              58 pt_wsize equ	$82	window resize
+0022                              59 *
+0022                              60 pt__kyst equ	0	keystroke  in window event bit
+0022                              61 pt__kypr equ	1	keypress in window event bit
+0022                              62 pt__kyup equ	2	key up in window event bit
+0022                              63 pt__move equ	3	pointer move event bit
+0022                              64 pt__outw equ	4	pointer out of window bit
+0022                              65 pt__inwn equ	5	pointer in window bit
+0022                              66 pt__ofsc equ	6	pointer off screen bit
+0022                              67 *
+0022                              68 pt__splt equ	8	split sub-window
+0022                              69 pt__join equ	9	join sub-window
+0022                              70 pt__pan  equ	10	pan sub-window
+0022                              71 pt__scrl equ	11	scroll sub-window
+0022                              72 *
+0022                              73 pt__do   equ	16	do command
+0022                              74 pt__can  equ	17	cancel command
+0022                              75 pt__help equ	18	help!!!
+0022                              76 pt__wmov equ	19	window move
+0022                              77 pt__wsiz equ	20	window size
+0022                              78 pt__zzzz equ	21	sleep
+0022                              79 pt__wake equ	22	wake
+0022                              80 pt__null equ	23	null event !!
+0022                              81 *
+0022                              82 * PT_RPTR pointer record
+0022                              83 *
+0022                              84 pp_chid  equ	$00	channel ID or -1
+0022                              85 pp_chnr  equ	$02	channel number or -1
+0022                              86 pp_sbwnr equ	$04	sub-window number or -1
+0022                              87 pp_xpos  equ	$06	x position or -1
+0022                              88 pp_ypos  equ	$08	y position or -1
+0022                              89 pp_kstrk equ	$0a	keystroke
+0022                              90 pp_kpres equ	$0b	key depressed
+0022                              91 pp_event equ	$0c	event vector
+0022                              92 pp_jevnt equ	$0c	job event
+0022                              93 pp_wevnt equ	$0d	window byte of event vector
+0022                              94 pp_sevnt equ	$0e	sub-window byte of event vector
+0022                              95 pp_pevnt equ	$0f	pointer byte of event vector
+0022                              96 pp_subdf equ	$10	sub-window definition (4 words)
+0022                              97 pp_end   equ	$18
+0022                              98 *
+0022                              99 * Definitions of objects
+0022                             100 *
+0022                             101 pto_form equ	$00	word	FORM of object
+0022                             102 pto_vers equ	$02	byte	dynamic sprite VERSion number
+0022                             103 pto_ctrl equ	$03	byte	sprite control bits
+0022                             104 pto_cver equ	$03 %00000011 cache version number bits
+0022                             105 pto_fupd equ	$03 %00000011 pto_cver value for "force cache update"
+0022                             106 pto_bblk equ	$04 %00000100 bit set if sprite block present
+0022                             107 pto__blk equ	2
+0022                             108 pto_opt  equ	$08 %00001000 bit set if options (pointer) present
+0022                             109 pto__opt equ	4
+0022                             110 pto_alph equ	$20 %00100000 sprite uses alpha channel
+0022                             111 pto__alph equ	5
+0022                             112 pto_pcmp equ	$40 %01000000 pattern compressed bit
+0022                             113 pto__pcmp equ	6
+0022                             114 pto_mcmp equ	$80 %10000000 mask compressed bit
+0022                             115 pto__mcmp equ	7
+0022                             116 pto_cmp  equ	$C0 %11000000 sprite compressed bit
+0022                             117 pto_size equ	$04		x and y SIZE of object
+0022                             118 pto_xsiz equ	$04	word	X SIZe of object
+0022                             119 pto_ysiz equ	$06	word	Y SIZe of object
+0022                             120 pto_org  equ	$08		ORiGin of object
+0022                             121 pto_xorg equ	$08	word	X ORiGin of object
+0022                             122 pto_yorg equ	$0a	word	Y ORiGin of object
+0022                             123 pto_cpat equ	$0c	long	relative pointer to Colour PATtern
+0022                             124 pto_mask equ	$10	long	relative pointer to MASK
+0022                             125 pto_nobj equ	$14	long	relative pointer to Next OBJect
+0022                             126 pto_hdrl equ	$18		object HeaDeR Length
+0022                             127 
+0022                             128 pto_opts equ	$18	long	optional (relative pointer to) options
+0022                             129 pto_blk  equ	$1c	long	optional relative pointer to sprite block
+0022                             130 pto_xshl equ	$20		eXtended Sprite Header Length
+0022                             131 
+0022                             132 *
+0022                             133 * Definition of partial save area header
+0022                             134 *
+0022                             135 ptp_link equ	$00	long	user defined LINK longword
+0022                             136 ptp_flag equ	$04	word	FLAG word
+0022                             137 ptp_flg  equ	$4afc		what you expect to find there
+0022                             138 ptp_xsiz equ	$06	word	total X SIZe
+0022                             139 ptp_ysiz equ	$08	word	total Y SIZe
+0022                             140 ptp_rinc equ	$0a	word	Row INCrement
+0022                             141 ptp_mode equ	$0c	word	MODE of saved data
+0022                             142 ptp_bits equ	$0e
+0022                             143 ptp_hdrl equ	$0e		HeaDeR Length
+0022                             144 *
+0022                             145 * sub-window definitions
+0022                             146 *
+0022                             147 sw_xsize equ	$00	word	sub-window X size
+0022                             148 sw_ysize equ	$02	word	sub-window Y size
+0022                             149 sw_xorg  equ	$04	word	sub-window X origin
+0022                             150 sw_yorg  equ	$06	word	sub-window Y origin
+0022                             151 sw_attr  equ	$08	8 bytes attributes
+0022                             152 sw_kflg  equ	$08	byte	cursor key flag
+0022                             153 sw__kfl  equ	  0		___ in bit 0
+0022                             154 sw_psprt equ	$10	long	pointer to sprite
+0022                             155 sw_defl  equ	$14		sub-window DEFinition Length
+0022                             156 *
+0022                             157 	in win1_georgegwilt_peass_keys_wwork
+0022                             158 *  Window Working Definition
+0022                             159 *
+0022                             160 ww_shadx equ    $4	         x shadow multiplier
+0022                             161 ww_shady equ    $3	         y shadow multiplier
+0022                             162 ww_scarr equ    $4	         scroll arrow height
+0022                             163 ww_scasp equ    $18          scroll arrow spacing
+0022                             164 ww_scawd equ    $a	         scroll arrow width
+0022                             165 ww_pnarr equ    $8	         pan arrow width
+0022                             166 ww_pnasp equ    $c	         pan arrow spacing
+0022                             167 ww_pnaht equ    $5	         pan arrow height
+0022                             168 ww_scbar equ    $6	         width of scroll bar
+0022                             169 ww_pnbar equ    $4	         height of pan bar
+0022                             170 ww_ptoff equ    $20002       offset of pointer for keystroke hits
+0022                             171 *
+0022                             172 ww_wstat equ    $00   long   pointer to window status area
+0022                             173 ww_wdef  equ    $04   long   pointer to window definition
+0022                             174 ww_chid  equ    $08   long   channel ID for window
+0022                             175 *
+0022                             176 ww_pprec equ    $0c   long   pointer to pointer record (24 bytes)
+0022                             177 ww_psave equ    $10   long   saved pointer position (absolute)
+0022                             178 *
+0022                             179 ww_spar1 equ    $14   long   window spare 1
+0022                             180 ww_spar2 equ    $18   word   window spare 2
+0022                             181 ww_spar3 equ    $1a   byte   window spare 3
+0022                             182 ww_pulld equ    $1b   byte   flag set if window is pulled down
+0022                             183 ww_splst equ    $1c   long   pointer to sub-window sprite list
+0022                             184 *
+0022                             185 ww_xsize equ    $20   word   window x size (width) in pixels
+0022                             186 ww_ysize equ    $22   word   window y size (height) in pixels
+0022                             187 ww_xorg  equ    $24   word   x origin of window
+0022                             188 ww_yorg  equ    $26   word   y origin of window
+0022                             189 ww_wattr equ    $28          window attributes
+0022                             190 ww_psprt equ    $30   long   pointer to pointer sprite for this window
+0022                             191 ww_lattr equ    $34          loose menu item attributes
+0022                             192 ww_help  equ    $5c   long   pointer to help definition
+0022                             193 ww_head  equ    $60          end of header
+0022                             194 *
+0022                             195 ww_ninfo equ    $60   word   number of information sub-windows
+0022                             196 ww_ninob equ    $62   word   number of information sub-window objects
+0022                             197 ww_pinfo equ    $64   long   pointer to information sub-window definition list
+0022                             198 ww_nlitm equ    $68   word   number of loose menu items
+0022                             199 ww_plitm equ    $6a   long   pointer to loose menu item list
+0022                             200 ww_nappl equ    $6e   word   number of application sub-windows
+0022                             201 ww_pappl equ    $70   long   pointer to application sub-window definition list
+0022                             202 ww_lists equ    $74          start of definition lists
+0022                             203 *
+0022                             204 * Window Attributes
+0022                             205 *
+0022                             206 wwa_clfg equ    $00   byte   clear flag
+0022                             207 wwa__cfl equ      7 	  ___ in bit 7
+0022                             208 wwa_kflg equ    $00   byte   cursor key flag
+0022                             209 wwa__kfl equ      0 	  ___ in bit 0
+0022                             210 wwa_shdd equ    $01   byte   shadow depth
+0022                             211 wwa_borw equ    $02   word   border width
+0022                             212 wwa_borc equ    $04   word   border colour
+0022                             213 wwa_papr equ    $06   word   paper colour
+0022                             214 *
+0022                             215 * Menu Item Attributes
+0022                             216 *
+0022                             217 wwa_curw equ    $00   word   current item border width
+0022                             218 wwa_curc equ    $02   word   current item border colour
+0022                             219 wwa_attr equ    $04          attribute records
+0022                             220 wwa_unav equ    $04          item unavailable
+0022                             221 wwa_aval equ    $10          item available
+0022                             222 wwa_selc equ    $1c          item selected
+0022                             223 wwa_elen equ    $28          menu item attribute entry length
+0022                             224 *
+0022                             225 *   attribute record
+0022                             226 wwa_back equ    $00   word   item background colour
+0022                             227 wwa_ink  equ    $02   word   text object ink colour 
+0022                             228 wwa_blob equ    $04   long   pointer to blob for pattern
+0022                             229 wwa_patt equ    $08   long   pointer to pattern for blob
+0022                             230 wwa_alen equ    $0c          attribute record length
+0022                             231 *
+0022                             232 * Loose Menu Items List
+0022                             233 *
+0022                             234 wwl_xsiz equ    $00   word   hit area x size (width)
+0022                             235 wwl_ysiz equ    $02   word   hit area y size (height)
+0022                             236 wwl_xorg equ    $04   word   hit area x origin
+0022                             237 wwl_yorg equ    $06   word   hit area y origin 
+0022                             238 wwl_xjst equ    $08   byte   object x justification rule
+0022                             239 wwl_yjst equ    $09   byte   object y justification rule
+0022                             240 wwl_type equ    $0a   byte   object type (0=text, 2=sprite, 4=blob, 6=pattern)
+0022                             241 wwl_skey equ    $0b   byte   selection keystroke
+0022                             242 wwl_pobj equ    $0c   long   pointer to object
+0022                             243 wwl_item equ    $10   word   item number 
+0022                             244 wwl_pact equ    $12   long   pointer to action routine
+0022                             245 wwl_elen equ    $16          loose menu item list entry length
+0022                             246 *
+0022                             247 * Information Sub-Window
+0022                             248 *
+0022                             249 wwi_xsiz equ    $00   word   sub-window x size (width) in pixels
+0022                             250 wwi_ysiz equ    $02   word   sub-window y size (height) in pixels
+0022                             251 wwi_xorg equ    $04   word   sub-window x origin
+0022                             252 wwi_yorg equ    $06   word   sub-window y origin
+0022                             253 wwi_watt equ    $08          sub-window attributes
+0022                             254 wwi_pobl equ    $10   long   pointer to information object list
+0022                             255 wwi_elen equ    $14          information list entry length
+0022                             256 *
+0022                             257 * Information Object List
+0022                             258 *
+0022                             259 wwo_xsiz equ    $00   word   object x size (width) in pixels
+0022                             260 wwo_ysiz equ    $02   word   object y size (height) in pixels
+0022                             261 wwo_xorg equ    $04   word   object x origin
+0022                             262 wwo_yorg equ    $06   word   object y origin 
+0022                             263 wwo_type equ    $08   byte   object type (0=text, 2=sprite, 4=blob, 6=pattern)
+0022                             264 wwo_spar equ    $09   byte   spare
+0022                             265 wwo_ink  equ    $0a   word   text ink colour
+0022                             266 wwo_csiz equ    $0c   word   text character size (two bytes)
+0022                             267 wwo_comb equ    $0a   long   pattern or blob to combine
+0022                             268 wwo_pobj equ    $0e   long   pointer to object
+0022                             269 wwo_elen equ    $12          information object list entry length
+0022                             270 *
+0022                             271 * Application sub-window definition
+0022                             272 *
+0022                             273 wwa_xsiz equ    $00   word   sub-window x size (width) in pixels
+0022                             274 wwa_ysiz equ    $02   word   sub-window y size (height) in pixels
+0022                             275 wwa_xorg equ    $04   word   sub-window x origin
+0022                             276 wwa_yorg equ    $06   word   sub-window y origin
+0022                             277 wwa_watt equ    $08          sub-window attributes
+0022                             278 wwa_pspr equ    $10   long   pointer to pointer sprite for this sub window
+0022                             279 wwa_draw equ    $14   long   pointer to application sub-window draw routine
+0022                             280 wwa_hit  equ    $18   long   pointer to application sub-window hit routine
+0022                             281 wwa_ctrl equ    $1c   long   pointer to sub-window control routine (or 0)
+0022                             282 wwa_nxsc equ    $20   word   maximum number of x control sections
+0022                             283 wwa_nysc equ    $22   word   maximum number of y control sections
+0022                             284 wwa_skey equ    $24   byte   application sub-window selection key
+0022                             285 wwa_blen equ    $28          application sub-window basic definition length
+0022                             286 *
+0022                             287 *   pannable and scrollable sub-windows only (wwa_nxsc or wwa_nysc <>0)
+0022                             288 *
+0022                             289 wwa_part equ    $28   long   pointer to the part window control block (or 0)
+0022                             290 wwa_insz equ    $2c   word   index hit size
+0022                             291 wwa_insp equ    $2e   word   index spacing left or above sub-window
+0022                             292 wwa_icur equ    $30   long   index current item attribute (border width, colour)
+0022                             293 wwa_iiat equ    $34          index item attribute record
+0022                             294 wwa_psac equ    $40   word   pan or scroll arrow colour
+0022                             295 wwa_psbc equ    $42   word   pan or scroll bar colour
+0022                             296 wwa_pssc equ    $44   word   pan or scroll bar section colour
+0022                             297 wwa_clen equ    $1e          application sub-window control definition length
+0022                             298 *
+0022                             299 *   menu sub-windows only
+0022                             300 *
+0022                             301 wwa_mstt equ    $64   long   pointer to the menu status block
+0022                             302 wwa_iatt equ    $68          item attributes
+0022                             303 wwa_ncol equ    $90   word   number of actual columns
+0022                             304 wwa_nrow equ    $92   word   number of actual rows
+0022                             305 wwa_xoff equ    $94   word   x offset of start of menu (section)
+0022                             306 wwa_yoff equ    $96   word   y offset of start of menu (section)
+0022                             307 wwa_xspc equ    $98   long   pointer to x (column) spacing list or -ve spacings
+0022                             308 wwa_yspc equ    $9c   long   pointer to y (row) spacing list or -ve spacings
+0022                             309 wwa_xind equ    $a0   long   pointer to x (column) index list
+0022                             310 wwa_yind equ    $a4   long   pointer to y (row) index list
+0022                             311 wwa_rowl equ    $a8   long   pointer to menu row list
+0022                             312 wwa_mlen equ    $48          length of menu working definition
+0022                             313 *
+0022                             314 *   menu object spacing list
+0022                             315 *
+0022                             316 wwm_size equ    $00   word   object hit size
+0022                             317 wwm_spce equ    $02   word   object spacing
+0022                             318 wwm_slen equ    $04          object spacing list element length
+0022                             319 *
+0022                             320 *   menu row list
+0022                             321 *
+0022                             322 wwm_rows equ    $00   long   pointer to object row list start
+0022                             323 wwm_rowe equ    $04   long   pointer to object row list end
+0022                             324 wwm_rlen equ    $08          menu row list element length
+0022                             325 *
+0022                             326 *   menu object / index list
+0022                             327 wwm_xjst equ    $00   byte   object x justification rule
+0022                             328 wwm_yjst equ    $01   byte   object y justification rule
+0022                             329 wwm_type equ    $02   byte   object type (0=text, 2=sprite, 4=blob, 6=pattern)
+0022                             330 wwm_skey equ    $03   byte   selection keystroke
+0022                             331 wwm_pobj equ    $04   long   pointer to object
+0022                             332 wwm_item equ    $08   word   item number (-ve for index)
+0022                             333 wwm_pact equ    $0a   long   pointer to action routine (zero for index)
+0022                             334 wwm_olen equ    $0e          menu object / index list entry length
+0022                             335 *
+0022                             336 * Definition fixup table keys
+0022                             337 *
+0022                             338 wwf_wdef equ    $00          fix working definition
+0022                             339 wwf_wstt equ    $02 	   status area
+0022                             340 wwf_loos equ    $04 	   loose object
+0022                             341 wwf_infw equ    $06 	   information window
+0022                             342 wwf_info equ    $08 	   information object
+0022                             343 wwf_appl equ    $0a 	   application sub-window list
+0022                             344 wwf_appw equ    $0c 	   application sub-window
+0022                             345 wwf_xctb equ    $0e 	   x control block
+0022                             346 wwf_yctb equ    $10 	   y control block
+0022                             347 wwf_mstt equ    $12 	   menu status block
+0022                             348 wwf_xspc equ    $14 	   x spacing list
+0022                             349 wwf_yspc equ    $16 	   y spacing list
+0022                             350 wwf_xind equ    $18 	   x index object
+0022                             351 wwf_yind equ    $1a 	   y index object
+0022                             352 wwf_rlst equ    $1c 	   row list
+0022                             353 wwf_mobj equ    $1e 	   menu object
+0022                             354 *
+0022                             355 wwf_addr equ    $80 %10000000       address (long, overwrite)
+0022                             356 wwf_set  equ    $40 %01000000       overwrite data
+0022                             357 wwf_add  equ    $00 %00000000       add data
+0022                             358 wwf_byte equ    $00 %00000000       byte data
+0022                             359 wwf_word equ    $10 %00010000       word data
+0022                             360 wwf_long equ    $20 %00100000       long data
+0022                             361 wwf__lng equ    5
+0022                             362 wwf_xlng equ    $30 %00110000       extended data
+0022                             363 wwf__ext equ    4
+0022                             364 wwf_vabs equ    $00 %00000000       data absolute (in table)
+0022                             365 wwf_vrel equ    $01 %00000001       data relative
+0022                             366 wwf_vatb equ    $02 %00000010       data in data area
+0022                             367 wwf_vitb equ    $03 %00000011       data pointed to from data area
+0022                             368 wwf_vrtb equ    $04 %00000100       data offset from pointer in data area
+0022                             369 	in win1_georgegwilt_peass_keys_wstatus
+0022                             370 * Window Status Area
+0022                             371 *
+0022                             372 *   window linkage area
+0022                             373 *
+0022                             374 ws_work  equ    $00   long   pointer to window working definition
+0022                             375 ws_wdef  equ    $04   long   pointer to window definition
+0022                             376 *
+0022                             377 *   window working area
+0022                             378 *
+0022                             379 ws_point equ    $08          pointer record (16 bytes)
+0022                             380 wsp_chid equ    $08   long   channel ID of window enclosing the pointer
+0022                             381 wsp_swnr equ    $0c   word   sub-window number enclosing pointer (or -1)
+0022                             382 wsp_xpos equ    $0e   word   pointer x pixel position
+0022                             383 wsp_ypos equ    $10   word   pointer y pixel position
+0022                             384 wsp_kstr equ    $12   byte   key stroke (or 0)
+0022                             385 wsp_kprs equ    $13   byte   key press (or 0)
+0022                             386 wsp_evnt equ    $14   long   event vector
+0022                             387 wsp_jeve equ    $14   byte   job byte of event vector
+0022                             388 wsp_weve equ    $15   byte   window byte of event vector
+0022                             389 wsp_seve equ    $16   byte   sub-window byte of event vector
+0022                             390 wsp_peve equ    $17   byte   pointer byte of event vector
+0022                             391 *
+0022                             392 ws_subdf equ    $18          sub_window definition (four words)
+0022                             393 wsp_xsiz equ    $18   word   sub-window x size (width)
+0022                             394 wsp_ysiz equ    $1a   word   sub-window y size (height)
+0022                             395 wsp_xorg equ    $1c   word   sub-window x origin
+0022                             396 wsp_yorg equ    $1e   word   sub-window y origin
+0022                             397 *
+0022                             398 ws_ptpos equ    $20   long   pointer position (absolute)
+0022                             399 ws_wmode equ    $24   word   window mode
+0022                             400 ws_scach equ    $26   byte   last used sprite cache version
+0022                             401 *
+0022                             402 ws_ciact equ    $2c   long   pointer to current item action routine
+0022                             403 ws_citem equ    $30   word   current item in sub-window
+0022                             404 ws_cibrw equ    $32   word   current item border width
+0022                             405 ws_cipap equ    $34   word   paper behind current hit item
+0022                             406 ws_cispr equ    $36
+0022                             407 ws_cihit equ    $38          current item hit area (absolute coordinates)
+0022                             408 ws_cihxs equ    $38   word	  x size
+0022                             409 ws_cihys equ    $3a   word	  y size
+0022                             410 ws_cihxo equ    $3c   word	  x origin
+0022                             411 ws_cihyo equ    $3e   word	  y origin
+0022                             412 *
+0022                             413 wsi_ctrl equ    $7000        start of control item numbers
+0022                             414 wsi_up   equ    $70          MSByte of item for up arrows  (LSByte is section)
+0022                             415 wsi_dn   equ    $71          MSByte of item for down arrows
+0022                             416 wsi_lt   equ    $72          MSByte of item for left arrows
+0022                             417 wsi_rt   equ    $73          MSByte of item for right arrows
+0022                             418 wsi_scr  equ    $78          MSByte of item for scroll bar
+0022                             419 wsi_pan  equ    $7a          MSByte of item for pan bar
+0022                             420 wsi__dnr equ    8	         item bit set for down/right
+0022                             421 wsi__pan equ    9	         item bit set for pan
+0022                             422 wsi__xt  equ    $a	         item bit set for extra pan/scroll
+0022                             423 wsi__bar equ    $b	         item bit set for bar
+0022                             424 *
+0022                             425 *   loose menu item status block
+0022                             426 *
+0022                             427 ws_litem equ    $40          one byte per loose item (1 = unavailable,
+0022                             428 *			0 = available, -1 = selected)
+0022                             429 *
+0022                             430 *   sub-window menu item status block
+0022                             431 *
+0022                             432 wss_item equ    $00          one byte per menu item (1 = unavailable,
+0022                             433 *			0 = available, -1 = selected)
+0022                             434 wss_ilen equ    $01          length of item status entry in status area
+0022                             435 *
+0022                             436 *   item flag values
+0022                             437 *
+0022                             438 wsi_unav equ    $10 	unavailable
+0022                             439 wsi_avbl equ    $00 	available
+0022                             440 wsi_slct equ    $80+$ffffff00 selected
+0022                             441 wsi_mkun equ    $11 	re-draw, making unavailable
+0022                             442 wsi_mkav equ    $01 	re-draw, making available
+0022                             443 wsi_mksl equ    $81+$ffffff00 re-draw, making selected
+0022                             444 wsi__chg equ    $00 	bit 0 set if item status changed
+0022                             445 *
+0022                             446 *   sub-window section control block header
+0022                             447 *
+0022                             448 wss_nsec equ    $00   word   number of sections
+0022                             449 *
+0022                             450 *   sub-window section control block record
+0022                             451 *
+0022                             452 wss_spos equ    $00   word   section start pixel position
+0022                             453 wss_sstt equ    $02   word   section start column or row
+0022                             454 wss_ssiz equ    $04   word   section size (number of columns or rows)
+0022                             455 wss_ssln equ    $06          section status list entry length
+0022                             456 	in win1_georgegwilt_peass_keys_wman
+0022                             457 ;
+0022                             458 ;	  Window manager vectors
+0022                             459 ;
+0022                             460 wm_vers	equ	    $00
+0022                             461 wm_setup	equ	    $04
+0022                             462 wm_smenu	equ	    $08
+0022                             463 wm_prpos	equ	    $0c
+0022                             464 wm_pulld	equ	    $10
+0022                             465 wm_unset	equ	    $14
+0022                             466 wm_wrset	equ	    $18
+0022                             467 wm_wdraw	equ	    $1c
+0022                             468 wm_mdraw	equ	    $20
+0022                             469 wm_index	equ	    $24
+0022                             470 wm_swdef	equ	    $28
+0022                             471 wm_ldraw	equ	    $2c
+0022                             472 wm_rptr	equ	    $30
+0022                             473 wm_mhit	equ	    $34
+0022                             474 wm_pansc	equ	    $38
+0022                             475 wm_idraw	equ	    $3c
+0022                             476 wm_chwin	equ	    $40
+0022                             477 wm_drbdr	equ	    $44
+0022                             478 wm_msect	equ	    $48
+0022                             479 wm_stlob	equ	    $4c
+0022                             480 wm_stiob	equ	    $50
+0022                             481 wm_fsize	equ	    $54
+0022                             482 wm_swinf	equ	    $58
+0022                             483 wm_swlit	equ	    $5c
+0022                             484 wm_swapp	equ	    $60
+0022                             485 wm_swsec	equ	    $64
+0022                             486 wm_rname	equ	    $68
+0022                             487 wm_ename	equ	    $6c
+0022                             488 wm_upbar	equ	    $70
+0022                             489 wm_erstr	equ	    $74
+0022                             490 wm_rptrt	equ	    $78
+0022                             491 wm_setsp	equ	    $7c
+0022                             492 wm_getsp	equ	    $80
+0022                             493 wm_trap3	equ	    $84
+0022                             494 wm_opw	  equ	    $88
+0022                             495 wm_ssclr	equ	    $8c
+0022                             496 wm_jbpal	equ	    $90
+0022                             497 wm_cpspr	equ	    $94
+0022                             498 ;
+0022                             499 wm_drall	equ	    0		; draw all
+0022                             500 wm_drsel	equ	    -1		; draw selectively
+0022                             501 ;
+0022                             502 ;	  Keys for values in window manager data structures
+0022                             503 ;
+0022                             504 textu	  equ	    -1
+0022                             505 text	  equ	    0
+0022                             506 sprite	  equ	    2
+0022                             507 blob	  equ	    4
+0022                             508 patt	  equ	    6
+0022                             509 ;
+0022                             510 ; Keys for colours (high order byte)
+0022                             511 ;
+0022                             512 wmc_ql	   equ	     $00	; traditional QL colours
+0022                             513 wmc_pal	 equ	     $01	; palette colours
+0022                             514 wmc_syspal equ	     $02	; system palette colour
+0022                             515 wmc_gray	 equ	     $03	; gray colour
+0022                             516 wmc_3db	 equ	     $04	; 3d border colour
+0022                             517 wmc_stip	 equ	     $40	; stipple colour
+0022                             518 wmc__stip  equ	     14	;   bit number in 16 bit word
+0022                             519 wmc_rgb	 equ	     $80	; 15bit rgb
+0022                             520 wmc__rgb	 equ	     15	;   bit number in 16 bit word
+0022                             521 
+0022                             522 
+0022                             523 
+0022                             524 
+0022                             525 
+0022                             526 
+0022                             527 
+0022                             528 ;
+0022                             529 	in win1_georgegwilt_peass_keys_wdef
+0022                             530 * Window Definition
+0022                             531 *
+0022                             532 *   Window definition table
+0022                             533 *
+0022                             534 wdt_menu equ    $00   long   relative pointer to menu definition
+0022                             535 *
+0022                             536 wdt_size equ    $00   long   space required for layout
+0022                             537 wdt_stat equ    $04   word   offset of status area in global status area
+0022                             538 wdt_mode equ    $06          preferred/allowed mode for this layout
+0022                             539 wdt_mprf equ    $06   byte   preferred mode
+0022                             540 wdt_mall equ    $07   byte   allowed modes
+0022                             541 *
+0022                             542 *   fixed part of window definition
+0022                             543 *
+0022                             544 wd_xsize equ    $00   word   default window x size (width) in pixels
+0022                             545 wd_ysize equ    $02   word   default window y size (height) in pixels
+0022                             546 wd_xorg  equ    $04   word   x origin of window
+0022                             547 wd_yorg  equ    $06   word   y origin of window
+0022                             548 wd_wattr equ    $08          window attributes
+0022                             549 wd_psprt equ    $10   word   pointer to pointer sprite for this window
+0022                             550 wd_lattr equ    $12          loose menu item attributes
+0022                             551 wd_help  equ    $2e   word   pointer to help window
+0022                             552 wd_rbase equ    $30          base of repeated part of window definition
+0022                             553 *
+0022                             554 *   repeated part of window definition
+0022                             555 *
+0022                             556 wd__vsiz equ    $e	         bit set in xmin or ymin if variable size permitted
+0022                             557 wd_xmin  equ    $00   word   x minimum size for this layout
+0022                             558 wd_ymin  equ    $02   word   y minimum size for this layout
+0022                             559 wd_pinfo equ    $04   word   pointer to information sub-window definition list
+0022                             560 wd_plitm equ    $06   word   pointer to loose menu item list
+0022                             561 wd_pappl equ    $08   word   pointer to application sub-window definition list
+0022                             562 wd_elen  equ    $0a          repeated entry length
+0022                             563 *
+0022                             564 * Window Attributes
+0022                             565 *
+0022                             566 wda_clfg equ    $00   byte   msb set if window not cleared when first drawn
+0022                             567 wda_shdd equ    $01   byte   shadow depth
+0022                             568 wda_borw equ    $02   word   border width
+0022                             569 wda_borc equ    $04   word   border colour
+0022                             570 wda_papr equ    $06   word   paper colour
+0022                             571 *
+0022                             572 * Menu Item Attributes
+0022                             573 *
+0022                             574 wda_curw equ    $00   word   current item border width
+0022                             575 wda_curc equ    $02   word   current item border colour
+0022                             576 wda_attr equ    $04          attribute records
+0022                             577 wda_unav equ    $04          item unavailable
+0022                             578 wda_aval equ    $0c          item available
+0022                             579 wda_selc equ    $14          item selected
+0022                             580 wda_elen equ    $1c          menu item attribute entry length
+0022                             581 *
+0022                             582 *   attribute record
+0022                             583 *
+0022                             584 wda_back equ    $00   word   item background colour
+0022                             585 wda_ink  equ    $02   word   text object ink colour 
+0022                             586 wda_blob equ    $04   word   pointer to blob for pattern
+0022                             587 wda_patt equ    $06   word   pointer to pattern for blob
+0022                             588 *
+0022                             589 * Loose Menu Items List
+0022                             590 *
+0022                             591 wdl_xsiz equ    $00   word   hit area x size (width) + scaling
+0022                             592 wdl_ysiz equ    $02   word   hit area y size (height) + scaling
+0022                             593 wdl_xorg equ    $04   word   hit area x origin + scaling
+0022                             594 wdl_yorg equ    $06   word   hit area y origin + scaling 
+0022                             595 wdl_xjst equ    $08   byte   object x justification rule
+0022                             596 wdl_yjst equ    $09   byte   object y justification rule
+0022                             597 wdl_type equ    $0a   byte   object type (0=text, 2=sprite, 4=blob, 6=pattern)
+0022                             598 wdl_skey equ    $0b   byte   selection keystroke
+0022                             599 wdl_pobj equ    $0c   word   pointer to object
+0022                             600 wdl_item equ    $0e   word   item number 
+0022                             601 wdl_pact equ    $10   word   pointer to action routine
+0022                             602 wdl_elen equ    $12          loose menu item list entry length
+0022                             603 *
+0022                             604 * Information Sub-Window
+0022                             605 *
+0022                             606 wdi_xsiz equ    $00   word   sub-window x size (width) in pixels + scaling
+0022                             607 wdi_ysiz equ    $02   word   sub-window y size (height) in pixels + scaling
+0022                             608 wdi_xorg equ    $04   word   sub-window x origin + scaling
+0022                             609 wdi_yorg equ    $06   word   sub-window y origin + scaling
+0022                             610 wdi_watt equ    $08          sub-window attributes
+0022                             611 wdi_pobl equ    $10   word   pointer to information object list
+0022                             612 wdi_elen equ    $12          information list entry length
+0022                             613 *
+0022                             614 * Information Object List
+0022                             615 *
+0022                             616 wdo_xsiz equ    $00   word   object x size (width) in pixels + scaling
+0022                             617 wdo_ysiz equ    $02   word   object y size (height) in pixels + scaling
+0022                             618 wdo_xorg equ    $04   word   object x origin + scaling
+0022                             619 wdo_yorg equ    $06   word   object y origin + scaling 
+0022                             620 wdo_type equ    $08   byte   object type (0=text, 2=sprite, 4=blob, 6=pattern)
+0022                             621 wdo_spar equ    $09   byte   spare
+0022                             622 wdo_ink  equ    $0a   word   text ink colour
+0022                             623 wdo_csiz equ    $0c   word   text character size (two bytes)
+0022                             624 wdo_comb equ    $0a   word   pattern or blob to combine
+0022                             625 wdo_pobj equ    $0e   word   pointer to object
+0022                             626 wdo_elen equ    $10          information object list entry length
+0022                             627 *
+0022                             628 * Application sub-window definition
+0022                             629 *
+0022                             630 wda_xsiz equ    $00   word   sub-window x size (width) in pixels + scaling
+0022                             631 wda_ysiz equ    $02   word   sub-window y size (height) in pixels + scaling
+0022                             632 wda_xorg equ    $04   word   sub-window x origin + scaling
+0022                             633 wda_yorg equ    $06   word   sub-window y origin + scaling
+0022                             634 wda_watt equ    $08          sub-window attributes
+0022                             635 wda_pspr equ    $10   word   pointer to pointer sprite for this sub-window
+0022                             636 wda_setr equ    $12   word   pointer to application sub-window setup routine
+0022                             637 wda_draw equ    $14   word   pointer to application sub-window draw routine
+0022                             638 wda_hit  equ    $16   word   pointer to application sub-window hit routine
+0022                             639 wda_ctrl equ    $18   word   pointer to application sub-window control routine
+0022                             640 wda_nxsc equ    $1a   word   maximum number of x control sections
+0022                             641 wda_nysc equ    $1c   word   maximum number of y control sections
+0022                             642 wda_skey equ    $1e   byte   application sub-window selection keystroke
+0022                             643 wda_ext  equ    $1f   byte   zero
+0022                             644 wda_blen equ    $20          application sub-window basic definition length
+0022                             645 *
+0022                             646 *   pannable and scrollable sub-windows only (wda_nxsc or wda_nysc <>0)
+0022                             647 *
+0022                             648 wda_part equ    $00   word   pointer to the part window control block (or 0)
+0022                             649 wda_insz equ    $02   word   index hit size + scaling
+0022                             650 wda_insp equ    $04   word   index spacing left or above sub-window + scaling
+0022                             651 wda_icur equ    $06   long   index current item attribute (border width, colour)
+0022                             652 wda_iiat equ    $0a          index item attribute record
+0022                             653 wda_psac equ    $12   word   pan or scroll arrow colour
+0022                             654 wda_psbc equ    $14   word   pan or scroll bar colour
+0022                             655 wda_pssc equ    $16   word   pan or scroll bar section colour
+0022                             656 wda_clen equ    $18          application sub-window control definition length
+0022                             657 *
+0022                             658 *   menu sub-windows only (processed by WM_SMENU called from application setup)
+0022                             659 *
+0022                             660 wda_mstt equ    $00   word   pointer to menu status block
+0022                             661 wda_iatt equ    $02          item attributes
+0022                             662 wda_ncol equ    $1e   word   number of actual columns
+0022                             663 wda_nrow equ    $20   word   number of actual rows
+0022                             664 wda_xoff equ    $22   word   x offset of start of menu (section)
+0022                             665 wda_yoff equ    $24   word   y offset of start of menu (section)
+0022                             666 wda_xspc equ    $26   word   pointer to x (column) spacing list
+0022                             667 wda_yspc equ    $28   word   pointer to y (row) spacing list
+0022                             668 wda_xind equ    $2a   word   pointer to x (column) index list
+0022                             669 wda_yind equ    $2c   word   pointer to y (row) index list
+0022                             670 wda_rowl equ    $2e   word   pointer to menu row list
+0022                             671 wda_mlem equ    $30          sub-window menu definition length
+0022                             672 *
+0022                             673 *   menu object spacing list
+0022                             674 *
+0022                             675 wdm_size equ    $00   word   object hit size + scaling
+0022                             676 wdm_spce equ    $02   word   object spacing + scaling
+0022                             677 wdm_slen equ    $04          object spacing list element length
+0022                             678 *
+0022                             679 *   menu row list
+0022                             680 wdm_rows equ    $00   word   pointer to object row list start
+0022                             681 wdm_rowe equ    $02   word   pointer to object row list end
+0022                             682 wdm_rlen equ    $04          menu row list element length
+0022                             683 *
+0022                             684 *   menu object / index list
+0022                             685 wdm_xjst equ    $00   byte   object x justification rule
+0022                             686 wdm_yjst equ    $01   byte   object y justification rule
+0022                             687 wdm_type equ    $02   byte   object type (0=text, 2=sprite, 4=blob, 6=pattern)
+0022                             688 wdm_skey equ    $03   byte   selection keystroke
+0022                             689 wdm_pobj equ    $04   word   pointer to object
+0022                             690 wdm_item equ    $06   word   item number (-1 for index)
+0022                             691 wdm_pact equ    $08   word   pointer to action routine (zero for index)
+0022                             692 wdm_olen equ    $0a          menu object / index list entry length
+0022                             693 
+0022                             694 id	equ 0			; Offset to channel id storage
+0022                             695 wmvec	equ 4			; Offset to WMAN vector storage
+0022                             696 slimit	equ 8			; Offset to storage for return from IOP_FLIM.
+0022                             697 ;				  The storage is X-size, Y-size, X-org, Y-org - all words.
+0022 4DF6 C800                   698 start	lea (a6,a4.l),a6	; Make A6 point to the job's dataspace
+0026 6100 00B4                   699 	bsr op_con		; Open a con channel
+002A 2D48 0000                   700 	move.l a0,id(a6)	; And store the channel id
+002E 7070                        701 	moveq #iop_pinf,d0	; Trap to get Pointer Information
+0030 76FF                        702 	moveq #-1,d3		; Timeout
+0032 4E43                        703 	trap #3 		; Do it
+0034 4A80                        704 	tst.l d0		; Is ptr_gen present?
+0036 6600 060E                   705 	bne sui 		; No, bale out via SUI
+003A 2D49 0004                   706 	move.l a1,wmvec(a6)	; Yes, store the WMAN vector
+003E 6700 0606                   707 	beq sui 		; Oops! WMAN wasn't actually found
+0042                             708 
+0042 2449                        709 flim	movea.l a1,a2		; The WMAN vector is required in A2
+0044                             710 ;				  The channel id is already in A0
+0044 43EE 0008                   711 	lea slimit(a6),a1	; Result buffer
+0048 706C                        712 	moveq #iop_flim,d0	; Query maximum size of window
+004A 7400                        713 	moveq #0,d2		; D2 is required to be zero
+004C                             714 ;				  D3 is the timeout from the above trap #3
+004C 4E43                        715 	trap #3 		; Do it (No errors)
+004E 4A80                        716 	tst.l d0		; Did it work?
+0050 6600 05F4                   717 	bne sui 		; No, exit via SUI
+0054                             718 
+0054 0491 000C 0008              719 	subi.l #$C0008,(a1)	; Subtract 12 from the width and 8 from the height
+005A 47FA 0276                   720 	lea wd0,a3		; Get the address of window definition
+005E 223C 0000 029E              721 	move.l #ww0_0,d1	; Get the size of the working definition
+0064 6100 0582                   722 	bsr getsp		; Easy PEasy routine to ALCHP memory and set A0
+0068 2848                        723 	movea.l a0,a4		; Which we save in A4
+006A 43FA 02B6                   724 	lea wst0,a1		; Status area starts here - thanks to SETW
+006E 2049                        725 	movea.l a1,a0		; Copy to A0
+0070 7240                        726 	moveq #wst0_e-wst0-1,d1 ; How many bytes to clear - 1
+0072                             727 
+0072 4218                        728 st_clr	clr.b (a0)+		; Clear one byte
+0074 51C9 FFFC                   729 	dbf d1,st_clr		; Then the remainder
+0078                             730 
+0078                             731 
+0078 41FA 029E                   732 	lea mst0,a0		; Menu items status area
+007C 7209                        733 	moveq #mst0_e-mst0-1,d1 ; How many bytes to clear - 1
+007E                             734 
+007E 4218                        735 mi_clr	clr.b (a0)+		; Cleare one byte
+0080 51C9 FFFC                   736 	dbf d1,mi_clr		; Then the remainder
+0084                             737 
+0084 206E 0000                   738 	movea.l id(a6),a0	; Get the channel id where we need it
+0088                             739 ;				  A1 is the status area address from above
+0088                             740 ;				  A3 is the window definition address from above
+0088                             741 ;				  A4 is the working definition address from GETSP above
+0088 222B 0030                   742 	move.l wd_xmin+wd_rbase(a3),d1 ; Get the minimum dimensions from definition
+008C 0281 0FFF 0FFF              743 	andi.l #$FFF0FFF,d1	; Mask off any scaling factors - as previously described
+0092 4EAA 0004                   744 	jsr wm_setup(a2)	; Set up the working definition - no errors
+0096                             745 
+0096 72FF                        746 	moveq #-1,d1		; We want to draw the window where the pointer is
+0098 4EAA 000C                   747 	jsr wm_prpos(a2)	; So position it first as a primary window, then
+009C 4EAA 001C                   748 	jsr wm_wdraw(a2)	; Draw the contents
+00A0 4EAA 0030                   749 wrpt	jsr wm_rptr(a2) 	; Enter the "read pointer" loop in WMAN
+00A4 6704                        750 	beq.s no_err		; Since D0 is zero D4 is non zero
+00A6 6000 059E                   751 	bra sui 		; An error occurred exit via SUI
+00AA                             752 
+00AA 2254                        753 no_err	movea.l (a4),a1 	; Status area address
+00AC 0829 0011 0015              754 	btst #pt__can,wsp_weve(a1) ; Check for CANCEL event
+00B2 6600 0592                   755 	bne sui 		; Exit
+00B6                             756 
+00B6 60E8                        757 	bra.s wrpt		; No more events, read pointer again
+00B8                             758 
+00B8                             759 ; Loose item action routine
+00B8                             760 
+00B8 08E9 0011 0015              761 afun0_0 bset  #pt__can,wsp_weve(a1) ; Set the CANCEL event bit
+00BE 7811                        762 	moveq #pt__can,d4	  ; And load the CANCEL event number in D4
+00C0 7000                        763 	moveq #0,d0		  ; No errors
+00C2 4E75                        764 	rts			  ; Exit, and cause an exit from wm_rptr too
+00C4                             765 
+00C4                             766 ; Application sub-window hit routine
+00C4                             767 
+00C4 4EEA 0034                   768 ahit0	jmp wm_mhit(a2) 	   ; Default hit routine
+00C8                             769 
+00C8                             770 
+00C8                             771 ; Various Menu routines next ...
+00C8                             772 
+00C8                             773 ahit2_0 equ *
+00C8                             774 ahit2_1 equ *
+00C8                             775 ahit2_2 equ *
+00C8                             776 ahit2_3 equ *
+00C8                             777 ahit2_4 equ *
+00C8                             778 ahit2_5 equ *
+00C8                             779 ahit2_6 equ *
+00C8                             780 ahit2_7 equ *
+00C8                             781 ahit2_8 equ *
+00C8 7800                        782 ahit2_9 moveq #0,d4
+00CA 7000                        783 	moveq #0,d0
+00CC 4E75                        784 	rts
+00CE                             785 
+00CE 4EEA 0008                   786 asmnu0	jmp wm_smenu(a2)	  ; Default menu setup routine
+00D2                             787 
+00D2 4EEA 0020                   788 adraw0	jmp wm_mdraw(a2)	  ; Draw menu
+00D6                             789 
+00D6                             790 
+00D6                             791 
+00D6                             792 ; Various helper routines go here...
+00D6                             793 
+00D6 0003                        794 con	dc.w con_e-con-2	  ; Size of channel definition
+00D8 636F 6E                     795 	dc.b 'con'
+00DB                             796 con_e	equ *
+00DB C0                          797 
+00DC 41FA FFF8                   798 op_con	lea  con,a0		  ; We want a console
+00E0 72FF                        799 	moveq #-1,d1		  ; For this job
+00E2 7600                        800 	moveq #0,d3		  ; Timeout
+00E4 7001                        801 	moveq #io_open,d0
+00E6 4E42                        802 	trap #2 		  ; Do it
+00E8 4E75                        803 	rts
+00EA                             804 
+00EA                             805 ; Pull in our window definition file.
+00EA                             806 
+00EA                             807 	in  win1_source_qltoday_AppmenuTest1Win_asm
+00EA                             808 
+00EA                             809 ; Undefined Labels
+00EA                             810 ;	 ahit2_0   Menu item 0 - hit routine
+00EA                             811 ;	 ahit2_1   Menu item 1 - hit routine
+00EA                             812 ;	 ahit2_2   Menu item 2 - hit routine
+00EA                             813 ;	 ahit2_3   Menu item 3 - hit routine
+00EA                             814 ;	 ahit2_4   Menu item 4 - hit routine
+00EA                             815 ;	 ahit2_5   Menu item 5 - hit routine
+00EA                             816 ;	 ahit2_6   Menu item 6 - hit routine
+00EA                             817 ;	 ahit2_7   Menu item 7 - hit routine
+00EA                             818 ;	 ahit2_8   Menu item 8 - hit routine
+00EA                             819 ;	 ahit2_9   Menu item 9 - hit routine
+00EA                             820 ;	 asmnu0    User Defined setup routine
+00EA                             821 ;	 adraw0    User defined draw routine
+00EA                             822 ;	 ahit0	   Application window - hit routine
+00EA                             823 ;	 afun0_0   Loose item 0 - hit routine
+00EA                             824 
+00EA                             825 ; Labels for External Use
+00EA                             826 ;	 mst0	   Menu status area
+00EA                             827 ;	 wst0	   Window status area
+00EA                             828 ;	 wd0	   Window definition address
+00EA                             829 ;	 ww0_0	   Size of default window
+00EA                             830 ;	 ww0_1	   Size of buttonised window
+00EA                             831 
+00EA 0000 0001 0002 0003 0004    832 SYS_SPR  dc.w	   0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37
+0136                             833 
+0136 0001                        834 txt0	 dc.w	   txt0_e-2-txt0
+0138 58                          835 	 dc.b	   "X"
+0139 00                          836 txt0_e	 ds.b	   0
+013A                             837 	 ds.w	   0
+013A                             838 
+013A 0017                        839 txt1	 dc.w	   txt1_e-2-txt1
+013C 4170 706C 6963 6174 696F    840 	 dc.b	   "Application Menu Test 1"
+0153 00                          841 txt1_e	 ds.b	   0
+0154                             842 	 ds.w	   0
+0154                             843 
+0154 0003                        844 txt2	 dc.w	   txt2_e-2-txt2
+0156 4F6E 65                     845 	 dc.b	   "One"
+0159 00                          846 txt2_e	 ds.b	   0
+015A                             847 	 ds.w	   0
+015A                             848 
+015A 0003                        849 txt3	 dc.w	   txt3_e-2-txt3
+015C 5477 6F                     850 	 dc.b	   "Two"
+015F 00                          851 txt3_e	 ds.b	   0
+0160                             852 	 ds.w	   0
+0160                             853 
+0160 0005                        854 txt4	 dc.w	   txt4_e-2-txt4
+0162 5468 7265 65                855 	 dc.b	   "Three"
+0167 00                          856 txt4_e	 ds.b	   0
+0168                             857 	 ds.w	   0
+0168                             858 
+0168 0004                        859 txt5	 dc.w	   txt5_e-2-txt5
+016A 466F 7572                   860 	 dc.b	   "Four"
+016E                             861 txt5_e	 ds.b	   0
+016E                             862 	 ds.w	   0
+016E                             863 
+016E 0004                        864 txt6	 dc.w	   txt6_e-2-txt6
+0170 4669 7665                   865 	 dc.b	   "Five"
+0174                             866 txt6_e	 ds.b	   0
+0174                             867 	 ds.w	   0
+0174                             868 
+0174 0003                        869 txt7	 dc.w	   txt7_e-2-txt7
+0176 5369 78                     870 	 dc.b	   "Six"
+0179 00                          871 txt7_e	 ds.b	   0
+017A                             872 	 ds.w	   0
+017A                             873 
+017A 0005                        874 txt8	 dc.w	   txt8_e-2-txt8
+017C 5365 7665 6E                875 	 dc.b	   "Seven"
+0181 00                          876 txt8_e	 ds.b	   0
+0182                             877 	 ds.w	   0
+0182                             878 
+0182 0005                        879 txt9	 dc.w	   txt9_e-2-txt9
+0184 4569 6768 74                880 	 dc.b	   "Eight"
+0189 00                          881 txt9_e	 ds.b	   0
+018A                             882 	 ds.w	   0
+018A                             883 
+018A 0004                        884 txt10	 dc.w	   txt10_e-2-txt10
+018C 4E69 6E65                   885 	 dc.b	   "Nine"
+0190                             886 txt10_e  ds.b	   0
+0190                             887 	 ds.w	   0
+0190                             888 
+0190 0003                        889 txt11	 dc.w	   txt11_e-2-txt11
+0192 5465 6E                     890 	 dc.b	   "Ten"
+0195 00                          891 txt11_e  ds.b	   0
+0196                             892 	 ds.w	   0
+0196                             893 
+0196                             894 
+0196                             895 meos2
+0196                             896 
+0196 0100                        897 	 dc.b	   1,0	     xjst, yjst
+0198 0031                        898 	 dc.b	   0,49      type, skey
+019A FFBA                        899 	 dc.w	   txt2-*    pobj *
+019C 0000                        900 	 dc.w	   0	     item
+019E FF2A                        901 	 dc.w	   ahit2_0-* pact *
+01A0                             902 
+01A0 0100                        903 	 dc.b	   1,0	     xjst, yjst
+01A2 0032                        904 	 dc.b	   0,50      type, skey
+01A4 FFB6                        905 	 dc.w	   txt3-*    pobj *
+01A6 0001                        906 	 dc.w	   1	     item
+01A8 FF20                        907 	 dc.w	   ahit2_1-* pact *
+01AA                             908 
+01AA 0100                        909 	 dc.b	   1,0	     xjst, yjst
+01AC 0033                        910 	 dc.b	   0,51      type, skey
+01AE FFB2                        911 	 dc.w	   txt4-*    pobj *
+01B0 0002                        912 	 dc.w	   2	     item
+01B2 FF16                        913 	 dc.w	   ahit2_2-* pact *
+01B4                             914 
+01B4 0100                        915 	 dc.b	   1,0	     xjst, yjst
+01B6 0034                        916 	 dc.b	   0,52      type, skey
+01B8 FFB0                        917 	 dc.w	   txt5-*    pobj *
+01BA 0003                        918 	 dc.w	   3	     item
+01BC FF0C                        919 	 dc.w	   ahit2_3-* pact *
+01BE                             920 
+01BE 0100                        921 	 dc.b	   1,0	     xjst, yjst
+01C0 0035                        922 	 dc.b	   0,53      type, skey
+01C2 FFAC                        923 	 dc.w	   txt6-*    pobj *
+01C4 0004                        924 	 dc.w	   4	     item
+01C6 FF02                        925 	 dc.w	   ahit2_4-* pact *
+01C8                             926 
+01C8 0100                        927 	 dc.b	   1,0	     xjst, yjst
+01CA 0036                        928 	 dc.b	   0,54      type, skey
+01CC FFA8                        929 	 dc.w	   txt7-*    pobj *
+01CE 0005                        930 	 dc.w	   5	     item
+01D0 FEF8                        931 	 dc.w	   ahit2_5-* pact *
+01D2                             932 
+01D2 0100                        933 	 dc.b	   1,0	     xjst, yjst
+01D4 0037                        934 	 dc.b	   0,55      type, skey
+01D6 FFA4                        935 	 dc.w	   txt8-*    pobj *
+01D8 0006                        936 	 dc.w	   6	     item
+01DA FEEE                        937 	 dc.w	   ahit2_6-* pact *
+01DC                             938 
+01DC 0100                        939 	 dc.b	   1,0	     xjst, yjst
+01DE 0038                        940 	 dc.b	   0,56      type, skey
+01E0 FFA2                        941 	 dc.w	   txt9-*    pobj *
+01E2 0007                        942 	 dc.w	   7	     item
+01E4 FEE4                        943 	 dc.w	   ahit2_7-* pact *
+01E6                             944 
+01E6 0100                        945 	 dc.b	   1,0	     xjst, yjst
+01E8 0039                        946 	 dc.b	   0,57      type, skey
+01EA FFA0                        947 	 dc.w	   txt10-*   pobj *
+01EC 0008                        948 	 dc.w	   8	     item
+01EE FEDA                        949 	 dc.w	   ahit2_8-* pact *
+01F0                             950 
+01F0 0100                        951 	 dc.b	   1,0	     xjst, yjst
+01F2 0030                        952 	 dc.b	   0,48      type, skey
+01F4 FF9C                        953 	 dc.w	   txt11-*   pobj *
+01F6 0009                        954 	 dc.w	   9	     item
+01F8 FED0                        955 	 dc.w	   ahit2_9-* pact *
+01FA                             956 
+01FA                             957 drow0
+01FA FF9C                        958 	 dc.w	   0+meos2-*	       rows *
+01FC FFCC                        959 	 dc.w	   50+meos2-*	       rowe *
+01FE FFCA                        960 	 dc.w	   50+meos2-*	       rows *
+0200 FFFA                        961 	 dc.w	   100+meos2-*	       rowe *
+0202                             962 
+0202                             963 spls0
+0202 0022                        964 	 dc.w	   34	     size
+0204 0024                        965 	 dc.w	   36	     spce
+0206 0022                        966 	 dc.w	   34	     size
+0208 0024                        967 	 dc.w	   36	     spce
+020A 0022                        968 	 dc.w	   34	     size
+020C 0024                        969 	 dc.w	   36	     spce
+020E 0022                        970 	 dc.w	   34	     size
+0210 0024                        971 	 dc.w	   36	     spce
+0212 0022                        972 	 dc.w	   34	     size
+0214 0024                        973 	 dc.w	   36	     spce
+0216                             974 
+0216                             975 
+0216                             976 spls1
+0216 000A                        977 	 dc.w	   10	     size
+0218 000C                        978 	 dc.w	   12	     spce
+021A 000A                        979 	 dc.w	   10	     size
+021C 000C                        980 	 dc.w	   12	     spce
+021E                             981 
+021E                             982 
+021E                             983 app_list0
+021E 0004                        984 	 dc.w	   appw0-*
+0220 0000                        985 	 dc.w	   0
+0222                             986 
+0222                             987 appw0
+0222 00CE                        988 	 dc.w	   206	     xsize
+0224 0066                        989 	 dc.w	   102	     ysize
+0226 0004                        990 	 dc.w	   4	     xorg
+0228 0012                        991 	 dc.w	   18	     yorg
+022A 0100                        992 	 dc.w	   256	     flag
+022C 0001                        993 	 dc.w	   1	     borw
+022E 0000                        994 	 dc.w	   0	     borc
+0230 0007                        995 	 dc.w	   7	     papr
+0232 0000                        996 	 dc.w	   0	     pspr *
+0234 FE9A                        997 	 dc.w	   asmnu0-*  setr *
+0236 FE9C                        998 	 dc.w	   adraw0-*  draw *
+0238 FE8C                        999 	 dc.w	   ahit0-*   hit *
+023A 0000                       1000 	 dc.w	   0	     cntrl *
+023C 0000                       1001 	 dc.w	   0	     nxsc
+023E 0000                       1002 	 dc.w	   0	     nysc
+0240 09                         1003 	 dc.b	   9	     skey
+0241 00                         1004 	 dc.b	   0	     spr1
+0242 FFF6                       1005 	 dc.w	   mst0-wst0 mstt *
+0244 0001                       1006 	 dc.w	   1	     curw
+0246 0000                       1007 	 dc.w	   0	     curc
+0248 0007                       1008 	 dc.w	   7	     uback
+024A 00FF                       1009 	 dc.w	   255	     uink
+024C 0000                       1010 	 dc.w	   0	     ublob *
+024E 0000                       1011 	 dc.w	   0	     upatt *
+0250 0007                       1012 	 dc.w	   7	     aback
+0252 0000                       1013 	 dc.w	   0	     aink
+0254 0000                       1014 	 dc.w	   0	     ablob *
+0256 0000                       1015 	 dc.w	   0	     apatt *
+0258 0004                       1016 	 dc.w	   4	     sback
+025A 0000                       1017 	 dc.w	   0	     sink
+025C 0000                       1018 	 dc.w	   0	     sblob *
+025E 0000                       1019 	 dc.w	   0	     spatt *
+0260 0005                       1020 	 dc.w	   5	     ncol
+0262 0002                       1021 	 dc.w	   2	     nrow
+0264 0000                       1022 	 dc.w	   0	     xoff
+0266 0000                       1023 	 dc.w	   0	     yoff
+0268 FF9A                       1024 	 dc.w	   spls0-*   xspc *
+026A FFAC                       1025 	 dc.w	   spls1-*   yspc *
+026C 0000                       1026 	 dc.w	   0	     xind *
+026E 0000                       1027 	 dc.w	   0	     xind *
+0270 FF8A                       1028 	 dc.w	   drow0-*   rowl *
+0272                            1029 
+0272                            1030 pobl0
+0272 008A                       1031 	 dc.w	   138	     xsize
+0274 000A                       1032 	 dc.w	   10	     ysize
+0276 0002                       1033 	 dc.w	   2	     xorg
+0278 0002                       1034 	 dc.w	   2	     yorg
+027A 00                         1035 	 dc.b	   0	     type
+027B 00                         1036 	 dc.b	   0	     spar
+027C 0000 0000                  1037 	 dc.l	   0	     spce
+0280 FEBA                       1038 	 dc.w	   txt1-*    pobj *
+0282 FFFF                       1039 	 dc.w	   -1
+0284                            1040 
+0284                            1041 infw0
+0284 00DC                       1042 	 dc.w	   220	     xsize
+0286 0010                       1043 	 dc.w	   16	     ysize
+0288 0000                       1044 	 dc.w	   0	     xorg
+028A 0000                       1045 	 dc.w	   0	     yorg
+028C 0000                       1046 	 dc.w	   0	     flag
+028E 0000                       1047 	 dc.w	   0	     borw
+0290 020E                       1048 	 dc.w	   526	     borc
+0292 005C                       1049 	 dc.w	   92	     papr
+0294 FFDE                       1050 	 dc.w	   pobl0-*   pobl *
+0296 00D8                       1051 	 dc.w	   216	     xsize
+0298 000E                       1052 	 dc.w	   14	     ysize
+029A 0002                       1053 	 dc.w	   2	     xorg
+029C 007D                       1054 	 dc.w	   125	     yorg
+029E 0000                       1055 	 dc.w	   0	     flag
+02A0 0001                       1056 	 dc.w	   1	     borw
+02A2 0000                       1057 	 dc.w	   0	     borc
+02A4 0007                       1058 	 dc.w	   7	     papr
+02A6 0000                       1059 	 dc.w	   0	     pobl *
+02A8 FFFF                       1060 	 dc.w	   -1	     end
+02AA                            1061 
+02AA                            1062 
+02AA                            1063 litm0
+02AA 000A 000A                  1064 	 dc.w	   10,10     xsize, ysize
+02AE 00CE 0003                  1065 	 dc.w	   206,3     xorg, yorg
+02B2 0000                       1066 	 dc.b	   0,0	     xjst, yjst
+02B4 0003                       1067 	 dc.b	   0,3	     type, skey
+02B6 FE80                       1068 	 dc.w	   txt0-*    pobj *
+02B8 0000                       1069 	 dc.w	   0	     item
+02BA FDFE                       1070 	 dc.w	   afun0_0-* pact *
+02BC FFFF                       1071 	 dc.w	   -1	     end
+02BE                            1072 
+02BE                            1073 litm1
+02BE 4014 000C                  1074 	 dc.w	   16404,12  xsize, ysize
+02C2 0000 0000                  1075 	 dc.w	   0,0	     xorg, yorg
+02C6 0000                       1076 	 dc.b	   0,0	     xjst, yjst
+02C8 0000                       1077 	 dc.b	   0,0	     type, skey
+02CA 0000                       1078 	 dc.w	   0	     pobj *
+02CC 0000                       1079 	 dc.w	   0	     item
+02CE 0000                       1080 	 dc.w	   0	     pact *
+02D0 FFFF                       1081 	 dc.w	   -1	     end
+02D2                            1082 
+02D2                            1083 
+02D2                            1084 wd0
+02D2 00DC                       1085 	 dc.w	   220	     xsize
+02D4 008C                       1086 	 dc.w	   140	     ysize
+02D6 0000                       1087 	 dc.w	   0	     xorg
+02D8 0000                       1088 	 dc.w	   0	     yorg
+02DA 0102                       1089 	 dc.w	   258	     flag
+02DC 0001                       1090 	 dc.w	   1	     borw
+02DE 0000                       1091 	 dc.w	   0	     borc
+02E0 0007                       1092 	 dc.w	   7	     papr
+02E2 0000                       1093 	 dc.w	   0	     sprt *
+02E4 0001                       1094 	 dc.w	   1	     curw
+02E6 0000                       1095 	 dc.w	   0	     curc
+02E8 0007                       1096 	 dc.w	   7	     uback
+02EA 00FF                       1097 	 dc.w	   255	     uink
+02EC 0000                       1098 	 dc.w	   0	     ublob *
+02EE 0000                       1099 	 dc.w	   0	     upatt *
+02F0 0007                       1100 	 dc.w	   7	     aback
+02F2 0000                       1101 	 dc.w	   0	     aink
+02F4 0000                       1102 	 dc.w	   0	     ablob *
+02F6 0000                       1103 	 dc.w	   0	     apatt *
+02F8 0004                       1104 	 dc.w	   4	     sback
+02FA 0000                       1105 	 dc.w	   0	     sink
+02FC 0000                       1106 	 dc.w	   0	     sblob *
+02FE 0000                       1107 	 dc.w	   0	     spatt *
+0300 0000                       1108 	 dc.w	   0	     help
+0302 00DC                       1109 	 dc.w	   220	     xsize
+0304 008C                       1110 	 dc.w	   140	     ysize
+0306 FF7E                       1111 	 dc.w	   infw0-*   pinfo *
+0308 FFA2                       1112 	 dc.w	   litm0-*   plitem *
+030A FF14                       1113 	 dc.w	   app_list0-*	       pappl *
+030C 4000                       1114 	 dc.w	   16384     xsize
+030E 000C                       1115 	 dc.w	   12	     ysize
+0310 0000                       1116 	 dc.w	   0	     pinfo *
+0312 FFAC                       1117 	 dc.w	   litm1-*   plitem *
+0314 0000                       1118 	 dc.w	   0	     pappl *
+0316 FFFF                       1119 	 dc.w	   -1
+0318                            1120 
+0318                            1121 ; Sizes
+0318                            1122 ww0_0	 equ	   670
+0318                            1123 ww0_1	 equ	   148
+0318                            1124 
+0318                            1125 ; Status Areas
+0318 7400 0000 4E69 6E65 0006   1126 mst0	 ds.b	   10
+0322                            1127 mst0_e	 ds.b	   0
+0322                            1128 	 ds.w	   0
+0322                            1129 
+0322 0000 5465 6E00 0100 0031   1130 wst0	 ds.b	   65
+0363 00                         1131 wst0_e	 ds.b	   0
+0364                            1132 	 ds.w	   0
+0364                            1133 
+0364                            1134 ; We need George's Easy PEasy code next.
+0364                            1135 
+0364                            1136 	in  win1_georgegwilt_peass_peas_sym_lst
+0364                            1137 GETSP	EQU   *+$00000284
+0364                            1138 MOVE	EQU   *+$000002B8
+0364                            1139 RECHP	EQU   *+$00000298
+0364                            1140 SET_AP	EQU   *+$000002EA
+0364                            1141 SLEEP	EQU   *+$00000000
+0364                            1142 SUI	EQU   *+$000002E2
+0364 0000 5465 6E00 0100 0031   1143 	lib win1_georgegwilt_peass_peas_bin
+073A                            1144 
+073A                            1145 ; And finally, George's sprites.
+073A                            1146 
+073A                            1147 	in  win1_georgegwilt_peass_csprc_sym_lst
+073A                            1148 WM_SPRITE_CF1       EQU   *+$00000098
+073A                            1149 WM_SPRITE_CF4       EQU   *+$00000134
+073A                            1150 WM_SPRITE_F5        EQU   *+$00000168
+073A                            1151 WM_SPRITE_F8        EQU   *+$00000204
+073A                            1152 WM_SPRITE_F10       EQU   *+$0000026C
+073A                            1153 WM_SPRITE_INSG      EQU   *+$00000320
+073A                            1154 WM_SPRITE_WAKE      EQU   *+$000004A4
+073A                            1155 WM_SPRITE_F2        EQU   *+$00000514
+073A                            1156 WM_SPRITE_MOVE      EQU   *+$000005D8
+073A                            1157 CPT_DOWN_SPR        EQU   *+$0000264C
+073A                            1158 CPT_CURT_SPR        EQU   *+$000029AC
+073A                            1159 WM_SPRITE_ARROW     EQU   *+$00000000
+073A                            1160 WM_SPRITE_CF2       EQU   *+$000000CC
+073A                            1161 WM_SPRITE_F6        EQU   *+$0000019C
+073A                            1162 WM_SPRITE_F9        EQU   *+$00000238
+073A                            1163 WM_SPRITE_SLEEP     EQU   *+$00000470
+073A                            1164 WM_SPRITE_F3        EQU   *+$00000548
+073A                            1165 WM_SPRITE_SIZE      EQU   *+$00000610
+073A                            1166 CPT_HAND_SPR        EQU   *+$00000644
+073A                            1167 CPT_DIA_SPR         EQU   *+$00000B04
+073A                            1168 CPT_CIRC_SPR        EQU   *+$00000E3C
+073A                            1169 CPT_NUL_SPR         EQU   *+$00001BDC
+073A                            1170 CPT_RIGHT_SPR       EQU   *+$00001F94
+073A                            1171 CPT_UP_SPR          EQU   *+$000022EC
+073A                            1172 WM_SPRITE_CF3       EQU   *+$00000100
+073A                            1173 WM_SPRITE_F7        EQU   *+$000001D0
+073A                            1174 WM_SPRITE_HAND      EQU   *+$000002A0
+073A                            1175 WM_SPRITE_INSL      EQU   *+$000003C8
+073A                            1176 WM_SPRITE_F1        EQU   *+$000004E0
+073A                            1177 WM_SPRITE_F4        EQU   *+$0000057C
+073A                            1178 CPT_LEFT_SPR        EQU   *+$00001C3C
+073A 0000 5465 6E00 0100 0031   1179 	lib win1_georgegwilt_peass_csprc_bin
+31B6                            1180 

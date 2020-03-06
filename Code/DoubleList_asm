@@ -1,0 +1,594 @@
+* =======================================================================
+* A test harness 'job' for our linked lists code. What's the point of all
+* the explanations if you can't test the code ?
+*
+* This code is simply a wrapper to allow different demos to be 'slotted'
+* in to demonstrate the real code in the article, as opposed to the job
+* code.
+*
+* The code being demonstrated is located at DEMO below. As new demos are
+* required, only that bit should (!) need changing.
+* =======================================================================
+
+
+* -----------------------------------------------------------------------
+* These are offsets from the start of the job's dataspace where working
+* variable are stored. The dataspace is held at (A4) in the job's code.
+* -----------------------------------------------------------------------
+con_id      equ     0                   ; Id for title channel
+con_id2     equ     4                   ; Id for main output
+
+* -----------------------------------------------------------------------
+* These are simply user friendly names instead of numbers for various
+* bits and bobs, colours etc.
+* -----------------------------------------------------------------------
+black       equ     0                   ; Colour code for mode 4 black
+red         equ     2                   ; Red
+green       equ     4                   ; Green
+white       equ     7                   ; White
+linefeed    equ    10                   ; Linefeed character
+oops        equ    -1                   ; General error code for sub-routines
+err_nc      equ    -1                   ; NOT COMPLETE error code
+
+* -----------------------------------------------------------------------
+* Constants for use with job control commands. (It doesn't matter if I
+* have two names with the same value ! )
+* -----------------------------------------------------------------------
+infinite    equ     -1                  ; Infinite timeout
+me          equ     -1                  ; Id for 'this' job
+
+
+
+* -----------------------------------------------------------------------
+* Code starts here.
+* -----------------------------------------------------------------------
+start       bra.s   LinkList            ; 2 bytes short jump
+            dc.l    0                   ; 4 bytes padding
+            dc.w    $4afb               ; Job identifier must be at location 6
+            dc.w    11                  ; Bytes in job's name
+            dc.b    'LinkedLists',0     ; Bytes of job's name plus padding
+
+LinkList    adda.l   a6,a4              ; A4.L = start of dataspace
+            bsr      Mode4              ; Set the screen mode
+            bsr      Title              ; Open the title window
+            bsr      Output             ; Open the output window
+            bsr      Headings           ; Display headings
+            bsr      Demo               ; Do the demo code
+            bsr      Finished           ; Advise user that we are done
+
+* -----------------------------------------------------------------------
+* Code ends here.
+* -----------------------------------------------------------------------
+all_done    moveq   #mt_frjob,d0        ; Force Remove a job
+            moveq   #me,d1              ; The current job
+            move.l  d0,d3               ; Any error code to send to Superbasic
+            trap    #1                  ; Kill this job, its channels and its memory
+
+            bra.s   all_done            ; Should never get here - sanity check !
+
+
+* =======================================================================
+* The DEMO code starts here.
+*
+* This demo does the following :
+*
+* Creates a number of nodes and stores a LONG value in each one.
+* Lists each node address, it's PRIOR & NEXT pointer and data value on screen.
+* Finds a node based on its data value.
+* Deletes the found node from the list.
+* Lists each node again.
+* =======================================================================
+Demo       bsr     BuildList            ; Build a linked list
+           bsr     Before               ; Display 'BEFORE :'
+           bsr     ShowList             ; Display list details
+           bsr     FindNode             ; Locate a single node
+           bne.s   DemoAfter            ; Failed to find node with data = 3
+           bsr     DeleteNode           ; Delete a single node
+
+DemoAfter  bsr     After                ; Display 'AFTER : '
+           bsr     ShowList             ; Show details again
+           bsr     KillList             ; Delete entire list
+           rts                          ; Done
+
+* -----------------------------------------------------------------------
+* A location to hold a single long word pointing to the first 'real'
+* node in our linked list. This must be initialized to zero.
+* -----------------------------------------------------------------------
+RootNode   dc.l    0,0                  ; This is our root node.
+
+NodeSize   equ     12                   ; Length in bytes of each node in the list
+Next       equ     0                    ; Offset to NEXT pointer in a node
+Prior      equ     4                    ; Offset to PRIOR pointer in a node
+NData      equ     8                    ; Offset to the data portion of a node
+
+* -----------------------------------------------------------------------
+* Build a list of 5 nodes each holding a long word of data.
+* -----------------------------------------------------------------------
+BuildList  lea     RootNode,a0          ; Pointer to root node address
+           moveq   #4,d7                ; How many nodes in D7 = 5 (DBRA remember ?)
+           moveq   #NodeSize,d1         ; Each node is 12 bytes long
+
+BuildLoop  bsr.s   BuildNode            ; Create a new node, address is in A1.L
+           bne     all_done             ; Just die on errors
+           move.l  d7,NData(a1)         ; Store data value - which is just our counter
+           bsr.s   AddNode              ; Add to list
+           dbra    d7,BuildLoop         ; Do the rest
+           rts                          ; Done
+
+* -----------------------------------------------------------------------
+* AddNode - Adds a new node to a list. See text for details.
+*
+* Entry : A0.L = root node address, A1.L = New node address.
+* Exit  :Preserves all regsiters, no error codes returned.
+* -----------------------------------------------------------------------
+AddNode    cmpa.l  a0,a1                ; Don't allow the root node to be added again
+           beq.s   AddExit              ; Bale out quietly if attempted
+           move.l (a0),(a1)             ; Save current first node in new node's NEXT area
+           move.l  a0,Prior(a1)         ; Set the PRIOR node for this new node
+           move.l  a1,(a0)              ; Store address of new node in root's NEXT area
+           cmpi.l  #0,(a1)              ; Nothing to do if this is the very first node
+           beq.s   AddExit              ; Exit with Z set = First node added to list
+           move.l  a0,-(a7)             ; Preserve working register (root pointer)
+           move.l  (a1),a0              ; A0 = address of original FIRST node in list
+           move.l  a1,prior(a0)         ; Store address of new FIRST node in PRIOR pointer
+           move.l  (a7)+,a0             ; Restore working register (root pointer)
+AddExit    rts
+
+* -----------------------------------------------------------------------
+* Allocate a single new node
+* On entry, D1.L is amount of memory required.
+* On exit, A1 holds the address of the new node, with D0 holding errors.
+* All registers preserved, except A1 and D0.
+* -----------------------------------------------------------------------
+BuildNode  movem.l d1-d3/a0/a2-a3,-(a7) ; Save working registers
+           moveq   #MT_ALCHP,d0         ; Set the trap
+           moveq   #me,d2               ; I want it for me
+           trap    #1                   ; Do it
+           move.l  a0,a1                ; Get the node address where we need it
+           movem.l (a7)+,d1-d3/a0/a2-a3 ; Restore working registers
+           tst.l   d0                   ; Set flags
+           rts                          ; Exit
+
+* -----------------------------------------------------------------------
+* Walk through a linked list displaying the details of each node as we
+* go.
+* On entry, A0 = root node of the list.
+* -----------------------------------------------------------------------
+ShowList    lea    RootNode,a0          ; Root node address
+
+ShowLoop    move.l (a0),a0              ; Get address of the next node
+            cmpa.l #0,a0                ; Done ?
+            beq.s  ShowExit             ; Yes
+            move.l a0,-(a7)             ; We must preserve A0 - it's our node pointer
+            bsr.s  ShowNode             ; Display that node's details
+            move.l (a7)+,a0             ; Restore the node pointer again
+            bra.s  ShowLoop             ; Do the rest of the list
+
+ShowExit    rts                         ; Done
+
+* -----------------------------------------------------------------------
+* Display the details of a single node in the linked list.
+* On entry A0 = the node address.
+* -----------------------------------------------------------------------
+ShowNode    move.l a0,a5                ; The node address
+            move.l con_id2(a4),a0       ; The channel address
+            move.l a5,d4                ; The node address
+            bsr.s  ShowAddr             ; Print node address
+            move.l (a5),d4              ; The NEXT pointer
+            bsr    ShowNext             ; Print NEXT pointer
+            move.l Prior(a5),d4         ; The PRIOR pointer
+            bsr.s  ShowPrior            ; Print PRIOR pointer
+            move.l NData(a5),d4         ; The node data
+            bsr    ShowData             ; Print the data
+            rts
+
+* -----------------------------------------------------------------------
+* Display 'BEFORE :' in the output channel.
+* -----------------------------------------------------------------------
+Before     lea     BeforeAddr,a1        ; The prompt
+           movea.l con_id2(a4),a0       ; Needs channel id
+           bsr     Prompt               ; Print it
+           rts
+
+BeforeAddr dc.w    B4End-BeforeAddr-2
+           dc.b    'BEFORE :',linefeed
+B4End      equ     *
+
+* -----------------------------------------------------------------------
+* Display 'AFTER :' in the output channel
+* -----------------------------------------------------------------------
+After      lea     AfterAddr,a1         ; The prompt
+           movea.l con_id2(a4),a0       ; Needs channel id
+           bsr     Prompt               ; Print it
+           rts
+
+AfterAddr  dc.w    AftEnd-AfterAddr-2
+           dc.b    linefeed,linefeed,'AFTER :',linefeed
+AftEnd     equ     *
+
+* -----------------------------------------------------------------------
+* Display the node's actual address in memory.
+* On entry D4 = the node address.
+* -----------------------------------------------------------------------
+ShowAddr   lea     MsgAddr,a1           ; Our prompt
+
+ShowPrompt bsr     Prompt               ; Print it
+           bsr.s   D4ToHex              ; Convert D4.L to hex
+           bsr.s   PrintHex             ; Print it and a linefeed
+           rts
+
+MsgAddr    dc.w    AddrEnd-MsgAddr-2
+           dc.b    linefeed,'Node addr : '
+AddrEnd    equ     *
+
+* -----------------------------------------------------------------------
+* Print the contents of the buffer to screen.
+* -----------------------------------------------------------------------
+PrintHex   lea     Buffer,a1            ; What to print
+           move.l  con_id2(a4),a0       ; Channel to print to
+           bsr     Prompt               ; Do it
+           rts
+
+* -----------------------------------------------------------------------
+* Convert the long word in D4 to hex ready for printing
+* -----------------------------------------------------------------------
+D4ToHex    lea     buffer+2,a1          ; Buffer address
+           bsr     hex_l                ; Do all 4 bytes = 8 characters
+           lea     buffer,a1            ; Buffer again
+           move.w  #8,(a1)              ; Store text length
+           rts
+
+* -----------------------------------------------------------------------
+* Display the node's PRIOR address in memory.
+* On entry D4 = the node's PRIOR pointer.
+* -----------------------------------------------------------------------
+ShowPrior  lea     MsgPrior,a1          ; Our prompt
+           bra.s   ShowPrompt           ; Print it
+
+MsgPrior   dc.w    PriorEnd-MsgPrior-2
+           dc.b    '  PRIOR : '
+PriorEnd   equ     *
+
+* -----------------------------------------------------------------------
+* Display the node's NEXT address in memory.
+* On entry D4 = the node's NEXT pointer.
+* -----------------------------------------------------------------------
+ShowNext   lea     MsgNext,a1           ; Our prompt
+           bra.s   ShowPrompt           ; Print it
+
+MsgNext    dc.w    NextEnd-MsgNext-2
+           dc.b    '  NEXT : '
+NextEnd    equ     *
+
+* -----------------------------------------------------------------------
+* Display the node's actual data content.
+* On entry D4 = the data.
+* -----------------------------------------------------------------------
+ShowData   lea     MsgData,a1           ; Our prompt
+           bra.s   ShowPrompt           ; Print it
+
+MsgData    dc.w    DataEnd-MsgData-2
+           dc.b    '  Data : '
+DataEnd    equ     *
+
+* -----------------------------------------------------------------------
+* Locate a node in the list based on it's data value.
+* On exit, A1 is the required node's address plus Z set - if found.
+*          A1 is undefined plus Z clear - if not found.
+* -----------------------------------------------------------------------
+FindNode   lea     RootNode,a0          ; Pointer to root node in list
+           lea     Compare,a1           ; Address of node comparison routine
+           moveq   #3,d1                ; The data value we are looking for
+           bsr.s   FindANode            ; Go find it, or not
+           rts
+
+* -----------------------------------------------------------------------
+* This routine expects the following input registers so that it can scan
+* a linked list for the required data value and return the address of the
+* node holding that data value with the Z flag set if found, or the Z flag
+* cleared for not found.
+*
+* A0.L = Rootnode of the list.
+* A1.L = Address of Compare routine.
+* D1.L = Value to look for in list.
+* -----------------------------------------------------------------------
+FindANode  moveq   #oops,d0             ; Assume not found (yet)
+
+FindLoop   cmpa.l  #0,a0                ; Reached the end yet ?
+           beq.s   FindExit             ; Yes, node not found, exit with error
+
+           move.l  (a0),a3              ; Fetch the NEXT node address into A3.L
+           jsr     (a1)                 ; And jump into the comparison routine
+           beq.s   FindFound            ; Looks like we found our node
+
+FindNext   move.l  (a0),a0              ; A0 now holds the NEXT node in the list
+           bra.s   FindLoop             ; Go around again
+
+FindFound  movea.l a3,a1                ; This is the required node
+           moveq   #0,d0                ; Clear error flag
+
+FindExit   tst.l   d0                   ; Set zero flag for success, unset for error
+           rts
+
+* -----------------------------------------------------------------------
+* This is the simple compare routine for our FindNode code. On entry, we
+* have the following registers set :
+*
+* D1.L = The value we want to find in a node in the list.
+* A3.L = The address of a node which we are checking for the data value.
+*
+* We must preserve A0, A1 and D1.
+*------------------------------------------------------------------------
+Compare    cmp.l NData(a3),d1           ; Is the data in the node = the value we want?
+           rts                          ; Exit with Z set if so, unset otherwise.
+
+* -----------------------------------------------------------------------
+* QDOSMSQ tidies up rather nicely for us on exit - so we don't have to !!
+* -----------------------------------------------------------------------
+KillList    rts
+
+* -----------------------------------------------------------------------
+* A demo routine to delete the node whose address is passed in A1.L. Sets
+* Z if found &deleted, clears it otherwise.
+* -----------------------------------------------------------------------
+DeleteNode  lea     rootnode,a0         ; Address of the root node
+            bsr.s   DelANode
+            rts
+
+* -----------------------------------------------------------------------
+* Routine to delete a node whose address is passed in A1.L from the list
+* whose address is passed in A0.L. On exit, Z flag will be set if deleted
+* or cleared if not.
+* Trashes A0 and D0 on exit.
+* -----------------------------------------------------------------------
+DelANode    moveq   #oops,d0            ; Assume it's going to fail
+            cmpa.l  a1,a0               ; Trying to delete the rootnode ?
+            beq.s   DelExit             ; Exit if so.
+
+DelList     cmpi.l  #0,(a0)             ; If this is true, we have an empty list !
+            beq.s   DelExit             ; Exit not found - we have an empty list.
+            move.l  Prior(a1),a0        ; A0 points at the node before the 'deleted' one
+            move.l  (a1),(a0)           ; Make the prior node point to the deleted node's
+*                                       ; NEXT node, thus deleting the node from the NEXT
+*                                       ; chain through the list.
+            cmpi.l  #0,(a1)             ; Deleting final node in list ?
+            beq.s   DelDone             ; Yes, nothing more to do.
+            move.l  (a1),a0             ; A0 now points after the 'deleted' node.
+            move.l  Prior(a1),Prior(a0) ; Make the next node point to the deleted node's
+*                                       ; PRIOR node, thus deleting the node from the
+*                                       ; PRIOR chain through the list.
+DelDone     moveq   #0,d0               ; Indicate a node was deleted successfully
+
+DelExit     tst.l   d0                  ; Set or clear Z flag
+            rts
+
+* =======================================================================
+* The DEMO code ends here.
+* =======================================================================
+
+
+
+* -----------------------------------------------------------------------
+* Set mode 4 if not already set. Do not change from TV to monitor or
+* vice versa. We must preserve the display type if we reset the mode.
+* -----------------------------------------------------------------------
+Mode4       moveq    #mt_dmode,d0
+            moveq    #-1,d1             ; Read current mode
+            moveq    #-1,d2             ; Read current display type
+            trap     #1                 ; Do it
+            tst.l    d0                 ; Did it work ?
+            bne      all_done           ; No, bale out, cannot continue
+
+            tst.b    d1                 ; 0 in D1.B = Mode 4
+            beq.s    ModeExit           ; No need to set mode 4
+            moveq    #mt_dmode,d0
+            clr.l    d1                 ; We need mode 4
+            trap     #1                 ; Set mode 4 (d2 = display type)
+            tst.l    d0                 ; Check it
+            bne      all_done           ; Bale out if errors detected
+ModeExit    rts                         ; Done.
+
+* -----------------------------------------------------------------------
+* Mode 4 is current mode. Open the title window at the top of the screen.
+* -----------------------------------------------------------------------
+Title       lea      con_def,a1         ; Window definition
+            movea.w  ut_con,a2          ; Utility to define a window etc
+            jsr      (a2)               ; Do it
+            tst.l    d0                 ; Did it work ok ?
+            bne      all_done           ; No, exit program
+            move.l   a0,con_id(a4)      ; Store console id for title channel
+            rts                         ; Done
+
+*------------------------------------------------------------------------
+* Definition for title window channel
+*------------------------------------------------------------------------
+con_def     dc.b    red                 ; Border colour
+            dc.b    1                   ; Border width
+            dc.b    white               ; Paper/strip colour
+            dc.b    black               ; Ink colour
+            dc.w    448                 ; Width
+            dc.w    24                  ; Height
+            dc.w    32                  ; Start position x
+            dc.w    16                  ; Start position y
+
+* -----------------------------------------------------------------------
+* Open the output window underneath the title one.
+* -----------------------------------------------------------------------
+Output      lea      con_def2,a1        ; Output window definition
+            movea.w  ut_con,a2          ; Utility again
+            jsr      (a2)               ; Do it
+            tst.l    d0                 ; Did it work ?
+            bne      all_done           ; No, exit routine
+            move.l   a0,con_id2(a4)     ; Store console id for output channel
+
+            moveq    #0,d0              ; No errors detected
+            rts
+
+*------------------------------------------------------------------------
+* Definition for output window channel
+*------------------------------------------------------------------------
+con_def2    dc.b    red                 ; Border colour
+            dc.b    1                   ; Border width
+            dc.b    white               ; Paper/strip colour
+            dc.b    black               ; Ink colour
+            dc.w    448                 ; Width
+            dc.w    200                 ; Height
+            dc.w    32                  ; X org
+            dc.w    40                  ; Y org
+
+* -----------------------------------------------------------------------
+* Print the headings
+* -----------------------------------------------------------------------
+headings    movea.l  con_id(a4),a0       ; Title channel id
+            bsr.s    cls                 ; Clear screen
+            lea      mes_title,a1        ; Title string
+            bsr.s    prompt              ; Print title string
+            rts
+
+mes_title   dc.w     mes_end-mes_title-2
+            dc.b     'Single Linked Lists'
+mes_end     equ      *
+
+
+* -----------------------------------------------------------------------
+* Sign off message
+* -----------------------------------------------------------------------
+Finished    move.l   con_id2(a4),a0      ; Fetch title channel id
+            lea      end_title,a1        ; Title string
+            bsr.s    prompt              ; Print title string
+            bsr.s    input               ; Wait for ENTER
+            rts
+
+end_title   dc.w     end_end-end_title-2
+            dc.b     linefeed,linefeed,'Press ENTER to quit : '
+end_end     equ      *
+
+
+* =======================================================================
+* CLS :
+* =======================================================================
+* 1. Clear the (screen) channel whose id is in A0.
+* =======================================================================
+cls         moveq    #sd_clear,d0        ; CLS
+            moveq    #infinite,d3        ; Infinite timeout
+            trap     #3                  ; CLS title window
+            rts
+
+
+* =======================================================================
+* Prompt :
+* =======================================================================
+* 1. Print the string at (A1) to the channel in A0.
+*
+* Z set if all ok, unset if not.
+* =======================================================================
+prompt      movea.w ut_mtext,a2          ; Print a string utility
+            jsr     (a2)                 ; Print it
+            tst.l   d0                   ; Check for errors
+            rts
+
+
+* =======================================================================
+* Input :
+* =======================================================================
+* Wait for user input from the channel id in A0.
+*
+* Returns the input length (not counting the ENTER character) in D1.W
+* Returns the address of the first character in the buffer in A1.L
+* Preserves the channel id in A0.L
+* Z set if all ok, unset if not.
+* =======================================================================
+input       lea     buffer+2,a1         ; Our buffer address plus 2
+            move.l  a1,-(a7)            ; Save it on the stack
+            moveq   #io_fline,d0        ; Input some bytes (inc linefeed)
+            moveq   #60,d2              ; Buffer size maximum
+            moveq   #infinite,d3        ; Inifinite timeout
+            trap    #3
+
+            move.l  (a7)+,a1            ; Restore buffer pointer
+            subq.w  #1,d1               ; Subtract the linefeed character
+            move.w  d1,-2(a1)           ; Store length in buffer
+            tst.l   d0                  ; Did it all work ?
+            rts
+
+buffer      ds.w    31                  ; 60 chars for input plus 1 word for size.
+
+
+* =======================================================================
+* hex_l :
+* =======================================================================
+* Convert a 4 byte value in D4.L to Hex in a buffer. Use the input
+* buffer for the output and DOES NOT store the length word !
+*
+* Expects D4.L to hold the value.
+* =======================================================================
+hex_l       swap    d4              ; $ABCD -> $CDAB in D4
+            bsr.s   hex_w           ; Convert the $AB part first
+            swap    d4              ; $CDAB -> $ABCD again
+*           drop into hex_w to convert the $CD part
+
+* =======================================================================
+* hex_w :
+* =======================================================================
+* Convert a 2 byte value in D4.W to Hex in a buffer.
+*
+* Expects D4.W to hold the value.
+* Expects A1.L to point at the buffer.
+* =======================================================================
+hex_w       ror.w   #8,d4           ; $DE -> $ED in D4
+            bsr.s   hex_b           ; Convert the $D part first
+            rol.w   #8,d4           ; $ED -> $DE again
+*           drop into hex_b to convert the $E part
+
+* =======================================================================
+* hex_b :
+* =======================================================================
+* Convert a 1 byte value in D4.B to Hex in a buffer.
+*
+* Expects D4.B to hold the value.
+* Expects A1.L to point at the buffer.
+* =======================================================================
+hex_b       ror.b   #4,d4           ; Swap lower and higer nibbles
+            bsr.s   hex_nibble      ; Print high nibble first
+            rol.b   #4,d4           ; Swap back again
+*           drop into hex_nibble to print the lower nibble
+
+* =======================================================================
+* hex_nibble :
+* =======================================================================
+* Convert a 4 bit value in D4.B to Hex in a buffer.
+*
+* Expects D4.B to hold the value.
+* Expects A1.L to point at the buffer.
+* =======================================================================
+hex_nibble  move.b  d4,-(a7)        ; Save value in both nibbles
+            andi.b  #$0f,d4         ; D4.B now = 0 to 15
+            addi.b  #'0',d4         ; Now = '0' to '?' (ascii only)
+            cmpi.b  #'9',d4         ; Is this a digit ?
+            bls.s   nib_digit       ; Yes
+            addi.b  #7,d4           ; Add offset to UPPERCASE letters
+
+nib_digit   move.b  d4,(a1)+        ; Store in buffer
+            move.b  (a7)+,d4        ; Restore original value
+            rts
+
+* =======================================================================
+* print_hex :
+* =======================================================================
+* Convert D4 into 8 hex characters, then print it to the channel in A0.L
+*
+* Expects D4.L to hold the value.
+* Expects A0.L to hold the channel id.
+* =======================================================================
+print_hex   lea      buffer,a1      ; Output buffer for address
+            move.w   #8,(a1)+       ; We know the result is 8 bytes
+            bsr      hex_l          ; Convert 4 bytes to text
+            lea      buffer,a1      ; Text to print
+            bsr      prompt         ; Print it
+            rts                     ; All done. (Error code in D0)
+
+
+* =======================================================================
+* End of test harness
+* =======================================================================
+

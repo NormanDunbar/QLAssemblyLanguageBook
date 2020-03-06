@@ -1,0 +1,24 @@
+start	 moveq #0,d3
+	 lea buffer,a1
+	 move.l a1,a3
+	 bsr LongToASCII
+
+	 move.l #12345678,d3
+	 move.l a3,a1
+	 bsr LongToASCII
+
+	 moveq #-1,d3
+	 move.l d3,d7
+	 move.l a3,a1
+	 bsr LongToASCII
+
+	 move.l d7,d3
+	 move.l a3,a1
+	 bsr LongToASCIIs
+
+	 moveq #0,d0
+	 rts
+
+	 in win1_libs_LongToASCIIs_lib
+
+buffer	 ds.w 256

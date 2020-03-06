@@ -1,0 +1,140 @@
+00000000                               0 *------------------------------------------------------------------------------
+                                         -
+00000000                               1 * PLOT_4 and PLOT_8
+00000000                               2 *
+00000000                               3 * Mode 4 and mode 8 plot routines which give direct access to the screen memory
+                                         .
+00000000                               4 * NOTE : Must call plot_init at least once before using PLOT_4 and PLOT_8 or 
+00000000                               5 * seriously unpredictable results will occur. Additionally, there are no check
+00000000                               6 * to ensure that x and v values are in range.
+00000000                               7 *
+00000000                               8 *    D1.W = x (across)
+00000000                               9 *    D2.W = y (down)
+00000000                              10 *    D3.W = colour (0 to 7)
+00000000                              11 *------------------------------------------------------------------------------
+                                         -
+00000000                              12 * Copyringht Norman Dunbar, March 2000. 
+00000000                              13 *------------------------------------------------------------------------------
+                                         -
+00000000                              16 *------------------------------------------------------------------------------
+                                         -
+00000000                              17 * In D3 bit 2 is green and bit 1 is red, we don't need any other bits, so get
+00000000                              18 * rid of them now. Then shift the Green bit into bit 15 of D4 and the red into
+00000000                              19 * bit 7 of D3 ...
+00000000                              20 *------------------------------------------------------------------------------
+                                         -
+00000000 604A                         21 start       bra     plot_init       ; Call here (start + 4) to initialise thing
+                                         s
+00000002 6004                         22             bra     plot_4          ; Call start + 4 to plot in mode 4
+00000004 6000 008C                    23             bra     plot_8          ; Call start + 8 to plot in mode 8
+00000008 6124                         25 plot_4      bsr.s   calc            ; Get A1 = screen address
+0000000A 0243 0006                    26             andi.w  #6,d3           ; D3 = 00000000 00000GR0 (showing all bits)
+0000000E ED4B                         27             lsl.w   #6,d3           ; D3 = 0000000G R0000000
+00000010 3803                         28             move.w  d3,d4           ; D4 = 0000000G R0000000
+00000012 EF4C                         29             lsl.w   #7,d4           ; D4 = GR000000 00000000
+00000014 8644                         30             or.w    d4,d3           ; D3 = GR00000G R0000000
+00000016 0243 8080                    31             andi.w  #$8080,d3       ; D3 = G0000000 R0000000 (keep both bits 7)
+0000001A                              33 *------------------------------------------------------------------------------
+                                         -
+0000001A                              34 * D3.W is now set to a colour mask for pixel 0. This is where we want to start.
+0000001A                              35 * Now we need to build a mask to clear out pixel 0 as well. This is easy - use 
+                                         the
+0000001A                              36 * value from the table above. Then we can start rotating them into the correct
+0000001A                              37 * position as detailed above.
+0000001A                              38 *------------------------------------------------------------------------------
+                                         -
+0000001A 343C 7F7F                    39             move.w  #$7f7f,d2       ; AND mask = 10000000 10000000
+0000001E 0241 0007                    40             andi.w  #7,d1           ; (x AND 7) in d1
+00000022 E27A                         41             ror.w   d1,d2           ; Build correct AND mask
+00000024 E27B                         42             ror.w   d1,d3           ; Build correct OR mask (colour)
+00000026 C551                         43             and.w   d2,(a1)         ; AND out the changing pixel
+00000028 8751                         44             or.w    d3,(a1)         ; OR in the (new) colour
+0000002A 7000                         45             moveq   #0,d0           ; No errors
+0000002C 4E75                         46             rts                     ; All done
+0000002E                              48 *------------------------------------------------------------------------------
+                                         -
+0000002E                              49 * Calculate the screen address for the x and y values passed in D1 and D2.
+0000002E                              50 * Trashes A1, D4 and D5.
+0000002E                              51 * The routine plot_init must have been called to initialise the screen addresse
+                                         s
+0000002E                              52 * and scan line widths BEFORE calling this routine.
+0000002E                              53 *------------------------------------------------------------------------------
+                                         -
+0000002E 43FA 005C                    54 calc        lea     scr_base,a1     ; Where we hold the screen base address
+00000032 2019                         55             move.l  (a1)+,d0        ; Fetch the screen base address
+00000034 3C11                         56             move.w  (a1),d6         ; And the scan line size
+00000036 2240                         57             movea.l d0,a1           ; Get the screen base where we want it
+00000038                              59 *------------------------------------------------------------------------------
+                                         -
+00000038                              60 * D1.W = x across value
+00000038                              61 * D2.W = y down value
+00000038                              62 * D3.W = ink colour required
+00000038                              63 * D6.W = scan line size
+00000038                              64 * A1.L = screen base address
+00000038                              65 *------------------------------------------------------------------------------
+                                         -
+00000038 3A02                         66             move.w  d2,d5           ; Copy y value (down)
+0000003A 48C5                         67             ext.l   d5              ; We get a long result next ...
+0000003C CAC6                         68             mulu    d6,d5           ; Multiply by scan_line size
+0000003E D3C5                         69             adda.l  d5,a1           ; A1 = correct scan line address
+00000040 3801                         71             move.w  d1,d4           ; Copy x value
+00000042 E44C                         72             lsr.w   #2,d4           ; D4 = INT(x / 4)
+00000044 0884 0000                    73             bclr    #0,d4           ; Make even = green byte in scan_line
+00000048 D2C4                         74             adda.w  d4,a1           ; A1 = correct screen word address
+0000004A 4E75                         75             rts                     ; Done
+0000004C                              77 *------------------------------------------------------------------------------
+                                         -
+0000004C                              78 * This routine must be called once before using the above plot routines. It
+0000004C                              79 * initialises the screen base address and scan line width from the channel
+0000004C                              80 * definition block for SuperBasic channel #0.
+0000004C                              81 *------------------------------------------------------------------------------
+                                         -
+0000004C 91C8                         82 plot_init   suba.l  a0,a0           ; Channel id for #0 is always 0
+0000004E 43FA 003C                    83             lea     scr_base,a1     ; Parameter passed to extop routine
+00000052 45FA 002C                    84             lea     extop,a2        ; Actual routine to call
+00000056 7009                         85             moveq   #sd_extop,d0    ; Trap code
+00000058 76FF                         86             moveq   #-1,d3          ; Timout
+0000005A 4E43                         87             trap    #3              ; Do it
+0000005C 4A80                         88             tst.l   d0              ; OK ?
+0000005E 6618                         89             bne.s   done            ; No, bale out D1 = A1 = garbage
+00000060 3F01                         91 got_them    move.w  d1,-(a7)        ; Need to check qdos, save scan_line
+00000062 7000                         92             moveq   #mt_inf,d0      ; Trap to get qdos version (preseves A1)
+00000064 4E41                         93             trap    #1              ; Get it (no errors)
+00000066 321F                         94             move.w  (a7)+,d1        ; Retrieve scan_line value
+00000068 0282 FF00 FFFF               95             andi.l  #$ff00ffff,d2   ; D2 = qdos, mask out the dot in "1.03" etc
+0000006E 0C82 3100 3034               96             cmpi.l  #$31003034,d2   ; Test for "1?03" where ? = don't care
+00000074 6504                         97             bcs.s   too_old         ; Less than 1.03 is too old
+00000076 3281                         99 save        move.w  d1,(a1)         ; Store the scan_line size
+00000078 4E75                        101 done        rts                     ; Finished
+0000007A 323C 0080                   103 too_old     move.w  #128,d1         ; Must be 128 bytes 
+0000007E 60F6                        104             bra.s   save            ; Save D1 and exit
+00000080 22E8 0032                   106 extop       move.l  $32(a0),(a1)+   ; Fetch the scan_line length & store it
+00000084 3228 0064                   107             move.w  $64(a0),d1      ; Fetch the screen base - don't store it
+00000088 7000                        108             moveq   #0,d0           ; No errors
+0000008A 4E75                        109             rts                     ; done
+0000008C                             111 *------------------------------------------------------------------------------
+                                         -
+0000008C                             112 * Set aside some storage space to hold the screen base and scan_line width. Thi
+                                         s
+0000008C                             113 * saves having to calculate it every time we plot a single pixel.
+0000008C                             114 *------------------------------------------------------------------------------
+                                         -
+0000008C 0000 0000                   115 scr_base    ds.l    1
+00000090 0000                        116 scan_line   ds.w    1
+00000092 619A                        118 plot_8      bsr.s   calc            ; Get A1 = screen address
+00000094 0243 0007                   119             andi.w  #7,d3           ; D3 = 00000000 00000GRB
+00000098 ED4B                        120             lsl.w   #6,d3           ; D3 = 0000000G RB000000
+0000009A 3803                        121             move.w  d3,d4           ; D4 = 0000000G RB000000
+0000009C EF4C                        122             lsl.w   #7,d4           ; D4 = GRB00000 00000000
+0000009E 0244 8000                   123             andi.w  #$8000,d4       ; D4 = G0000000 00000000
+000000A2 0243 00C0                   124             andi.w  #$00C0,d3       ; D3 = 00000000 RB000000
+000000A6 8644                        125             or.w    d4,d3           ; D3 = G000000G RB000000
+000000A8 343C 7F3F                   126             move.w  #$7f3f,d2       ; AND mask = 01111111 00111111
+000000AC 0241 0006                   127             andi.w  #6,d1           ; (x AND 6) in d1
+000000B0 E27A                        128             ror.w   d1,d2           ; Build correct AND mask
+000000B2 E27B                        129             ror.w   d1,d3           ; Build correct OR mask (colour)
+000000B4 C551                        130             and.w   d2,(a1)         ; AND out the changing pixel
+000000B6 8751                        131             or.w    d3,(a1)         ; OR in the (new) colour
+000000B8 7000                        132             moveq   #0,d0           ; No errors
+000000BA 4E75                        133             rts                     ; All done
+        No ERRORs         No WARNINGs 

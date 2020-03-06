@@ -1,0 +1,34 @@
+Start       bra.s    Start2         ; Skip over result storage
+Result      dc.l     0              ; Space for our result, address = Start + 2
+FirstNumber dc.l     9              ; Assume Fibonacci 9 by default = Start + 6
+
+Start2      lea       Result,a3     ; Where to shove the answer
+            move.l    4(a3),d0      ; Fetch FirstNumber
+            lea       Answers,a4    ; Answer table address
+            bsr.s     Fibonacci     ; Do it
+FRET_1      move.l    d0,(a3)       ; Shove it !
+            moveq     #0,d0         ; No errors
+            rts                     ; Back to SuperBasic
+
+Fibonacci  cmpi.l   #2,d0           ; Special cases 0 or 1 ?
+           bcc.s    Fib_2           ; No, D0 is 2 or more. (Unsigned !)
+           moveq    #1,d0           ; Return 1 for Fibonacci(0) or Fibonacci(1)
+           rts                      ; That's our exit clause !
+
+Fib_2      subq.l   #1,d0           ; Calculate N-1
+           move.l   d0,-(a7)        ; Stack our 'N-1' value
+           bsr.s    Fibonacci       ; Work out Fibonacci(N-1)
+FRET_2     move.l   d0,-(a7)        ; Save the result of Fibonacci(N-1)
+           move.l   4(a7),d1        ; Retrieve 'N-1' again
+           lsl.l    #2,d1           ; Each answer entry is 4 bytes long
+           move.l   d0,4(a4,d1.l)   ; Store an answer in the table
+           move.l   4(a7),d0        ; N-1 yet again
+           subq.l   #1,d0           ; Calculate N-2
+           bsr.s    Fibonacci       ; Work out Fibonacci(N-2)
+FRET_3     add.l    (a7)+,D0        ; Add Fibonacci(N-1) to Fibonacci(N-2)
+           adda.l   4,a7            ; Clear original N-1 off of the stack
+           rts                      ; And return
+
+answers    dc.l     1               ; Fib(0) = 1;
+           dc.l     1               ; Fib(1) = 1;
+           ds.l     999             ; Room for fib(2) to fib(1000)

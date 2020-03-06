@@ -1,0 +1,138 @@
+
+; Undefined Labels
+;	 ahit0
+;	 afun0_0
+
+; Labels for External Use
+;	 wst0
+;	 wd0
+;	 ww0_0
+;	 ww0_1
+
+SYS_SPR  dc.w	   0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37
+
+txt0	 dc.w	   txt0_e-2-txt0
+	 dc.b	   "X"
+txt0_e	 ds.b	   0
+	 ds.w	   0
+
+txt1	 dc.w	   txt1_e-2-txt1
+	 dc.b	   "Application Window Hit Test 2"
+txt1_e	 ds.b	   0
+	 ds.w	   0
+
+app_list0
+	 dc.w	   appw0-*
+	 dc.w	   0
+
+appw0
+	 dc.w	   192	     xsize
+	 dc.w	   119	     ysize
+	 dc.w	   4	     xorg
+	 dc.w	   18	     yorg
+	 dc.w	   256	     flag
+	 dc.w	   1	     borw
+	 dc.w	   0	     borc
+	 dc.w	   7	     papr
+	 dc.w	   0	     pspr *
+	 dc.w	   0	     setr *
+	 dc.w	   0	     draw *
+	 dc.w	   ahit0-*   hit *
+	 dc.w	   0	     cntrl *
+	 dc.w	   0	     nxsc
+	 dc.w	   0	     nysc
+	 dc.b	   9	     skey
+	 dc.b	   0	     spr1
+
+pobl0
+	 dc.w	   138	     xsize
+	 dc.w	   10	     ysize
+	 dc.w	   2	     xorg
+	 dc.w	   2	     yorg
+	 dc.b	   0	     type
+	 dc.b	   0	     spar
+	 dc.l	   0	     Ink, xcsize,ycsize
+	 dc.w	   txt1-*    pobj *
+	 dc.w	   -1
+
+infw0
+	 dc.w	   200	     xsize
+	 dc.w	   16	     ysize
+	 dc.w	   0	     xorg
+	 dc.w	   0	     yorg
+	 dc.w	   0	     flag
+	 dc.w	   0	     borw
+	 dc.w	   526	     borc
+	 dc.w	   92	     papr
+	 dc.w	   pobl0-*   pobl *
+	 dc.w	   -1	     end
+
+
+litm0
+	 dc.w	   10,10     xsize, ysize
+	 dc.w	   186,3     xorg, yorg
+	 dc.b	   0,0	     xjst, yjst
+	 dc.b	   0,3	     type, skey
+	 dc.w	   txt0-*    pobj *
+	 dc.w	   0	     item
+	 dc.w	   afun0_0-* pact *
+	 dc.w	   -1	     end
+
+
+litm1
+	 dc.w	   16404,12  xsize, ysize
+	 dc.w	   0,0	     xorg, yorg
+	 dc.b	   0,0	     xjst, yjst
+	 dc.b	   0,0	     type, skey
+	 dc.w	   0	     pobj *
+	 dc.w	   0	     item
+	 dc.w	   0	     pact *
+	 dc.w	   -1	     end
+
+
+wd0
+	 dc.w	   200	     xsize
+	 dc.w	   140	     ysize
+	 dc.w	   0	     xorg
+	 dc.w	   0	     yorg
+	 dc.w	   258	     flag
+	 dc.w	   1	     borw
+	 dc.w	   0	     borc
+	 dc.w	   7	     papr
+	 dc.w	   0	     sprt *
+	 dc.w	   1	     curw
+	 dc.w	   0	     curc
+	 dc.w	   7	     uback
+	 dc.w	   255	     uink
+	 dc.w	   0	     ublob *
+	 dc.w	   0	     upatt *
+	 dc.w	   7	     aback
+	 dc.w	   0	     aink
+	 dc.w	   0	     ablob *
+	 dc.w	   0	     apatt *
+	 dc.w	   4	     sback
+	 dc.w	   0	     sink
+	 dc.w	   0	     sblob *
+	 dc.w	   0	     spatt *
+	 dc.w	   0	     help
+	 dc.w	   200	     xsize
+	 dc.w	   140	     ysize
+	 dc.w	   infw0-*   pinfo *
+	 dc.w	   litm0-*   plitem *
+	 dc.w	   app_list0-*	       pappl *
+	 dc.w	   16384     xsize
+	 dc.w	   12	     ysize
+	 dc.w	   0	     pinfo *
+	 dc.w	   litm1-*   plitem *
+	 dc.w	   0	     pappl *
+	 dc.w	   -1
+
+; Sizes
+ww0_0	 equ	   290
+ww0_1	 equ	   148
+
+; Status Areas
+wst0
+	 ds.b	   65
+wst0_e	 ds.b	   0
+	 ds.w	   0

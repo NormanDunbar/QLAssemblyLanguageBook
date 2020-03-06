@@ -1,0 +1,263 @@
+	bra.s start
+	dc.l  0
+	dc.w  $4afb
+
+fname	dc.w  fname_e-fname-2
+	dc.b  "Application Window Hit Test 2"
+fname_e ds.b  0
+	ds.w  0
+
+; We need the various equates files etc.
+
+	in win1_georgegwilt_peass_keys_pe
+	in win1_georgegwilt_peass_qdos_pt
+	in win1_georgegwilt_peass_keys_wwork
+	in win1_georgegwilt_peass_keys_wstatus
+	in win1_georgegwilt_peass_keys_wman
+	in win1_georgegwilt_peass_keys_wdef
+
+id	equ 0			; Offset to channel id storage
+wmvec	equ 4			; Offset to WMAN vector storage
+slimit	equ 8			; Offset to storage for return from IOP_FLIM.
+;				  The storage is X-size, Y-size, X-org, Y-org - all words.
+start	lea (a6,a4.l),a6	; Make A6 point to the job's dataspace
+	bsr op_con		; Open a con channel
+	move.l a0,id(a6)	; And store the channel id
+	moveq #iop_pinf,d0	; Trap to get Pointer Information
+	moveq #-1,d3		; Timeout
+	trap #3 		; Do it
+	tst.l d0		; Is ptr_gen present?
+	bne sui 		; No, bale out via SUI
+	move.l a1,wmvec(a6)	; Yes, store the WMAN vector
+	beq sui 		; Oops! WMAN wasn't actually found
+
+flim	movea.l a1,a2		; The WMAN vector is required in A2
+;				  The channel id is already in A0
+	lea slimit(a6),a1	; Result buffer
+	moveq #iop_flim,d0	; Query maximum size of window
+	moveq #0,d2		; D2 is required to be zero
+;				  D3 is the timeout from the above trap #3
+	trap #3 		; Do it (No errors)
+	tst.l d0		; Did it work?
+	bne sui 		; No, exit via SUI
+
+	subi.l #$C0008,(a1)	; Subtract 12 from the width and 8 from the height
+	lea wd0,a3		; Get the address of window definition
+	move.l #ww0_0,d1	; Get the size of the working definition
+	bsr getsp		; Easy PEasy routine to ALCHP memory and set A0
+	movea.l a0,a4		; Which we save in A4
+	lea wst0,a1		; Status area starts here - thanks to SETW
+	movea.l a1,a0		; Copy to A0
+	moveq #wst0_e-wst0-1,d1 ; How many bytes to clear - 1
+
+st_clr	clr.b (a0)+		; Clear one byte
+	dbf d1,st_clr		; Then the remainder
+	movea.l id(a6),a0	; Get the channel id where we need it
+;				  A1 is the status area address from above
+;				  A3 is the window definition address from above
+;				  A4 is the working definition address from GETSP above
+	move.l wd_xmin+wd_rbase(a3),d1 ; Get the minimum dimensions from definition
+	andi.l #$FFF0FFF,d1	; Mask off any scaling factors - as previously described
+	jsr wm_setup(a2)	; Set up the working definition - no errors
+
+	moveq #-1,d1		; We want to draw the window where the pointer is
+	jsr wm_prpos(a2)	; So position it first as a primary window, then
+	jsr wm_wdraw(a2)	; Draw the contents
+wrpt	jsr wm_rptr(a2) 	; Enter the "read pointer" loop in WMAN
+	beq.s no_err		; Since D0 is zero D4 is non zero
+	bra sui 		; An error occurred exit via SUI
+
+no_err	movea.l (a4),a1 	; Status area address
+	btst #pt__can,wsp_weve(a1) ; Check for CANCEL event
+	bne sui 		; Exit
+
+	bra.s wrpt		; No more events, read pointer again
+
+; Loose item action routine
+
+afun0_0 bset  #pt__can,wsp_weve(a1) ; Set the CANCEL event bit
+	moveq #pt__can,d4	  ; And load the CANCEL event number in D4
+	moveq #0,d0		  ; No errors
+	rts			  ; Exit, and cause an exit from wm_rptr too
+
+; Application sub-window hit routine
+
+ahit0	movem.l d1/d3/d5-d7/a0/a4,-(a7) ; Save the workers
+
+	bsr.s apinit		  ; Initialise the sub-window
+	bsr.s ptrpos		  ; Display details of the pointer position
+	bsr.s keystr		  ; Display keystroke
+	bsr events		  ; Prine event details
+
+	movem.l (a7)+,d1/d3/d5-d7/a0/a4 ; Restore the workers
+	moveq #0,d0		  ; No errors
+	rts
+
+
+; Helper - Initialise the sub-window.
+
+apinit	movem.l d1-d2/a1-a2,-(a7) ; We need these registers later
+	moveq #0,d1		  ; D1.W = Application sub window number
+	moveq #0,d2		  ; D2.W = Ink colour
+;				    A4 already set to Working definition
+	jsr wm_swapp(a2)	  ; Set channel id (A0) to the sub window
+	movem.l (a7)+,d1-d2/a1-a2 ; Ptr position & keystroke back again
+	rts
+
+
+; Helper - Display pointer position details.
+
+ptrpos	movem.l d1-d3/a1,-(a7)	  ; These get corrupted here
+	lea ptrx,a1		  ; 'Ptr_x: '
+	bsr.s print		  ; Print it
+
+	move.l (a7),d1		  ; Restore the old D1 again.
+
+	swap d1 		  ; Lo = pointer X, Hi = pointer Y 
+	bsr pr_int2		  ; Print pointer X
+
+	lea ptry,a1		  ; ' Ptr_Y: '
+	bsr.s print		  ; Print it
+
+	movem.l (a7)+,d1-d3/a1	  ; Retrieve other registers
+	bsr.s pr_int2		  ; Print pointer Y
+	rts
+
+
+
+; Helper - Display keystroke
+
+keystr	movem.l d1-d3/a1,-(a7)	  ; These get corrupted here
+	lea keystk,a1		  ; 'Key: '
+	bsr.s print		  ; Print it
+
+	move.l 4(a7),d2 	  ; Retrieve D2
+	cmpi.b #-1,d2		  ; External keystroke?
+	bne.s k_hit		  ; no, try a HIT
+
+	lea keyext,a1		  ; 'External'
+	bra.s k_doit		  ; Print & exit
+
+k_hit	cmpi.b #1,d2		  ; HIT?
+	bne.s k_do		  ; No, try a DO
+
+	lea keyhit,a1		  ; 'HIT'
+	bra.s k_doit		  ; Print & exit
+
+k_do	cmpi.b #2,d2		  ; DO?
+	bne.s k_zero		  ; NO, must be a key code or zero
+
+	lea keydo,a1		  ; 'DO'
+	bra.s k_doit		  ; Print & exit
+
+k_zero	cmpi.b #0,d2		  ; Zero = no key pressed
+	bne.s k_keys		  ; Has to be a key press
+
+	lea keyzero,a1		  ; 'No key'
+	bra.s k_doit		  ; Print & exit
+
+k_keys	move.w d2,d1		  ; Need keystroke in D1.B
+	moveq #io_sbyte,d0
+	moveq #-1,d3
+	trap #3 		  ; Print keystroke
+	bra.s k_done		  ; Exit
+
+k_doit	bsr.s print		  ; Print message
+k_done	movem.l (a7)+,d1-d3/a1	  ; Restore working registers
+	rts
+
+
+; Helper - Print event details
+
+events	movem.l d1-d3/a1,-(a7)	  ; Save the usual bunch
+	lea event,a1		  ; 'Event: '
+	bsr.s print		  ; Print message
+	move.w d4,d1		  ; Event number
+	bsr.s pr_int2		  ; Print it
+	movem.l (a7)+,d1-d3/a1	  ; Restore the workers
+	rts
+
+
+; Helper - Print string at (a1) to channel in A0. Then CLS to end of line.
+
+print	move.w ut_mtext,a2	  ; Vector to print string
+	jsr (a2)		  ; Print it
+	movem.l d1/d3/a1,-(a7)	  ; These get corrupted
+	moveq #sd_clrrt,d0	  ; CLS to end of cursor line
+	moveq #-1,d3
+	trap #3 		  ; Do it
+	movem.l (a7)+,d1/d3/a1	  ; Restore
+	rts
+
+
+; Helper - Print word int at (a1) to channel in A0.
+
+pr_int	move.w (a1),d1		  ; Get word to print
+pr_int2 move.w ut_mint,a2	  ; Print word int vector
+	jsr (a2)		  ; Print it
+	rts
+
+
+; Assorted TEXT messages etc follow.
+
+ptrx	dc.w ptrx_e-ptrx-2
+	dc.b 'Ptr_X: '
+ptrx_e	equ *
+
+ptry	dc.w ptry_e-ptry-2
+	dc.b ' Ptr_Y: '
+ptry_e	equ *
+
+keystk	dc.w keystk_e-keystk-2
+	dc.b $0a
+	dc.b 'Key: '
+keystk_e equ *
+
+keyhit	dc.w keyhit_e-keyhit-2
+	dc.b '1 = HIT'
+keyhit_e equ *
+
+keydo	dc.w keydo_e-keydo-2
+	dc.b '2 = DO'
+keydo_e equ *
+
+keyext	dc.w keyext_e-keyext-2
+	dc.b '-1 = External Keystroke'
+keyext_e equ *
+
+keyzero dc.w keyzero_e-keyzero-2
+	dc.b '0 = No Key Pressed'
+keyzero_e equ *
+
+event	dc.w event_e-event-2
+	dc.b $0a
+	dc.b 'Event: '
+event_e equ *
+
+
+; Various helper routines go here...
+
+con	dc.w con_e-con-2	  ; Size of channel definition
+	dc.b 'con'
+con_e	equ *
+
+op_con	lea  con,a0		  ; We want a console
+	moveq #-1,d1		  ; For this job
+	moveq #0,d3		  ; Timeout
+	moveq #io_open,d0
+	trap #2 		  ; Do it
+	rts
+
+; Pull in our window definition file.
+
+	in  win1_source_qltoday_ApplHitTestWin_2_asm
+
+; We need George's Easy PEasy code next.
+
+	in  win1_georgegwilt_peass_peas_sym_lst
+	lib win1_georgegwilt_peass_peas_bin
+
+; And finally, George's sprites.
+
+	in  win1_georgegwilt_peass_csprc_sym_lst
+	lib win1_georgegwilt_peass_csprc_bin

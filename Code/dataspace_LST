@@ -1,0 +1,503 @@
+00000000                               0 * ta 12,20,40,72; si1; sl1; sr85
+00000000                               2 *======================================================================*
+00000000                               3 * DATASPACE version 1.00					       *
+00000000                               4 *								       *
+00000000                               5 * Copyright Norman Dunbar February 1991.			       *
+00000000                               6 *								       *
+00000000                               7 * Changes a task file's dataspace.                                     *
+00000000                               8 *======================================================================*
+00000000                               9 *								       *
+00000000                              10 * AMENDMENTS							       *
+00000000                              11 *								       *
+00000000                              12 * Buffer flush added so that a file on another disc could be processed *
+00000000                              13 * as testing gave 'files open' error when a disc was changed. It would *
+00000000                              14 * seem that the close routine does not flush out the buffers straight  *
+00000000                              15 * away. Now works fine. 					       *
+00000000                              16 *								       *
+00000000                              17 * Press any key to kill job message added at end. I was using PTR_GEN  *
+00000000                              18 * and WMAN from the Quanta library disc SPECIALS_0 which refresh the   *
+00000000                              19 * screen when a switch between jobs takes place, however, this had the *
+00000000                              20 * effect of clearing out any error messages from the job as it aborted *
+00000000                              21 * The message is now displayed until the user presses any key, then    *
+00000000                              22 * the job ends. 						       *
+00000000                              23 *								       *
+00000000                              24 *======================================================================*
+00000000                              26 *----------------------------------------------------------------------*
+00000000                              27 * EQUATES  Trap #1						       *
+00000000                              28 *----------------------------------------------------------------------*
+00000000                              30 ;mt_frjob   equ     $05 		Force remove job
+00000000                              32 *----------------------------------------------------------------------*
+00000000                              33 * EQUATES  Trap #2						       *
+00000000                              34 *----------------------------------------------------------------------*
+00000000                              36 ;io_open    equ     $01 		Open a channel
+00000000                              37 ;io_close   equ     $02 		Close a channel
+00000000                              39 *----------------------------------------------------------------------*
+00000000                              40 * EQUATES  Trap #3						       *
+00000000                              41 *----------------------------------------------------------------------*
+00000000                              43 ;io_fbyte   equ     $01 		Fetch one byte
+00000000                              44 ;io_fline   equ     $02 		Fetch a line ending in LF
+00000000                              45 ;fs_flush   equ     $41 		Flush a files buffers
+00000000                              46 ;fs_heads   equ     $46 		Set file header
+00000000                              47 ;fs_headr   equ     $47 		Read file header
+00000000                              49 *----------------------------------------------------------------------*
+00000000                              50 * EQUATES  Vectors						       *
+00000000                              51 *----------------------------------------------------------------------*
+00000000                              53 ;ut_con     equ     $C6 		Open a CON_ channel
+00000000                              54 ;ut_err     equ     $CC 		Send a message to channel
+00000000                              55 ;ut_err0    equ     $CA 		Send message to #0 or #1
+00000000                              56 ;ut_mtext   equ     $D0 		Send text to a channel
+00000000                              57 ;cn_ftod    equ     $F0 		Convert float to ascii
+00000000                              59 *----------------------------------------------------------------------*
+00000000                              60 * EQUATES  General						       *
+00000000                              61 *----------------------------------------------------------------------*
+00000000                              63 ftyp	   equ	   $05		       Offset to file type
+00000000                              64 fdat	   equ	   $06		       Offset to file dataspace
+00000000                              66 me	   equ	  -$01		       This job
+00000000                              67 linefeed   equ	   $0A		       Ascii line feed
+00000000                              68 timeout    equ	  -$01		       Infinite timeout
+00000000                              69 black	   equ	   $00		       Black ink/paper code
+00000000                              70 red	   equ	   $02		       Red ditto
+00000000                              71 green	   equ	   $04		       Green ditto
+00000000                              72 white	   equ	   $06		       White ditto
+00000000                              74 *======================================================================*
+00000000                              75 * Here be dragons, well the start of the code anyway.....	       *
+00000000                              76 *======================================================================*
+00000000 601E                         78 start	   bra.s   dataspace	       Jump over header
+00000002 0000 0000                    79 	   dc.l    0		       Make sure $4AFB is at offset 6
+00000006 4AFB                         80 	   dc.w    $4AFB	       ID word
+00000008 0016                         82 name	   dc.w    22		       Length of name
+0000000A 4461 7461 7370 6163 6520     83 	   dc.b    'Dataspace Version 1.00'
+         5665 7273 696F 6E20 312E        
+         3030                            
+00000020                              85 *----------------------------------------------------------------------*
+00000020                              86 * Open a console window 					       *
+00000020                              87 *----------------------------------------------------------------------*
+00000020 3478 00C6                    89 dataspace  move.w  ut_con,a2
+00000024 43FA 01D6                    90 	   lea.l   con_def,a1	       Console definition block
+00000028 4E92                         91 	   jsr	   (a2) 	       Open a CON_ channel
+0000002A 4A80                         92 	   tst.l   d0		       Check for errors
+0000002C 6600 01AC                    93 	   bne	   job_end	       And bale out if found
+00000030 2E08                         94 	   move.l  a0,d7	       Store console id
+00000032                              96 *----------------------------------------------------------------------*
+00000032                              97 * Console is open, sign on					       *
+00000032                              98 *----------------------------------------------------------------------*
+00000032 43FA FFD4                   100 sign_on    lea.l   name,a1	       Job name
+00000036 6100 0176                   101 	   bsr	   write_text	       Print job name
+0000003A 43FA 01CC                   102 	   lea.l   copyright,a1        Copyright message
+0000003E 6100 016E                   103 	   bsr	   write_text	       And copyright message
+00000042                             105 *----------------------------------------------------------------------*
+00000042                             106 * Main loop, keep asking for a filename until ENTER only pressed       *
+00000042                             107 *								       *
+00000042                             108 * First prompt for filename					       *
+00000042                             109 *----------------------------------------------------------------------*
+00000042 2047                        111 main_loop  move.l  d7,a0	       Console id
+00000044 43FA 01E8                   112 	   lea.l   mess_1,a1
+00000048 6100 0164                   113 	   bsr	   write_text	       Enter filename message
+0000004C 6100 0192                   114 	   bsr	   get_text	       Get filename
+00000050                             116 *----------------------------------------------------------------------*
+00000050                             117 * Then check if it was only ENTER and if so exit the job	       *
+00000050                             118 *----------------------------------------------------------------------*
+00000050 4A41                        120 check_end  tst.w   d1		       Finished ?
+00000052 6700 0170                   121 	   beq	   any_key	       Yes
+00000056                             123 *----------------------------------------------------------------------*
+00000056                             124 * Otherwise attempt to open the file				       *
+00000056                             125 *----------------------------------------------------------------------*
+00000056 7001                        127 open_file  moveq   #io_open,d0	       Open file
+00000058 72FF                        128 	   moveq   #me,d1	       For this job
+0000005A 7600                        129 	   moveq   #0,d3	       For input
+0000005C 2049                        130 	   move.l  a1,a0	       File name is in buffer
+0000005E 4E42                        131 	   trap    #2
+00000060 4A80                        132 	   tst.l   d0		       Check errors
+00000062 6724                        133 	   beq.s   read_head	       Open was ok
+00000064                             135 *----------------------------------------------------------------------*
+00000064                             136 * Cannot open the file, print its name and the error message	       *
+00000064                             137 *----------------------------------------------------------------------*
+00000064 2F00                        139 cant_open  move.l  d0,-(a7)	       Store error code
+00000066 43FA 01F2                   140 	   lea.l   mess_2,a1	       Cannot open message
+0000006A 6100 0142                   141 	   bsr	   write_text	       Print it
+0000006E 43FA 0354                   142 	   lea.l   input,a1	       File name
+00000072 6100 013A                   143 	   bsr	   write_text	       Print filename
+00000076 43FA 0242                   144 	   lea.l   mess_6,a1	       A colon
+0000007A 6100 0132                   145 	   bsr	   write_text	       Print it
+0000007E 201F                        146 	   move.l  (a7)+,d0	       Get error code
+00000080 3478 00CC                   147 	   move.w  ut_err,a2
+00000084 4E92                        148 	   jsr	   (a2) 	       Print error message
+00000086                             150 *----------------------------------------------------------------------*
+00000086                             151 * Note, D0 is preserved by UT_ERR, so cannot check for errors	       *
+00000086                             152 *----------------------------------------------------------------------*
+00000086 60BA                        154 	   bra.s   main_loop
+00000088                             156 *----------------------------------------------------------------------*
+00000088                             157 * File has been opened ok, read the file header 		       *
+00000088                             158 *----------------------------------------------------------------------*
+00000088 2C08                        160 read_head  move.l  a0,d6	       Store file id
+0000008A 7047                        161 	   moveq   #fs_headr,d0
+0000008C 7440                        162 	   moveq   #64,d2	       Size of buffer
+0000008E 76FF                        163 	   moveq   #timeout,d3	       Timeout
+00000090 43FA 02F2                   164 	   lea.l   buffer,a1	       Put header here
+00000094 2A49                        165 	   move.l  a1,a5	       Store buffer
+00000096 4E43                        166 	   trap    #3		       Go get the file header
+00000098 4A80                        167 	   tst.l   d0		       Check for errors
+0000009A 6716                        168 	   beq.s   check_exec	       none
+0000009C                             170 *----------------------------------------------------------------------*
+0000009C                             171 * Cannot read file header, say so and print the error message	       *
+0000009C                             172 *----------------------------------------------------------------------*
+0000009C 43FA 01CA                   174 cant_read  lea.l   mess_3,a1	       Cannot read header message
+000000A0 2F00                        175 	   move.l  d0,-(a7)	       Store error code
+000000A2 6100 010A                   176 	   bsr	   write_text	       Print message
+000000A6 201F                        177 	   move.l  (a7)+,d0	       Get error code
+000000A8 3478 00CC                   178 	   move.w  ut_err,a2
+000000AC 4E92                        179 	   jsr	   (a2) 	       Print error message
+000000AE 6000 00F4                   180 	   bra	   main_end	       Skip the rest of the loop
+000000B2                             182 *----------------------------------------------------------------------*
+000000B2                             183 * Header has been read ok, check if the file is EXECable	       *
+000000B2                             184 *----------------------------------------------------------------------*
+000000B2 0C2D 0001 0005              186 check_exec cmpi.b  #1,ftyp(a5)	       Check file is EXECable
+000000B8 6714                        187 	   beq.s   current	       It is
+000000BA                             189 *----------------------------------------------------------------------*
+000000BA                             190 * File is not EXECable, print an error message			       *
+000000BA                             191 *----------------------------------------------------------------------*
+000000BA 43FA 0308                   193 not_exec   lea.l   input,a1	       Filename
+000000BE 6100 00EE                   194 	   bsr	   write_text	       Print filename
+000000C2 43FA 01C0                   195 	   lea.l   mess_4,a1	       Not an EXECable file message
+000000C6 6100 00E6                   196 	   bsr	   write_text	       Print the message
+000000CA 6000 00D8                   197 	   bra	   main_end	       Skip rest of the loop
+000000CE                             199 *----------------------------------------------------------------------*
+000000CE                             200 * File is EXECable, print its current dataspace 		       *
+000000CE                             201 *----------------------------------------------------------------------*
+000000CE 43FA 01D0                   203 current    lea.l   mess_5,a1	       Current dataspace is message
+000000D2 6100 00DA                   204 	   bsr	   write_text	       Print it
+000000D6                             206 *----------------------------------------------------------------------*
+000000D6                             207 * Now get the current dataspace & convert it to ASCII		       *
+000000D6                             208 *----------------------------------------------------------------------*
+000000D6 262D 0006                   210 	   move.l  fdat(a5),d3	       D3.L is dataspace
+000000DA 43FA 02EA                   211 	   lea.l   input+2,a1	       A1.L is output buffer
+000000DE 45FA 0310                   212 	   lea.l   tens_table,a2       Powers of 10
+000000E2 7200                        213 	   moveq   #0,d1	       D1.W is digit counter (all digits)
+000000E4 241A                        215 next_digit move.l  (a2)+,d2	       D2.L is current power of 10
+000000E6 671E                        216 	   beq.s   all_done	       But zero is end of table
+000000E8 4200                        217 	   clr.b   d0		       D0.B is current digit
+000000EA 9682                        219 digit_loop sub.l   d2,d3	       Subtract the current power of 10
+000000EC 6D04                        220 	   blt.s   buff_digit	       Too far
+000000EE 5200                        221 	   addq.b  #1,d0	       Increase current digit
+000000F0 60F8                        222 	   bra.s   digit_loop	       And try again
+000000F2 D682                        224 buff_digit add.l   d2,d3	       Correct for the overflow
+000000F4 4A00                        225 	   tst.b   d0		       Is this a zero ?
+000000F6 6604                        226 	   bne.s   not_a_zero	       No
+000000F8 4A41                        227 	   tst.w   d1		       Yes, is it a leading zero ?
+000000FA 67E8                        228 	   beq.s   next_digit	       Yes, ignore it
+000000FC 0600 0030                   230 not_a_zero addi.b  #'0',d0	       Convert to ASCII
+00000100 12C0                        231 	   move.b  d0,(a1)+	       Store in buffer
+00000102 5241                        232 	   addq.w  #1,d1	       Increment total digits
+00000104 60DE                        233 	   bra.s   next_digit	       And do the rest
+00000106                             235 *----------------------------------------------------------------------*
+00000106                             236 * Check for a result of zero. In this case force a '0' to be printed   *
+00000106                             237 *----------------------------------------------------------------------*
+00000106 4A41                        239 all_done   tst.w   d1		       Any digits found ?
+00000108 6606                        240 	   bne.s   not_zero	       yes
+0000010A 12BC 0030                   241 	   move.b  #'0',(a1)	       Store a zero
+0000010E 7201                        242 	   moveq   #1,d1	       And set the count
+00000110 43FA 02B2                   244 not_zero   lea.l   input,a1	       The buffer
+00000114 3281                        245 	   move.w  d1,(a1)	       Store character count
+00000116                             247 *----------------------------------------------------------------------*
+00000116                             248 * Dataspace is converted, print it out				       *
+00000116                             249 *----------------------------------------------------------------------*
+00000116 6100 0096                   251 	   bsr	   write_text	       Print old dataspace
+0000011A                             253 *----------------------------------------------------------------------*
+0000011A                             254 * Now prompt for, and read in the required new dataspace	       *
+0000011A                             255 *----------------------------------------------------------------------*
+0000011A 43FA 01C0                   257 new	   lea.l   mess_8,a1	       New dataspace message
+0000011E 6100 008E                   258 	   bsr	   write_text	       Print it
+00000122 6100 00BC                   259 	   bsr	   get_text	       Get new dataspace
+00000126 4A41                        260 	   tst.w   d1		       No text ?
+00000128 67F0                        261 	   beq.s   new		       Try again
+0000012A 3019                        262 	   move.w  (a1)+,d0	       Get text length
+0000012C 5340                        263 	   subq.w  #1,d0	       Adjust for dbra
+0000012E                             265 *----------------------------------------------------------------------*
+0000012E                             266 * Convert from ASCII into binary, ignore leadin (any) spaces and stop  *
+0000012E                             267 * if a 'K' or 'k' is detected. Reject all other non-digit characters   *
+0000012E                             268 *----------------------------------------------------------------------*
+0000012E 7800                        270 convert    moveq   #0,d4	       Needs to be a long word
+00000130 2A04                        271 	   move.l  d4,d5	       D5 is total so far
+00000132 1819                        273 conv_next  move.b  (a1)+,d4	       Get a byte
+00000134 0C04 0020                   274 	   cmpi.b  #' ',d4	       Is it a space ?
+00000138 6734                        275 	   beq.s   try_next	       Yes, ignore it
+0000013A 0C04 006B                   276 	   cmpi.b  #'k',d4	       Is it 'k'
+0000013E 6606                        277 	   bne.s   try_K	       no
+00000140 E585                        279 mul_1024   asl.l   #2,d5	       Yes, multiply by 1024
+00000142 E185                        280 	   asl.l   #8,d5	       Can't do it in one go
+00000144 602C                        281 	   bra.s   make_even	       And exit
+00000146 0C04 004B                   283 try_K	   cmpi.b  #'K',d4	       Try uppercase
+0000014A 67F4                        284 	   beq.s   mul_1024	       Yes
+0000014C 0C04 0030                   286 	   cmpi.b  #'0',d4	       Is it a digit ?
+00000150 6506                        287 	   bcs.s   invalid	       No
+00000152 0C04 0039                   288 	   cmpi.b  #'9',d4	       But it might be
+00000156 6308                        289 	   bls.s   mul_10	       Yes it is
+00000158                             291 *----------------------------------------------------------------------*
+00000158                             292 * An invalid digit has been detected, print error message & try again  *
+00000158                             293 *----------------------------------------------------------------------*
+00000158 43FA 01CE                   295 invalid    lea.l   mess_10,a1	       Invalid digit message
+0000015C 6150                        296 	   bsr.s   write_text	       Print it
+0000015E 60BA                        297 	   bra.s   new		       try again
+00000160                             299 *----------------------------------------------------------------------*
+00000160                             300 * Multiply D5.L by 10 and add in the digit just read		       *
+00000160                             301 *----------------------------------------------------------------------*
+00000160 E385                        303 mul_10	   asl.l   #1,d5	       D5 = D5 * 2
+00000162 2605                        304 	   move.l  d5,d3	       Store for now
+00000164 E585                        305 	   asl.l   #2,d5	       Now D5 = D5 * 8
+00000166 DA83                        306 	   add.l   d3,d5	       And finally D5 = D5 * 10
+00000168 0404 0030                   307 	   subi.b  #'0',d4	       Convert byte to (long) binary
+0000016C DA84                        308 	   add.l   d4,d5	       Total = (total * 10) + digit
+0000016E 51C8 FFC2                   310 try_next   dbra    d0,conv_next        Do rest of digits
+00000172                             312 *----------------------------------------------------------------------*
+00000172                             313 * When finished, the value must be even 			       *
+00000172                             314 *----------------------------------------------------------------------*
+00000172 5285                        316 make_even  addq.l  #1,d5	       Prepare to make even
+00000174 0885 0000                   317 	   bclr    #0,d5	       Make dataspace even
+00000178                             319 *----------------------------------------------------------------------*
+00000178                             320 * Now load the header with the new dataspace and set it 	       *
+00000178                             321 *----------------------------------------------------------------------*
+00000178 2B45 0006                   323 set_head   move.l  d5,fdat(a5)	       Store in the header
+0000017C 7046                        324 	   moveq   #fs_heads,d0        Set the file header
+0000017E 76FF                        325 	   moveq   #timeout,d3	       Timeout
+00000180 2046                        326 	   move.l  d6,a0	       File id
+00000182 224D                        327 	   move.l  a5,a1	       File header
+00000184 4E43                        328 	   trap    #3		       Go set it
+00000186 4A80                        329 	   tst.l   d0		       Any errors ?
+00000188 660A                        330 	   bne.s   not_set	       Yes
+0000018A                             332 *----------------------------------------------------------------------*
+0000018A                             333 * Now flush out the file buffers, so that if I change discs I have     *
+0000018A                             334 * written the header to the current disc. Cannot detect the QDOS error *
+0000018A                             335 * READ/WRITE failed (try removing the disc and it won't fail or        *
+0000018A                             336 * produce an error code). It might print a message if it can find an   *
+0000018A                             337 * open command channel which is not in use. I got it when testing via  *
+0000018A                             338 * a monitor but not while running on its own.			       *
+0000018A                             339 *----------------------------------------------------------------------*
+0000018A 7041                        341 flush	   moveq   #fs_flush,d0        Prepare to flush the buffer
+0000018C 76FF                        342 	   moveq   #timeout,d3	       This could take all day
+0000018E 4E43                        343 	   trap    #3		       But do it anyway
+00000190 4A80                        344 	   tst.l   d0		       And check for errors
+00000192 6710                        345 	   beq.s   main_end	       None, do the next file
+00000194                             347 *----------------------------------------------------------------------*
+00000194                             348 * Header not set or flush failed, print error message		       *
+00000194                             349 *----------------------------------------------------------------------*
+00000194 2F00                        351 not_set    move.l  d0,-(a7)	       Store error code
+00000196 43FA 0128                   352 	   lea.l   mess_7,a1	       Cannot set header message
+0000019A 6112                        353 	   bsr.s   write_text	       Print it
+0000019C 201F                        354 	   move.l  (a7)+,d0	       Get error code
+0000019E 3478 00CC                   355 	   move.w  ut_err,a2
+000001A2 4E92                        356 	   jsr	   (a2) 	       Print error message
+000001A4                             358 *----------------------------------------------------------------------*
+000001A4                             359 * Can't trap errors in UT_ERR as D0 is preserved.                      *
+000001A4                             360 * Close the file & loop to the start				       *
+000001A4                             361 *----------------------------------------------------------------------*
+000001A4 2046                        363 main_end   move.l  d6,a0	       File id for close
+000001A6 7002                        364 	   moveq   #io_close,d0
+000001A8 4E42                        365 	   trap    #2		       Close the file
+000001AA 6000 FE96                   366 	   bra	   main_loop	       And see if more to be done
+000001AE                             368 *======================================================================*
+000001AE                             369 * Here be subroutines. (What no dragons ?)			       *
+000001AE                             370 *======================================================================*
+000001AE                             372 *----------------------------------------------------------------------*
+000001AE                             373 * Subroutine to print text to screen				       *
+000001AE                             374 *								       *
+000001AE                             375 * ENTRY 							       *
+000001AE                             376 *								       *
+000001AE                             377 * D7.L = Channel id						       *
+000001AE                             378 * A1.L = Pointer to text to print (Word then bytes)		       *
+000001AE                             379 *								       *
+000001AE                             380 * EXIT								       *
+000001AE                             381 *								       *
+000001AE                             382 * A0.L = channel id						       *
+000001AE                             383 *----------------------------------------------------------------------*
+000001AE 3478 00D0                   385 write_text move.w  ut_mtext,a2	       Print text vector
+000001B2 2047                        386 	   move.l  d7,a0	       Channel id
+000001B4 4E92                        387 	   jsr	   (a2) 	       Print it
+000001B6 4A80                        388 	   tst.l   d0		       Check errors
+000001B8 6602                        389 	   bne.s   job_error	       Oops kill job
+000001BA 4E75                        390 	   rts			       Otherwise exit
+000001BC                             392 *----------------------------------------------------------------------*
+000001BC                             393 * A fatal error has occurred, print it, wait for any key and kill job  *
+000001BC                             394 * wait for a key allows WMAN & PTR_GEN users to see the message before *
+000001BC                             395 * WMAN restores the screen.					       *
+000001BC                             396 *----------------------------------------------------------------------*
+000001BC 2047                        398 job_error  move.l  d7,a0	       Get console id
+000001BE 3478 00CA                   399 	   move.w  ut_err0,a2	       Print error text vector
+000001C2 4E92                        400 	   jsr	   (a2) 	       Print to #0
+000001C4 2047                        402 any_key    move.l  d7,a0	       In case entry is here
+000001C6 43FA 0192                   403 	   lea.l   mess_12,a1	       Press any key message
+000001CA 3478 00D0                   404 	   move.w  ut_mtext,a2	       Don't use WRITE_TEXT in case of errors
+000001CE 4E92                        405 	   jsr	   (a2) 	       Print it
+000001D0 7001                        406 	   moveq   #io_fbyte,d0        Fetch one byte
+000001D2 76FF                        407 	   moveq   #timeout,d3	       Take all day if you like
+000001D4 4E43                        408 	   trap    #3		       Go get it
+000001D6 7002                        409 	   moveq   #io_close,d0
+000001D8 4E42                        410 	   trap    #2		       Close console channel
+000001DA                             412 *----------------------------------------------------------------------*
+000001DA                             413 * This job will self destruct in no time at all 		       *
+000001DA                             414 *----------------------------------------------------------------------*
+000001DA 7005                        416 job_end    moveq   #mt_frjob,d0        Job is about to die
+000001DC 72FF                        417 	   moveq   #me,d1	       And it is this job
+000001DE 4E41                        418 	   trap    #1		       RIP (there is not return)
+000001E0                             420 *----------------------------------------------------------------------*
+000001E0                             421 * Subroutine to get some text from the user			       *
+000001E0                             422 *								       *
+000001E0                             423 * ENTRY 							       *
+000001E0                             424 *								       *
+000001E0                             425 * D7.L = channel id						       *
+000001E0                             426 *								       *
+000001E0                             427 * EXIT								       *
+000001E0                             428 *								       *
+000001E0                             429 * D1.W = number of bytes read					       *
+000001E0                             430 * A0.L = channel id						       *
+000001E0                             431 * A1.L = start of buffer (word then bytes)			       *
+000001E0                             432 *----------------------------------------------------------------------*
+000001E0 43FA 01E2                   434 get_text   lea.l   input,a1	       Buffer for the text
+000001E4 2F09                        435 	   move.l  a1,-(a7)	       Store it
+000001E6 5489                        436 	   addq.l  #2,a1	       Leave room for the length word
+000001E8 7002                        437 	   moveq   #io_fline,d0
+000001EA 742A                        438 	   moveq   #42,d2	       Maximum buffer size
+000001EC 76FF                        439 	   moveq   #timeout,d3	       Take as long as you like
+000001EE 4E43                        440 	   trap    #3		       Get some text
+000001F0 4A80                        441 	   tst.l   d0		       Check for errors
+000001F2 66C8                        442 	   bne.s   job_error	       Bale out (stack will be ok)
+000001F4 225F                        443 	   move.l  (a7)+,a1	       Get buffer start
+000001F6 5341                        444 	   subq.w  #1,d1	       Remove the line feed
+000001F8 3281                        445 	   move.w  d1,(a1)	       Store text length
+000001FA 4E75                        446 	   rts			       Exit
+000001FC                             448 *======================================================================*
+000001FC                             449 * Here be data (still no dragons ?)				       *
+000001FC                             450 *======================================================================*
+000001FC                             452 *----------------------------------------------------------------------*
+000001FC                             453 * Definition block for my console channel			       *
+000001FC                             454 *----------------------------------------------------------------------*
+000001FC 02                          456 con_def    dc.b    red		       Border colour
+000001FD 02                          457 	   dc.b    $02		       Border width
+000001FE 04                          458 	   dc.b    green	       Paper & strip colour
+000001FF 00                          459 	   dc.b    black	       Ink colour
+00000200 01C0                        460 	   dc.w    $01C0	       Width = 448
+00000202 003C                        461 	   dc.w    $003C	       Height = 60
+00000204 0020                        462 	   dc.w    $0020	       X position = 32
+00000206 0010                        463 	   dc.w    $0010	       Y position = 16
+00000208                             465 *----------------------------------------------------------------------*
+00000208                             466 * Copyright message, so the world knows my name 		       *
+00000208                             467 *----------------------------------------------------------------------*
+00000208 0024                        469 copyright  dc.w    copy_end-copyright-2
+0000020A 0A                          470 	   dc.b    linefeed
+0000020B 436F 7079 7269 6768 7420    471 	   dc.b    'Copyright Norman Dunbar, Jan 1991.'
+         4E6F 726D 616E 2044 756E        
+         6261                            
+0000022D 0A                          472 	   dc.b    linefeed
+0000022E                             473 copy_end
+0000022E                             475 *----------------------------------------------------------------------*
+0000022E                             476 * Various prompts & error messages				       *
+0000022E                             477 *----------------------------------------------------------------------*
+0000022E 002A                        479 mess_1	   dc.w    end_1-mess_1-2
+00000230 0A                          480 	   dc.b    linefeed
+00000231 456E 7465 7220 6669 6C65    481 	   dc.b    'Enter filename'
+         6E61 6D65                       
+0000023F 0A                          482 	   dc.b    linefeed
+00000240 6F72 2045 4E54 4552 206F    483 	   dc.b    'or ENTER only to finish : '
+         6E6C 7920 746F 2066 696E        
+         6973                            
+0000025A                             484 end_1
+0000025A 000C                        486 mess_2	   dc.w    end_2-mess_2-2
+0000025C 4361 6E6E 6F74 206F 7065    487 	   dc.b    'Cannot open '
+         6E20                            
+00000268                             488 end_2
+00000268 001A                        490 mess_3	   dc.w    end_3-mess_3-2
+0000026A 4361 6E6E 6F74 2072 6561    491 	   dc.b    'Cannot read file header : '
+         6420 6669 6C65 2068 6561        
+         6465                            
+00000284                             492 end_3
+00000284 001A                        494 mess_4	   dc.w    end_4-mess_4-2
+00000286 2069 7320 6E6F 7420 616E    495 	   dc.b    ' is not an EXECable file'
+         2045 5845 4361 626C 6520        
+         6669                            
+0000029E 0A                          496 	   dc.b    linefeed
+0000029F                             497 end_4
+0000029F 00                          498 
+000002A0 0018                        499 mess_5	   dc.w    end_5-mess_5-2
+000002A2 4375 7272 656E 7420 6461    500 	   dc.b    'Current dataspace is : '
+         7461 7370 6163 6520 6973        
+         203A                            
+000002B9                             501 end_5
+000002B9 00                          502 
+000002BA 0004                        503 mess_6	   dc.w    end_6-mess_6-2
+000002BC 203A 20                     504 	   dc.b    ' : '
+000002BF                             505 end_6
+000002BF 00                          506 
+000002C0 001A                        507 mess_7	   dc.w    end_7-mess_7-2
+000002C2 4361 6E6E 6F74 2073 6574    508 	   dc.b    'Cannot set file header : '
+         2066 696C 6520 6865 6164        
+         6572                            
+000002DB                             509 end_7
+000002DB 00                          510 
+000002DC 0040                        511 mess_8	   dc.w    end_8-mess_8-2
+000002DE 0A                          512 	   dc.b    linefeed
+000002DF 456E 7465 7220 6E65 7720    513 	   dc.b    'Enter new dataspace in bytes, or'
+         6461 7461 7370 6163 6520        
+         696E                            
+000002FF 0A                          514 	   dc.b    linefeed
+00000300 656E 6420 7769 7468 2022    515 	   dc.b    'end with "K" for kilobytes : '
+         4B22 2066 6F72 206B 696C        
+         6F62                            
+0000031D                             516 end_8
+0000031D 00                          517 
+0000031E 0008                        518 mess_9	   dc.w    end_9-mess_9-2
+00000320 2062 7974 6573              519 	   dc.b    ' bytes'
+00000326 0A                          520 	   dc.b    linefeed
+00000327                             521 end_9
+00000327 00                          522 
+00000328 001E                        523 mess_10    dc.w    end_10-mess_10-2
+0000032A 496E 7661 6C69 6420 6469    524 	   dc.b    'Invalid digit found in input'
+         6769 7420 666F 756E 6420        
+         696E                            
+00000346 0A                          525 	   dc.b    linefeed
+00000347                             526 end_10
+00000347 00                          527 
+00000348 0010                        528 mess_11    dc.w    end_11-mess_11-2
+0000034A 4461 7461 7370 6163 6520    529 	   dc.b    'Dataspace set.'
+         7365 742E                       
+00000358 0A                          530 	   dc.b    linefeed
+00000359                             531 end_11
+00000359 00                          532 
+0000035A 0028                        533 mess_12    dc.w    end_12-mess_12-2
+0000035C 0A                          534 	   dc.b    linefeed
+0000035D 476F 6F64 6279 652C 2070    535 	   dc.b    'Goodbye, press any key to kill job.....'
+         7265 7373 2061 6E79 206B        
+         6579                            
+00000384                             536 end_12
+00000384                             538 *----------------------------------------------------------------------*
+00000384                             539 * Two buffer areas, one for the file header & one for user input       *
+00000384                             540 * note how sneaky I have been, by using DS.W I have forced them both   *
+00000384                             541 * to be word aligned. If I had used DC.B they might not have been, and *
+00000384                             542 * I would be bound to get an address exception sometime. (it happened) *
+00000384                             543 *----------------------------------------------------------------------*
+00000384 0000 0000 0000 0000 0000    545 buffer	   ds.w    32		       Buffer is 64 bytes maximum
+         0000 0000 0000 0000 0000        
+         0000                            
+000003C4 0000 0000 0000 0000 0000    546 input	   ds.w    22		       Size = 41 + ENTER + word count
+         0000 0000 0000 0000 0000        
+         0000                            
+000003F0                             548 *----------------------------------------------------------------------*
+000003F0                             549 * A table of all powers of ten, from 9 to 0. This corresponds to the   *
+000003F0                             550 * values used when converting an UNSIGNED long word to ASCII.	       *
+000003F0                             551 * 2^31 = 2,147,483,648						       *
+000003F0                             552 * 10^9 = 1,000,000,000 so is a big enough 'highest' power to use       *
+000003F0                             553 *----------------------------------------------------------------------*
+000003F0 3B9A CA00                   555 tens_table dc.l    1000000000	       10 ^ 9
+000003F4 05F5 E100                   556 	   dc.l    100000000	       10 ^ 8
+000003F8 0098 9680                   557 	   dc.l    10000000	       10 ^ 7
+000003FC 000F 4240                   558 	   dc.l    1000000	       10 ^ 6
+00000400 0001 86A0                   559 	   dc.l    100000	       10 ^ 5
+00000404 0000 2710                   560 	   dc.l    10000	       10 ^ 4
+00000408 0000 03E8                   561 	   dc.l    1000 	       10 ^ 3
+0000040C 0000 0064                   562 	   dc.l    100		       10 ^ 2
+00000410 0000 000A                   563 	   dc.l    10		       10 ^ 1
+00000414 0000 0001                   564 	   dc.l    1		       10 ^ 0
+00000418 0000 0000                   565 	   dc.l    0		       Table end marker
+0000041C                             567 *----------------------------------------------------------------------*
+0000041C                             568 * STOP PRESS - dragons are extinct. (Unless you live on Kimodo Island) *
+0000041C                             569 *----------------------------------------------------------------------*
+0000041C                             571 	   END
+        No ERRORs         No WARNINGs 
