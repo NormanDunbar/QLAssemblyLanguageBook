@@ -284,7 +284,7 @@ However, relative addressing simply means, relative to where the
       of the loop:
 
 \begin{lstlisting}[firstnumber=1,]
-Start    MOVEQ #1000,D0
+Start    MOVE.W #1000,D0
 Loop     SUBQ #1,D0
          BNE.S Loop(PC)  
 \end{lstlisting}
