@@ -719,7 +719,7 @@ So far, so good. We have defined a list of objects and then gathered
     the menu ordering, that comes next.
 
 The above structure is used to define menu item lists and also index
-    lists. An index is drawn by the \pe{wm\_index} vector (which also draws pan and
+    lists. An index is drawn by the \pe{WM\_INDEX} vector (which also draws pan and
     scroll bars \& arrows -{} if necessary). Indices are best thought of as
     the row and column headings -{} similar to a spreadsheet, for example, when
     columns have letters and rows have numbers to identify them.
@@ -937,7 +937,7 @@ adraw0  jmp wm_index(a2)    ; Vector $34
 adexit  rts        
 \end{lstlisting}
 
-The call to \pe{wm\_index} is not required unless your menu has been
+The call to \pe{WM\_INDEX} is not required unless your menu has been
     defined to have sections and/or index items\footnote{George Gwilt has discovered that anything to do with these index items is not actually implemented in the WMAN code. Looks like Tony Tebby had a good idea, that couldn't be fulfilled.}. What are index items? Think
     of a spreadsheet, each row has a number and each column has a letter.
     These are the index items. Our example is not using index items, however,
@@ -1079,16 +1079,16 @@ D0 should contain zero or an error code and the SR must be set
 
 \begin{note}
 D3, on return from a hit routine, should normally be returned as
-      per its value on entry. It is not used by \pe{wm\_rptr} however, it is used by
-      \pe{wm\_rptrt} (read pointer with return on timeout) from
+      per its value on entry. It is not used by \pe{WM\_RPTR} however, it is used by
+      \pe{WM\_RPTRT} (read pointer with return on timeout) from
  WMAN\program{WMAN} 1.5 onwards. Wm\_rptr ignores the upper
-      word of D3. If your read pointer loop is using the \pe{wm\_rptrt} vector
+      word of D3. If your read pointer loop is using the \pe{WM\_RPTRT} vector
       instead, and you have changed the value of D3 within the hit code, you
       must clear the high word on exit.
 \end{note}
 
 On exit, if D0 is clear and the status (Z) bit is set, control will
-    return to the \pe{wm\_rptr} loop and not to your application's code. To return
+    return to the \pe{WM\_RPTR} loop and not to your application's code. To return
     to your own code, the hit routine needs to set at least one event bit in
     the event vector which can be done by returning a suitable value in D4.B
     on exit.

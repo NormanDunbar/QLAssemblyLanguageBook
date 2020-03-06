@@ -500,12 +500,12 @@ Please note, in the above George picks the smallest window definition as the
         obtained from wd\_xmin + wd\_rbase(a3) and placed in D1.L with the high word
         containing the width and the low word holding the height. Because this definition
         has scaling details embedded in the top nibble of each word, these must be masked
-        out before calling \pe{wm\_setup}.
+        out before calling \pe{WM\_SETUP}.
 
 The same applies if you set D1.L to zero -{} which means \emph{use the
         default (largest) definition} -{} unless the scaling factors are masked
-        off, the call to \pe{wm\_setup} will return, but your window will not display correctly,
-        if at all. This problem also affects the \pe{wm\_fsize} routine which returns the size,
+        off, the call to \pe{WM\_SETUP} will return, but your window will not display correctly,
+        if at all. This problem also affects the \pe{WM\_FSIZE} routine which returns the size,
         in D1.L, for a given definition. You \emph{must} mask off the
         scaling nibbles.
 
@@ -860,7 +860,7 @@ The sleep loose item's action routine is almost as simple, but because the
         item status and redraw it.
 
 The code above starts off by obtaining the correct loose item number and
-        changing its status to indicate that it is available. It then calls \pe{wm\_ldraw} to
+        changing its status to indicate that it is available. It then calls \pe{WM\_LDRAW} to
         redraw only those loose items asking for a status change \& redraw -{} as
         signalled by the value of minus one in D3. This prevents redrawing up to 32 loose
         items which don't need redrawing because nothing has changed.

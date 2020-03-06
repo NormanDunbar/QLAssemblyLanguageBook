@@ -106,7 +106,7 @@ Then, right at the end, line 100, where we include our window definition, change
 
 Save the file. We are done.
 
-Note in the above code, the call to \pe{wm\_swapp}. This sets the channel id in A0
+Note in the above code, the call to \pe{WM\_SWAPP}. This sets the channel id in A0
         to point to the application sub-{}window that we specify in D1. The ink colour is
         set according to the value in D2.W and the \emph{sub-{}window is
         cleared}. If we don't do this call, we might still print to the
@@ -118,7 +118,7 @@ Note in the above code, the call to \pe{wm\_swapp}. This sets the channel id in 
         item, or an information window or some random place in the window.
 
 Obviously if you are running a program that has an application sub-{}window
-        that doesn't have a hit routine, you will still need to call \pe{wm\_swapp} to make sure
+        that doesn't have a hit routine, you will still need to call \pe{WM\_SWAPP} to make sure
         that the channel id in A0 points to where the sub-{}window is on screen -{} assuming
         of course, that you wish to write text to that sub-{}window as part of the
         application.

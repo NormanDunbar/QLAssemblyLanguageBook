@@ -85,9 +85,9 @@ For our current needs, this definition allows us to have a simple
 \section{Application Sub-{}Window Hit Routines}
 
 The hit routine for an application sub-{}window is called from within
-    the \pe{wm\_rptr} call either when you HIT in the window, or when you press the
+    the \pe{WM\_RPTR} call either when you HIT in the window, or when you press the
     selection key for that sub-{}window. Similar to loose item action routines
-    previously discussed, if the code exits with D0 set to zero, the \pe{wm\_rptr}
+    previously discussed, if the code exits with D0 set to zero, the \pe{WM\_RPTR}
     call will resume again -{} in other words, control will not return to your
     own code just yet -{} unless the hit code sets any event bits in the event
     vector. This is slightly different from loose item action routines in this
@@ -127,10 +127,10 @@ Hit routines should exit with D1, D5 -{} D7, A0 and A4 preserved to
     exit.
 
 D3, on return from a hit routine, should normally be returned as per
-    its value on entry. It is not used by \pe{wm\_rptr} however, it is used by
-    \pe{wm\_rptrt} (read pointer with return on timeout) from
+    its value on entry. It is not used by \pe{WM\_RPTR} however, it is used by
+    \pe{WM\_RPTRT} (read pointer with return on timeout) from
  WMAN\program{WMAN} 1.5 onwards. Wm\_rptr ignores the upper
-    word of D3. If your read pointer loop is using the \pe{wm\_rptrt} vector
+    word of D3. If your read pointer loop is using the \pe{WM\_RPTRT} vector
     instead, and you have changed the value of D3 within the hit code, you
     must clear the high word on exit.
 
@@ -142,7 +142,7 @@ It is important to note that WMAN\program{WMAN}  \emph{doesn't} set the event bi
     set.
 
 On exit, if D0 is clear and the status (Z) bit is set, control will
-    return to the \pe{wm\_rptr} loop and not to your application's code. To return
+    return to the \pe{WM\_RPTR} loop and not to your application's code. To return
     to your own code, the hit routine needs to set at least one event bit in
     the event vector.
 
@@ -679,7 +679,7 @@ If we are here, we need to check for any events that may have been
     every event, only the CANCEL event caused by the ESC key being
     pressed.
 
-On return from the \pe{wm\_rptr} call, A0 is the channel id and A4 is the
+On return from the \pe{WM\_RPTR} call, A0 is the channel id and A4 is the
     working definition address.
 
 \begin{lstlisting}[firstnumber=last,caption={ApplTest\_asm - Event Handling}]
@@ -713,7 +713,7 @@ Because we have an application window defined, then the following is
     the default application window hit routine. When you hit the application
     window, or press the TAB key, the following code is executed. The default
     simply sets the registers to show no errors, no events and returns control
-    back to the \pe{wm\_rptr} loop.
+    back to the \pe{WM\_RPTR} loop.
 
 \begin{lstlisting}[firstnumber=last,caption={ApplTest\_asm - Application Window HIT Routine}]
 ; Application sub-window hit routine
