@@ -206,7 +206,7 @@ The 68000 has a large number of addressing modes and these can often
 From here on, you need to be aware that numbers may be in decimal
     format or hexadecimal. All hexadecimal numbers are prefixed with the
     dollar sign (\$) and wherever this is seen in front of a number (or in some
-    cases, what appears to be a word) will be a hexadecimal number. (I will
+    cases, what appears to be a word) it will be a hexadecimal number. (I will
     assume that you are familiar with hex.) A couple of examples of
     hexadecimal numbers are:
 
@@ -224,7 +224,7 @@ Without any further hesitation, lets dive right in with the
 
 This is an easy one to start off with. Register direct addressing
       mode simply means that both the source and the destination in the
-      instruction are registers either data, address or a mixture of
+      instruction are registers; either data, address or a mixture of
       both.
 
 Simple examples are:
@@ -259,14 +259,17 @@ There are two variations to this mode, absolute short and absolute
       to avoid confusion.
 
 \begin{lstlisting}[firstnumber=1,]
-          MOVE.L    $1000,D1    get a long from address $1000
-          MOVE.L    $9000,D1    get a long from address $FFFF9000  
+          MOVE.L    $1000.W,D1    get a long from address $00001000
+          MOVE.L    $9000.W,D1    get a long from address $FFFF9000  
 \end{lstlisting}
 
 The other variation is absolute long, in this case, the address
       given is a full 32 bits long and refers to the actual address in memory
-      -{} there is no ambiguity with absolute long. \lstinline{MOVE.L $123456,D1} -{} gets the
+      -{} there is no ambiguity with absolute long. \lstinline{MOVE.L $123456.L,D1} -{} gets the
       long word at address \$123456.
+
+To avoid any confusion, be explicit and always use the `.W' or `.L' suffix on the address, as shown 
+      in the previous examples.
 
 \subsection{Relative}\address{Relative}
 
@@ -432,7 +435,7 @@ The actions carried out are as follows for pre-{}decrement: The
 
 The opposite action takes place with post-{}increment, as follows:
       The contents of the memory address pointed to by A7 is copied into D0,
-      then the address held in A7 id incremented by the size of the data just
+      then the address held in A7 is incremented by the size of the data just
       copied ( byte, word or long). Again, this equates to: 
 \begin{lstlisting}[firstnumber=1,language={}]
 1000 LET D0 = PEEK_L(A7)

@@ -34,11 +34,11 @@ and causes an exception to be generated if the value in Dn.W is
       normal QL this is totally ignored -{} the exception that is -{} however,
       with a bit of deft QDOS programming, this can be redirected to your own
       routine. I have never seen this done in any programs -{} yet! By the way,
-      the value in the effective address is a two's compliment signed number.
+      the value in the effective address is a two's complement signed number.
       The flags affected are:
 \begin{itemize}[itemsep=0pt]
 
-\item{}N -{} set if Dn.W is less than zero, cleared is Dn.W is greater
+\item{}N -{} set if Dn.W is less than zero, cleared if Dn.W is greater
           than the effective address value. Otherwise it is undefined.
 
 
@@ -158,7 +158,7 @@ and causes the processor to put the word of data into the SR,
       exceptions are generated. The interrupt must be higher that the current
       processor interrupt level to have any effect. The flags are set
       according to the data word in the instruction. This is another
-      privileged instruction and is the processor is in user mode, and a
+      privileged instruction and, if the processor is in user mode, a
       privilege violation exception will be generated.
 
 \mc6800x{TRAPV}
@@ -196,9 +196,9 @@ When the bit number is being processed the 68000 makes sure that
       registers) then the actual bit number is bit number MOD 32.
 
 If a memory address is being manipulated, the range is adjusted to
-      be 0 to 8 using bit number MOD 8.
+      be 0 to 7 using bit number MOD 8.
 
-The flags are all unaffected except for the Z flag which takes the
+The flags are all unaffected except for the Z flag which reflects the
       state of the `previous' value of the bit being manipulated.
 
 The instructions are:
@@ -230,7 +230,7 @@ As a small example, imagine you were writing a program and you
       checking every one for `A' and `Z' (which only apply to the English
       language remember, you could set up a bitmap table of 256 bytes and have
       a single bit represent uppercase, another could be for numeric, another
-      for control/unprintable characters etc etc. As each character was read,
+      for control/unprintable characters etc etc. As each character is read,
       index into the table on that character code and check the appropriate
       bit.
 

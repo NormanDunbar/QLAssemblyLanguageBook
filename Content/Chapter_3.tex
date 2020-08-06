@@ -101,10 +101,10 @@ The \opcode{RTS} instruction ends a subroutine and means return to where you
     next instruction in that program.
 
 The subroutine called from the second line begins at the label
-    `Addon'. It is very simply and adds 1 to the value in D1.L before the \opcode{RTS}
+    `Addon'. It is very simple and adds 1 to the value in D1.L before the \opcode{RTS}
     returns to the place where it was called from.
 
-Put simply. The code above loops around adding 1 to D1.L until such
+Put simply, the code above loops around adding 1 to D1.L until such
     time as D1.L equals 10. At this point the code returns to wherever it was
     called from.
 
@@ -604,7 +604,7 @@ Start     MOVEQ     #100,D0
           DIVS      D1,D0
 \end{lstlisting}
 
-Results in D0 being set to \$00010009 which is 9 remainder 1. The 9
+Results in D0 being set to \$0001000B which is 11 remainder 1. The 11
       is in the lowest word while the 1 is in the highest word.
 
 The instruction should be read as `divide source into
@@ -665,7 +665,7 @@ Multiply the destination word by the source word and place the
 \end{lstlisting}
 
 This instruction converts the binary value in the destination to
-      its two's compliment value. This is done by subtracting the current
+      its two's complement value. This is done by subtracting the current
       value from zero, putting the result back into the destination and setting
       the flags. All the flags are affected by this instruction. The
       instruction can act upon byte, word or long sized values.

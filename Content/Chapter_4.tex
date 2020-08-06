@@ -9,7 +9,7 @@ Following on from the previous chapter, we now start to look at the
 
 Logic is the heart of all computer systems -{} well, all digital ones
     anyway. Logic is how the central processor works. The 68000 series of
-    processors are no exception and in the instruction set, there are a few
+    processors are no exception and, in the instruction set there are a few
     logical operations that can be carried out. This chapter discusses those
     instructions.
 
@@ -17,8 +17,8 @@ Logic is the heart of all computer systems -{} well, all digital ones
 \label{ch4-Logic}%\hyperlabel{ch4-Logic}%
 
 The logical \opcode{NOT} instruction is probably the simplest of all this
-    family of instruction. It converts the destination address from its
-    current state of ones and zeros into the exact opposite to zeros and ones.
+    family of instructions. It converts the destination address from its
+    current state of ones and zeros into the exact opposite of zeros and ones.
     The format is:
 
 \begin{lstlisting}[firstnumber=1,]
@@ -26,9 +26,10 @@ The logical \opcode{NOT} instruction is probably the simplest of all this
 \end{lstlisting}
 
 Size can be byte, word or long. The instruction carries out a `ones
-    compliment' of the destination address. If you remember back to the
-    discussion of `Twos compliment' numbers earlier on in the series, you will
-    remember that converting a positive number to negative involved flipping
+    complement' of the destination address. If you remember back to Section 2.4, the 
+    discussion of `Twos complement' numbers, you will
+    remember that one way of converting an unsigned number to signed or vice versa,
+    involved flipping
     all the zeros and ones and then adding one to the result. The \opcode{NOT}
     instruction carries out the first part of flipping all the ones and zeros
     over.
@@ -38,7 +39,7 @@ If D0.W holds the value of \$0001 then after a \lstinline{NOT.W D0}, it will hol
     versa.
 
 NOT must not be confused with the arithmetic \opcode{NEG} instruction which
-    carries out a `twos compliment' negation of a value. (D0.W in the above
+    carries out a `twos complement' negation of a value. (D0.W in the above
     example would become \$FFFF which is equivalent to \lstinline{NOT.W D0} followed by
     \lstinline{ADDQ.W \#1,D0})
 
@@ -217,7 +218,7 @@ The flags are set as:
 \end{lstlisting}
 
 This is a similar instruction to the one above, and does a similar
-    job except it affects the entire status register. The other difference is
+    job, except it affects the entire status register. The other difference is
     that the processor must be running in Supervisor mode for this instruction
     to be carried out. If it is not then a privilege exception will be
     generated -{} this will hang the QL (usually)
@@ -256,7 +257,7 @@ This sets the QL so that only a level 7 interrupt will be actioned.
     The only problem here is that CTRL ALT and 7 activate a level 7 interrupt
     and effectively hangs your QL. After the above instructions, the
     supervisor mode is still in effect. (Work it out in binary!!) To exit
-    from supervisor mode \lstinline{ANDI \#\$07FF,SR} would need to be done -{} this leads us
+    from supervisor mode \lstinline{ANDI \#\$D7FF,SR} would need to be done -{} this leads us
     nicely into the AND family.
 
 \section{This AND That}\mc6800x{AND}
@@ -337,7 +338,7 @@ The \opcode{ANDI}\mc6800x{ANDI} (immediate) instruction has the same variations 
           ANDI.size #data,destination
 \end{lstlisting}
 
-And can be byte, word or long sized. It is used when the source
+and the instruction can be byte, word or long sized. It is used when the source
     value in the \opcode{AND} is immediate data as opposed to a register or memory
     address. Some, but not all, assemblers will allow you to write:
 
@@ -345,7 +346,7 @@ And can be byte, word or long sized. It is used when the source
           AND.size #data,destination
 \end{lstlisting}
 
-But the actual instruction assembled will be \opcode{ANDI} instead. Again the
+but the actual instruction assembled will be \opcode{ANDI} instead. Again the
     flags are affected as for \opcode{NOT}.
 
 \begin{lstlisting}[firstnumber=1,]
@@ -353,7 +354,7 @@ But the actual instruction assembled will be \opcode{ANDI} instead. Again the
 \end{lstlisting}
 
 The size of this instruction is always byte, however, only the lower 5 bits are used. The 
-   three high bits should, for safety, be set to 1 to avoid corrupying bits 5-7 of the CCR 
+   three high bits should, for safety, be set to 1 to avoid corrupting bits 5-7 of the CCR 
    which may be used for "other things" in different processors to the MC68008.
 
 This is an instruction that can be used to clear some or all of
@@ -454,13 +455,13 @@ Source & Destination & EOR\\ \hline
 Using the same example as \opcode{OR} and \opcode{AND} above we now have the following
    :
 
-D0.W contains \$AAAA and D1.W contains \$6543 the instruction
+D0.W contains \$AAAA and D1.W contains \$6543. The instruction
 
 \begin{lstlisting}[firstnumber=1,]
           EOR.W D0,D1
 \end{lstlisting}
 
-Will result in D1.W being set to \$CFE9 and D0 will remain unchanged.
+will result in D1.W being set to \$CFE9 and D0 will remain unchanged.
     How does this work? Once again, in binary:
 
 \begin{lstlisting}[firstnumber=1,frame=none,numbers=none]
@@ -515,7 +516,7 @@ The above code is very simple and assumes that there is exactly 100
     will be encrypted. To decrypt it, simply call `start' again and the data
     will be restored. 
 
-\begin{warning}This extremely bad for of encryption is extremely easily cracked because of the use of a single
+\begin{warning}This extremely bad form of encryption is extremely easily cracked because of the use of a single
     byte to encrypt the data so don't go using it for anything you value, such as your bank account details!
 \end{warning}
 
@@ -562,11 +563,11 @@ As above, the flags are changed according to the data -{} bits 0 to 4.
 \begin{itemize}[itemsep=0pt]
 
 \item{}T (trace) is changed if the value in bit 15 of the data is
-        0.
+        1.
 
 
 \item{}S (supervisor) is changed if the value in bit 13 of the data is
-        0.
+        1.
 
 \end{itemize}
 
@@ -620,7 +621,7 @@ Consider this example:
 
 \begin{lstlisting}[firstnumber=1,caption={LSL Example},label={lst:LslExample}]
           MOVEQ    #$81,D0     ; D0.B is 1000 0001
-          LSL.B    #1,D0       ; Now it is 0000 0010 and 
+          LSL.B    #1,D0       ; Now it is 0100 0000 and 
                                ; C and X are 1
           MOVEQ    #5,D2
           LSL.B    D2,D0       ; Now D0.B is 0100 0000
@@ -642,7 +643,7 @@ Shifting the opposite way gives this:
 \opcode{LSR} is a quick way of dividing an unsigned number by 2 -{} but the
     fractions are lost. Another couple of examples:
 
-\begin{lstlisting}[firstnumber=1,caption={LSL Multlication Example},label={lst:LsMultiplicationlExample}]
+\begin{lstlisting}[firstnumber=1,caption={LSL Multiplication Example},label={lst:LsMultiplicationlExample}]
           MOVEQ    #8,D0       ; D0.L holds 8
           LSL.L    #1,D0       ; D0.L now holds 16
           LSL.L    #2,D0       ; D0.L now holds 64

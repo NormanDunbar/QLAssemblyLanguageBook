@@ -130,7 +130,7 @@ Executing this instruction results in the condition codes being set
 All the other bits are simply ignored.
 
 \opcode{MOVE SR}\mc6800x{MOVE SR} -{} the size is always word and may not be specified in the
-    instruction. This instruction copied the 16 bits of the condition code
+    instruction. This instruction copies the 16 bits of the condition code
     register to the destination. The instruction format is:
 
 \begin{lstlisting}[firstnumber=1,]
@@ -141,7 +141,7 @@ When the instruction has been carried out, the lower 16 bits of the
     destination contain a copy of the Status Register of the processor. The
     actual data in the status register is unaffected by the move.
 
-There is a complimentary instruction to move data into the status
+There is a complementary instruction to move data into the status
     register which is:
 
 \begin{lstlisting}[firstnumber=1,]
@@ -302,8 +302,8 @@ The list can be specified in any order (unless the assembler rules
     
     Regardless of the order in which the registers are specified in the instruction, they are always stored in memory in order from D0 to D7 then A0 to A7 - for all the registers that are specified that is.
 
-This instruction will be most often used in its Post decrement and
-    pre-{}increment forms:
+This instruction will be most often used in its pre-{}decrement and
+    post-{}increment forms:
 
 \begin{lstlisting}[firstnumber=1,]
           MOVEM.L    D0-D3,-(A7) 
@@ -612,7 +612,7 @@ The two address registers are pointers to the memory addresses to be
     incremented by 1, 2 or 4 depending upon the size of the data being
     compared.
 
-\section{Signed and Unsigned Numbers}
+\section{Signed and Unsigned Numbers}\label{sec-signed-unsigned-numbers}
 \label{ch2-signed-unsinged}%\hyperlabel{ch2-signed-unsinged}%
 
 Before we take a closer look at the condition codes and how we can
@@ -657,14 +657,14 @@ Just as 1231 means $(1 * 10^{3}) + (2 * 10^{2}) + (3 * 10^{1}) + (1 * 10^{0})$, 
     all this, the same is true in binary.
 
 The binary nibble 1010 is $(1 * 2^{3}) + (0 * 2^{2}) + (1 * 2^{1}) + (0 * 2^{0})$, which is $(1 * 2 * 2 * 2) + (0 * 2 * 2) + (1 * 2) + (0 * 1)$, which is
-    $8 + 0 + 2 + 0$, which is 10 in decimal with converts to \$0A in hexadecimal.
+    $8 + 0 + 2 + 0$, which is 10 in decimal which converts to \$0A in hexadecimal.
 
 All the possible values that can be held in an unsigned nibble are
     0000 (zero) up to 1111 (15 or \$0F) and conversion is a matter of adding up
     each power of two in the number. From the right we have $2^{0}$ which is simply one. Then $2^{1}$ or two and so on.
 
-In an unsigned nibble the most significant bit $(2^{3})$ is used to hold
-    the sign, so all numbers below unsigned 7 are positive while those `above' 7 are actually negative and so are below 0.
+In a signed nibble the most significant bit $(2^{3})$ is used to hold
+    the sign, so all numbers from 0 to 7 are Positive while numbers from 8 to 15 are negative, representing -8 to -1.
 
 If the highest bit was not the sign bit it would represent $2^{3}$ or 8.
     To convert into a signed value simply negate the 8 to get minus 8, and add
@@ -674,6 +674,11 @@ $(-{}1 * 2^{3}) + (0 * 2^{2}) + (1 * 2^{1}) + (0 * 2^{0})$. This
     gives minus 8 plus 2 which is minus 6. This implies that for a signed
     number the range is minus 8 to plus 7 which is still a possible 16 values as with
     the unsigned version, just shifted slightly down the number scale.
+
+Another method of converting from signed to unsigned is to flip all the bits, then add 1. For 
+    example, -6 in a signed nibble is $1010$. Bit flipping results in $0101$ which is 5, 
+    adding 1 gives 6. So, the nibble value of $1010$ can represent either 10 or -6 depending 
+    on whether the nibble is signed or unsigned.
 
 That is the only difference between signed and unsigned numbers. The
     ranges of values in a byte are minus 128 to plus 127, in a word it is
