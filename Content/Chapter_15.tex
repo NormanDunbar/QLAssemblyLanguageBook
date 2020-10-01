@@ -368,7 +368,7 @@ not_zero   lea     input,a1            The buffer
 The code above begins by reading the long word representing the file
     data space requirements from the file header into register D3.L.
 
-D3.L is then converted to text read for printing by the fairly
+D3.L is then converted to text ready for printing by the fairly
     simple method of repeatedly subtracting assorted powers of 10 from the
     value until we get an overflow (underflow?) and saving the number of times
     we managed to successfully subtract the current power of 10. This count is

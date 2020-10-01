@@ -118,7 +118,8 @@ Next we have the event vector which is a long word in size. Only the lowest byte
 Ok, the documentation says that only the lowest byte is used, but the documentation is 
 very old. Things have moved on and it is possible for jobs to be sent an event, rather
 than generating one themselves, so it is possible that you will see data in bytes other
-than the lowest one.
+than the lowest one. Table~\ref{tab:TheEventVector} near the end of this section,
+has better information.
 
 Finally, we have 4 words defining the width, height, x and y positions of the window or
 sub-{}window in which the pointer event took place. You do not -{} some might say 
@@ -214,7 +215,7 @@ a red border one pixel wide. Once that has been done, we call CLS on the window.
             bsr     Trap3          ; Do trap #3 return here if all ok.
 
             moveq   #sd_clear,d0   ; cls
-            bsr.s   Trap3          ; Do trap #3 return here if all ok.
+            bsr     Trap3          ; Do trap #3 return here if all ok.
 \end{lstlisting}
 
 From this point onwards, both A0 and D3 are preserved by all the calls to \opcode{TRAP}s etc that
@@ -227,7 +228,7 @@ simply `vanish'.
 
 \begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Get Pointer Environment}]
 FindPE      moveq   #iop_pinf,d0   ; Get PE information
-            bsr.s   Trap3          ; Do trap #3 return here if all ok.
+            bsr     Trap3          ; Do trap #3 return here if all ok.
 \end{lstlisting}
 
 The PE exists and is usable. We now have to outline our primary window. This defines the
@@ -307,7 +308,7 @@ converting 24 bytes to hexadecimal and printing them out.
 
 \begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Space Table}]
 SpaceReqd   lea     SpaceTab,a3    ; Table of space positions
-            moveq   9,d5           ; 10 values in table
+            moveq   #9,d5          ; 10 values in table
 
 SpaceNext   cmp.w   (a3)+,d7       ; Is D7 a space position?
             dbeq    d5,SpaceNext   ; Scan until found, or not
@@ -316,7 +317,7 @@ SpaceNext   cmp.w   (a3)+,d7       ; Is D7 a space position?
 \end{lstlisting}
 
 At the end of the main loop, when all 24 bytes have been converted and printed out, we
-throw a new line and get ready to see if we should quite or not.
+throw a new line and get ready to see if we should quit or not.
 
 \begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Loop End}]
 LoopEnd     dbf     d7,PLoop       ; Do some more bytes
@@ -352,7 +353,7 @@ Exit        move.l  d0,d3          ; Error code in D3
             bra.s   Exit           ; We never get here, but ...
 \end{lstlisting}
 
-The next subroutine was added on advice from George. We scrolls up one line if we have filled the screen. This helps to keep the headings on the screen at all times. (Not in \emph{my} original code.)
+The next subroutine was added on advice from George. We scroll up one line if we have filled the screen. This helps to keep the headings on the screen at all times. (Not in \emph{my} original code.)
 
 \begin{lstlisting}[firstnumber=last,caption={Pointer Record Examiner - Scroll Screen}]
 Scroll      moveq   #2,d2          ; line 2

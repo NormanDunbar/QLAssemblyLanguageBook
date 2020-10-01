@@ -17,7 +17,7 @@ Window Manager. To slip easily into programming, we shall start off with a small
 perfectly useless pointer only program, so the Window Manager stuff will not be
 used.
 
-In order to run the program you should have \program{PTR\_GEN} loaded. If you are running
+In order to run the program you should have PTR\_GEN\program{PTR\_GEN} loaded. If you are running
 SMSQ/E then it is built in to the operating system. If you are running a `normal' QL then
 you will need to load it. I suspect most -{} if not all -{} users still with us will have a
 copy, however, if not, Dilwyn's Web Site will have a copy to download.
@@ -63,7 +63,7 @@ Bits 0 and 1 look a bit funny and are used in conjunction with bit 7 to indicate
 window request. If bit 7 is set then the rest should be zero except bit 0 or 1 -{} one of
 these should be set. If bit 0 is set the pointer is the resize one and if bit 1 is set it
 is the window move pointer. If both are unset, the Window Required pointer will be
-displayed. With bit 7, the topmost window of the pile if hit and selected. More on this
+displayed. With bit 7, the topmost window of the pile is hit and selected. More on this
 later in the series.
 
 Our termination vector is set to have bit zero turned on only. This means when a
@@ -166,7 +166,7 @@ The shadow size is added to the sized defined in our console definition block bu
 the shadow is outside of the hit area for our window. Now we read the pointer. The call to
 \pe{IOP\_RPTR} will not return unless the timeout expires or an event happens that has been set
 in the termination vector to cause a return. We are looking for a button or keypress while
-the pointer is inside out window.
+the pointer is inside our window.
 
 \begin{lstlisting}[firstnumber=last,caption={Simple PE Program - Part 9}]
 Pointer     moveq   #iop_rptr,d0       ; Read the Pointer
@@ -179,7 +179,7 @@ Pointer     moveq   #iop_rptr,d0       ; Read the Pointer
 errors
 \end{lstlisting}
 
-When the user click in the window with the mouse, either button will do, or presses
+When the user clicks in the window with the mouse, either button will do, or presses
 a key, the call to \pe{IOP\_RPTR} will return having filled the pointer record with useful
 information. We are not bothering with that here in this first simple demo. We are also
 ignoring the possibility of A0 pointing at a channel that is closed because by the time we

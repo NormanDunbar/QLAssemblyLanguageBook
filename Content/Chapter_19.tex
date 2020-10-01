@@ -12,7 +12,7 @@ We have moved house and are getting settled.\footnote{That was written originall
 
 With all the upheaval of getting moved and unpacked etc, I have not got a
         lot of code for you this time, hopefully, you won't be too bored by this episode
-        in which I go over bits and pieces of assembly language programming that causes me
+        in which I go over bits and pieces of assembly language programming that cause me
         grief.
 
 It all started when I was having a think the other day about life in general
@@ -242,7 +242,7 @@ ENDLOOP BNE.S NotFound
 
 Which we see makes the branch if the loop expired when the counter in D1.W
         hit minus 1. I propose that we rename this family of instructions to `Decrement
-        and Branch UNLESS condition'. That makes more sense to me.
+        and Branch UNTIL condition'. That makes more sense to me.
 
 \section{Do I TST.L D0 After TRAPs And Vectors?}
 \label{ch19-trap-vector}%hyperlabel{ch19-trap-vector}%
@@ -282,7 +282,7 @@ A TRAP call is treated as an exception and to return from an exception
 
 So, all these years where I've been testing D0 on return from vectors I've
         been wasting clock cycles when I need not have done. The status register is
-        correctly set on exit from a vectored utility but has only D0 is set on return
+        correctly set on exit from a vectored utility but only D0 is set on return
         from a TRAP.
 
 Simple, but it has caught me out for years. I now need to unlearn my habit

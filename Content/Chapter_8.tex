@@ -65,7 +65,7 @@ This is because each scan line (or row down the screen) starts 128
       memory and in different places, so any program that writes to the screen
       at the original addresses will probably cause carnage within the QXL and
       lead to unexplained crashes later on -{} if not straight away. It must
-      always be assumed the the old ways have gone forever and we must always
+      always be assumed that the old ways have gone forever and we must always
       calculate the screen start address and how long a scan line is before
       trying to access the memory.
 \end{warning}
@@ -112,10 +112,10 @@ So given that we have a channel id in A0 we can extract the required
     D0.
 
 The way we are using it here we don't need any parameters on the way
-    in, but coming out, D1.W holds the scan\_line size and A2.L holds the
+    in, but coming out, D1.W holds the scan\_line size and A1.L holds the
     address for the start of the screen memory.
 
-The actual routine itself get presented with the channel definition
+The A2 routine gets presented with the channel definition
     block's address in A0, not the channel id. Within the routine we copy the
     screen base address into A1 and the scan\_line size into D1.W and
     return.
@@ -146,7 +146,7 @@ If we have, as I have on my QXL, a scan\_line of 160 bytes, what is
 
 As there are 16 bits in a word we can assume correctly that two bits
     hold the data for mode 4 pixels and 4 bits hold the data for mode 8
-    pixels. Thus we have 160 bytes times 8 bits and divided by 4 to give 640
+    pixels. Thus we have 160 bytes times 8 bits and divided by 2 to give 640
     pixels across in mode 4. In mode 8 the answer will be 320 BUT the screen
     width is always the mode 4 width. Only the pixels double up in mode 8, so
     plotting point 639,0 in mode 8 still works! (or is it 0,639 -{} I can never
@@ -230,7 +230,7 @@ Which gives us the following:
 \centering
 \begin{tabular}{l l l}
 \toprule
-\textbf{Bit} & \textbf{GR (Binary)} & \textbf{Colour}  \\
+\textbf{Bit Pair} & \textbf{GR (Binary)} & \textbf{Colour}  \\
 \midrule
 %
 7 & 00 & Black \\
@@ -239,7 +239,7 @@ Which gives us the following:
 4 & 01 & Red \\
 3 & 10 & Green \\
 2 & 11 & White \\
-1 & 10 & Red \\
+1 & 10 & Green \\
 0 & 11 & White \\
 %
 \bottomrule
@@ -397,7 +397,20 @@ or
 
 $base~address + 2$
 
-so we know the memory word, but not the actual bits within it.
+However, what about the case of bit 5? The calculation would give an answer of:
+
+$base~address + (0 * scan~width) + INT(5 / 4)$
+
+or
+
+$base~address + 1$
+
+It is still correct to say that the calculation produces an answer that points within the correct word. However, it might not always give the same byte of that word. To consistently point at the first byte of the required word, we need to clear bit 0 of its address. 
+
+In the case of the bit 5 example, the result $base~address + 1$ will then become just $base~address$. Bear this in mind for the rest of this chapter.
+
+
+So we know the memory word, but not the actual bits within it.
     Remember bits 7 = pixel 0, bit 6 = pixel 1 and so on down (up?) to bit 0
     for pixel 7. How do we get to a value between 0 and 7 from any x value? If
     we AND the x value with 7 that will give us a value between 0 and 7 won't

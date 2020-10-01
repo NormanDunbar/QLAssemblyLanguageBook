@@ -25,12 +25,7 @@ You don't actually need to have a hit routine for all your application
 You can disable the hit routine, if you don't need or want one, by setting
         the pointer to the hit routine to zero in the window definition file created by SETW\program{SETW}. 
         
-\begin{note}
-George isn't fond of having an application window just for display purposes and points out that information windows are much, much simpler. He is, of course, correct!
-\end{note}        
- 
- Now, it's time to get down to editing our new
-        program.
+Now, it's time to get down to editing our new program.
 
 We need to copy the two files we created last time, and rename them. So,
         copy ApplTest\_asm to ApplHitTest\_asm,
@@ -236,6 +231,10 @@ The main code in this advanced hit routine is simple -{} it stacks all the
         to a few helper routines to carry out one specific task. I admit, this is not the
         most efficient method, but it allows me to split the code into manageable chunks
         for describing in the text.
+        
+\begin{note}
+I have been informed (August 2020) that this code is possibly not working correctly on QDOS (original QLs) as the keystroke prints as a grey square. I don't have any old fully working QLs that I can test on and my informant advises me that it \emph{does} work perfectly on SMSQ/E. 
+\end{note}
 
 \begin{lstlisting}[firstnumber=1,]
 ; Helper - Initialise the sub-window.
@@ -274,7 +273,7 @@ ptrpos  movem.l d1-d3/a1,-(a7)    ; These get corrupted here
         rts
 \end{lstlisting}
 
-The code above preservers all registers that will be corrupted and then
+The code above preserves all registers that will be corrupted and then
         displays the current pointer position in absolute screen coordinates. These are
         relative to the 0,0 position of the entire screen and not relative to the 0,0
         position of the actual main window for our application. 

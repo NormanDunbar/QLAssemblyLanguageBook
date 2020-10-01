@@ -277,7 +277,7 @@ SSP ----------> Status register word
 \end{lstlisting}
 
 so when the exception handler is running, the stack pointer holds
-    the address of the SR at the time the exception was caused and 4(A7) holds
+    the value of the SR at the time the exception was caused and 4(A7) holds
     the program counter where the exception was caused.
 
 The above is true for all exceptions apart from BUS ERROR, ADDRESS
@@ -561,7 +561,7 @@ Our exceptions table has now been defined and all we have to do is
     created by it will use the same vector table.
 
 This means that as the initiating job is SuperBasic, and as most
-    other jobs are created by SuperBasic, this means that we have effectively
+    other jobs are created by SuperBasic, we have effectively
     created a protection mechanism for every job in the system created \emph{from this point onwards}! If this is the first code loaded on your system, then
     every single job created will be protected by this code.
 

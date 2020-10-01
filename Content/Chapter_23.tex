@@ -320,8 +320,8 @@ the definition of a loose item with a text object displayed upon it.
 
 \begin{lstlisting}[firstnumber=last,caption={WMAN Example Window - Loose Item 0}]
 ;Loose menu item No. 1
-         dc.w  24                   ; Hit area width
-         dc.w  11                   ; Height size
+         dc.w  24                   ; Width
+         dc.w  11                   ; Height
          dc.w  132                  ; X origin
          dc.w  2                    ; Y origin
          dc.b  0                    ; Object x justification 
@@ -343,8 +343,8 @@ definition. Loose items have the properties listed in Table~\ref{tab:LooseItemPr
 \textbf{Property} & \textbf{Description} \\
 \midrule
 %
-Hit area width            & The width of the loose item. Includes the border defined above in the fixed definition \\
-Hit area height           & The height of the loose item. Includes the border defined above in the fixed definition \\
+Hit area width            & The width of the loose item including the border width defined in the fixed definition \\
+Hit area height           & The height of the loose item including the border width defined in the fixed definition \\
 X origin                  & Where the loose iten will be drawn. Relative to the start of the layout \\
 Y origin                  & Where the loose iten will be drawn. Relative to the start of the layout \\
 X justification           & How the object will be positioned horozontally within the hit area \\

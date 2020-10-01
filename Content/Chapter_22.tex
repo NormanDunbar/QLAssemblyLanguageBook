@@ -54,7 +54,7 @@ Before we go on, we need to know what all the bits of the PE
 A selection key is simply the key that you press -{} when the
       pointer is over the appropriate primary window (see below) -{} to activate
       some function or feature of the program in question. It may cause an
-      action to be carried out or simply highlight an option is a menu.
+      action to be carried out or simply highlight an option in a menu.
       Normally, the selection key is shown underlined, but this is not
       necessary, although it is more helpful to the user of the program if it
       is.
@@ -72,7 +72,7 @@ When the mouse buttons are in use then a HIT is what happens when
 \subsection{Outline or Primary Window}
 \label{ch22-outln}%\hyperlabel{ch22-outln}%
 
-I have mentioned outlines before, however, for the same of
+I have mentioned outlines before, however, for the sake of
       completeness, I'm reiterating here. The outline (or primary window) is
       the rectangle of your screen that the program will perform all its
       workings within. Any secondary windows (see below) opened by the program
@@ -106,7 +106,7 @@ Indeed, the caption bar for most PE programs that I know of is set
       the top of the window, then on top of that there is another plain white
       information window nicely centralised horizontally on top of the first
       one. The program name or caption is then inserted as an Information
-      Objects (see below) into this second information window.
+      Object (see below) into this second information window.
 
 \subsection{Information Objects}
 \label{ch22-info-obj}%\hyperlabel{ch22-info-obj}%
@@ -114,7 +114,7 @@ Indeed, the caption bar for most PE programs that I know of is set
 Once an information sub window has been created you need something
       to put in it -{} for information purposes. To this end you need to create
       information objects. These can be text or blobs, sprites or patterns
-      (see below). The most noticeable ones are the program name shown in the
+      (see below). The most noticeable ones are the program names shown in the
       `caption bar' of most PE programs.
 
 \subsection{Loose Items}
@@ -135,8 +135,8 @@ The popular loose items known to most users would probably be the
 There's not much to say about the application sub windows really.
       They are what's left of the primary or secondary window after borders,
       information sub windows and loose items etc have been removed. They are
-      the areas of the screen that the program prints its output or allows
-      input from the user and so on.
+      the areas of the screen that the program prints its output to; or allows
+      input from, the user and so on.
 
 A graphics drawing program, for example, would use the application
       sub window to allow the user to draw whatever it is that they are
@@ -170,10 +170,10 @@ A BLOB is part of a sprite and holds only data that defines the
       the sprite that holds the colour data. Why separate them like this? I
       suspect it was to save memory -{} why bother having sprites defined with
       the same shape, just different colours -{} by defining the BLOB once and
-      the PATTERS for the colours, you save repeating the blob data -{}
+      the PATTERNS for the colours, you save repeating the blob data -{}
       perhaps?
 
-Blobs and patters can be used independently of sprites
+Blobs and patterns can be used independently of sprites
       though.
 
 \subsection{Border}
@@ -226,7 +226,7 @@ If you look back an issue or so, you will notice that up until now,
     all my PE test programs simply opened a console and set an outline before
     entering the main loop to read the pointer, act upon it, repeat as
     necessary. Obviously, my test programs were small and insignificant -{} but
-    even though, they could benefit from a bit more added `sparkle'. The WMAN\program{WMAN}
+    even so, they could benefit from a bit more added `sparkle'. The WMAN\program{WMAN}
     routines make this possible.
 
 The first thing we have to do is create a definition of our window
@@ -239,7 +239,7 @@ The first thing we have to do is create a definition of our window
 \label{ch22-wdef}%\hyperlabel{ch22-wdef}%
 
 So, now you know what all the bits in a window are, we can get right
-    in and start discussing the standard way we have to define a windows and
+    in and start discussing the standard way we have to define a window and
     all its \emph{decorations}. Let's take a look at one that
  \emph{someone else} prepared earlier.
 
@@ -295,10 +295,10 @@ Next we define the attributes for our window.
 
 Again, there's nothing remarkably difficult here. Bit 7 of the first
     byte tells WMAN\program{WMAN} whether or not the window is to be cleared. Setting bit 7
-    says that the window \emph{must not} be cleared. Following
+    says that the window \emph{must not} be cleared. Bit 0 of this byte enables or disables 
+    the ability to move the pointer using the cursor keys. Following
     on, we define a shadow size for the bottom and right edges of our window.
-    Bit 0 of this byte enables or disables the ability to move the pointer
-    using the cursor keys.
+    
 
 \begin{note}
 The ability to disable/enable cursor key pointer movement is only
@@ -351,7 +351,7 @@ Now, that implies that all object lists must be within plus or minus
     lot of objects and so on to define. To this end, if bit zero is set -{} an
     odd address -{} then that offset is used as a pointer to a long word which
     itself is a relative pointer to the object in question. Obviously, the
-    word length odd pointer obviously has to be made even first, this is done
+    word length odd pointer has to be made even first, this is done
     simply by clearing bit zero.
 
 In the above, if the Pointer Sprite above was defined a long long
@@ -501,7 +501,7 @@ So we allow one and only one layout, which just happens to be
 
 We shall pause for breath at this point and discuss these lists in
     the next article. Hopefully, the above was not too taxing and I've
-    explained it better that I ever had it explained to me!
+    explained it better than I ever had it explained to me!
 
 \section{Coming Up...}
 \label{ch22-the-end}%\hyperlabel{ch22-the-end}%

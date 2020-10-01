@@ -241,7 +241,7 @@ floating point value. We can use this in our favour. The conversion stops when
 the address in D7 is reached as QDOSMSQ loops around converting each character
 from the buffer.
 
-With a slight modification the the code, we can cater for both formats of
+With a slight modification to the code, we can cater for both formats of
 buffers -{} one without a leading size, and one with. The changes required are
 simple.
 
@@ -278,11 +278,8 @@ convert  movem.l   d2/d7/a1-a3,-(a7)   ; Save workers
          bne.s     restore         ; No, bale out.
 \end{lstlisting}
 
-And that's all there is to it. You can now call the `convert' code with A0.L
-pointing at a buffer of ASCII characters and no QDOS length word as long as the
-buffer has an `invalid' digit at the end, a linefeed perhaps, or, you can point
-A0.L at a proper QDOSMSQ string's length word and call the code at `convertq'
-instead - with D7 set to zero first of course.
+And that's all there is to it. You can now call the `convert' code with D7.L = 0 and A0.L
+pointing at a buffer of ASCII characters, which has no QDOS length word. There must be an `invalid' character at the end of the buffer; or, you can point A0.L at a proper QDOSMSQ string's length word and call the code at `convertq' instead and D7 will be correctly set.
 
 A small test harness for the new version would be as follows:
 

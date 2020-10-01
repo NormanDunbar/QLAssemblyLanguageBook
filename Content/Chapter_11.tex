@@ -16,7 +16,7 @@ The code is a small example of creating and navigating a linked
     list. The demo starts by creating a list of 5 nodes, each holding one long
     word of data being simply the node number 0 to 4.
 
-The list contents are then printed on the screen shoing the node
+The list contents are then printed on the screen showing the node
     address, the next pointer and the data stored in that node. Once this is
     done, the node with data contents of 3 is located and deleted prior to the
     new list being printed out again.
@@ -72,8 +72,8 @@ The first of our sub-{}routines follows on. This part builds a list of
     5 nodes in the most simple manner possible -{} it runs a loop which calls
     the sub-{}routine to create a single node and link it into the list. If you
     want a bigger list, change the counter loaded into D7 to one less than the
-    number of node you want. Don't forget to adjust the height of your window
-    as wll if you want to see all the results on screen at the same
+    number of nodes you want. Don't forget to adjust the height of your window
+    as well if you want to see all the results on screen at the same
     time.
 
 \begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Build List}]
@@ -94,7 +94,7 @@ BuildLoop  bsr.s   BuildNode            ; Create a node, address in A1
 
 Here's the first of the real list routines. We add a new node into
     the list in the manner outlined in the article. We reject attempts to add
-    the rot node into the list -{} but without flagging any errors -{} and, as
+    the root node into the list -{} but without flagging any errors -{} and, as
     explained, we don't attempt to check if the new node already exists in the
     list because we are creating the node on the heap, so the chances of the
     new node being present already are pretty slim to say the least.
@@ -134,7 +134,7 @@ BuildNode  movem.l d1-d3/a0/a2-a3,-(a7) ; Save working registers
 \end{lstlisting}
 
 The following sub-{}routine is called once to display the linked list
-    before we do the deletions and again after we have deleting a node. The
+    before we do the deletions and again after we have deleted a node. The
     code simply walks through the entire list and prints out the node address,
     the next pointer and the data value by calling other sub-{}routines.
 
@@ -177,8 +177,8 @@ ShowNode    move.l a0,a5                ; The node address
 \end{lstlisting}
 
 Obviously, just displaying the list contents isn't very user
-    firiendly, so the next couple of routines display a title which informs
-    the user if the list being displyed is `before' or `after' the deletion
+    friendly, so the next couple of routines display a title which informs
+    the user if the list being displayed is `before' or `after' the deletion
     of a node.
 
 \begin{lstlisting}[firstnumber=last,caption={Single Linked List - Demo Code - Show Before and After States}]
@@ -248,7 +248,7 @@ D4ToHex    lea     buffer+2,a1          ; Buffer address
            rts
 \end{lstlisting}
 
-The second and third routines to diplsy the details of a node now
+The second and third routines to display the details of a node now
     follow. Starting with the code to show the node's NEXT pointer address
     closely followed by the code to print the actual data stored in the
     node.

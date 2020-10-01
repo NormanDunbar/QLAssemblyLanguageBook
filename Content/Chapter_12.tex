@@ -90,7 +90,7 @@ BuildLoop  bsr.s   BuildNode       ; Create node, address in A1.L
 \end{lstlisting}
 
 AddNode has been changed to cater for the doubly linked list by initialising the NEXT
-and PRIOR pointers in the new node and in the root node, then checking if there was
+and PRIOR pointers in the new node and in the root node, then checking if there were
 already any nodes in the list. If there were any nodes, the previous `first' node in
 the list (ie, the most recent one added) needs to have its PRIOR pointer set to be our
 brand new node. This is done by loading A0 with the new node's NEXT pointer and testing
@@ -218,7 +218,7 @@ deleted error.
 
 Deleting the node from the list (but, as before, not from memory) is actually quite
 simple. As A1 points to the node to be deleted we can find the node before it from the
-PRIOR(a1) address, and the node after it by the NEXT(A1) address. All we do to delete the
+PRIOR(A1) address, and the node after it by the NEXT(A1) address. All we do to delete the
 node from the list is set the prior node's NEXT address to the current value in the
 deleted node's NEXT address and then set the next node's PRIOR address to the PRIOR
 address of the deleted node.

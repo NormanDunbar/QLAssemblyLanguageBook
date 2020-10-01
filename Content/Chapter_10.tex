@@ -109,7 +109,7 @@ You can see from \figurename~\ref{fig:MemoryOrganisationOfASimpleLinkedList} tha
     the root node of the list.
 
 You must store the value zero in there before you go off adding
-    nodes, you'll see this reason why below in the code to add a node.
+    nodes, you'll see the reason why below in the code to add a node.
 
 \subsection{Adding Nodes.}
 \label{ch10-adding-nodes}%\hyperlabel{ch10-adding-nodes}%
@@ -177,7 +177,7 @@ If you wrote the program, and you are allocating nodes on the heap
 
 Deleting a node is slightly more difficult. The node to be deleted
       could be anywhere in the list, or not even in the list. How to find the
-      correct node is the main problem. However, for the same of argument,
+      correct node is the main problem. However, for the sake of argument,
       assume that we have the node address to be removed in A1.L and the
       address of FIRST in A0.L after a successful `find' operation, then
       removing the node at A1.L requires that we must navigate the list, as in
@@ -279,7 +279,7 @@ The first thing you must do when deleting a node is to actually
       node -{} if you catch my drift?
 
 The code to find an node in a list is dependant on the sort of
-      data stored in each node. If you store strings, the some form of string
+      data stored in each node. If you store strings, then some form of string
       comparison routine needs to be built in -{} does it compare on an equality
       basis (`AAA' = `AAA') or nearly equal basis (`AAA' == `aaa') and so on.
       You can use the built in QDOSMSQ routines to do the comparisons.
@@ -413,7 +413,7 @@ Putting all of the above together and tying in some extras to
 
 * ---------------------------------------------------------------------
 * These are offsets from the start of the job's dataspace where working
-* variable are stored. The dataspace is held at (A4) in the job's code.
+* variables are found. The dataspace is held at (A4) in the job's code.
 * ---------------------------------------------------------------------
 con_id      equ     0                   ; Id for title channel
 con_id2     equ     4                   ; Id for main output
@@ -824,7 +824,7 @@ As with single linked lists there is nothing to it. The new node
 
 Building up the linked list above, in Figure~\ref{fig:ConceptualModelOfADoublyLinkedList}, in stages, we would start with the root node located, most likely, somewhere in our code itself. Initially both the next and prior pointers would be set to zero.
 
-The nodes are address at the start of the list, so the first node to be added would be the one on the far right of the diagram, node \$1200. That node would be created and added to the list by setting the root node's next pointer to address \$1200 and the new node's prior pointer to address \$ABCD. Because it is the final node in the list so far, its next pointer is set to zero.
+The nodes are added at the start of the list, so the first node to be added would be the one on the far right of the diagram, node \$1200. That node would be created and added to the list by setting the root node's next pointer to address \$1200 and the new node's prior pointer to address \$ABCD. Because it is the final node in the list so far, its next pointer is set to zero.
 
 After adding the node at address \$2000, we would change the next pointer of the root node to this new address, \$2000, and the prior pointer of the node at \$1200 to \$2000. The new node would have its prior pointer set to the address that was in the \$1200 node's prior pointer, which is \$ABCD.
 
@@ -852,7 +852,7 @@ Here's the pseudo code to delete a node. We assume, as before,
 
 
 \item{}If the address in the root node's NEXT pointer is zero then we
-          still have an empty list so the value in A1 must be illegal. Exit
+          are at the end of the list so the value in A1 must be illegal. Exit
           with an error.
 
 
@@ -992,7 +992,7 @@ You might see a need to build a couple of comparison routines to
 \label{ch10-double-trouble}%\hyperlabel{ch10-double-trouble}%
 
 The problem with a doubly linked list is that while adding nodes
-      is just as simple as before, but deleting them could be problematical.
+      is just as simple as before, deleting them could be problematical.
       If you are passed the address of a node which is not in the list, how do
       you tell that it is or is not a valid node address? You can end up
       trashing bytes of memory almost at random as you start changing the NEXT

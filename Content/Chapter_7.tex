@@ -189,9 +189,8 @@ Which is a useful way to get the assembler to calculate the offset
     start there.
 
 On with the procedure. In assembler you must take great care to
-    ensure that you have enough parameters etc (see below) and that they are
-    all the correct type. In this example, we will get using integer
-    parameters but the first one must have a hash (\#) in front of it. Of
+    ensure that you have enough parameters (see below) and that they are
+    all the correct type. In this example, we will fetch parameters as integers, however, the first one must have a hash (\#) in front of it. Of
     course, when using INK, PAPER etc in SuperBasic, you can default the
     channel number and \#1 will be used instead. This means that the following
     statements are equivalent:
@@ -813,7 +812,7 @@ start   move.l  bv_rip(a6),a1   ; Fetch top of Maths Stack
 
 Well, you could, but at certain times there will be a hung QL and
     you will not know why. The reason is simple, but difficult to find or
-    trace. When you fetch parameters onto the maths stack, it can \emph{move around in memory}. Preserving the original value is fine if the stack stays put, but
+    trace. When you fetch parameters from the maths stack, it can \emph{move around in memory}. Preserving the original value is fine if the stack stays put, but
     if it moves and you set BV\_RIP to the old value, you can get into all
     sorts of trouble. It is best to keep the stack tidy using the methods
     described above.
@@ -885,7 +884,7 @@ Of course it would be simple to do this:
         beq.s   even            ; Yes
         addq.w  #1,d0           ; Add 1 for padding byte
 
-even    addq.w  #2,d0           ; Add 2 ro the size word
+even    addq.w  #2,d0           ; Add 2 to the size word
         add.w   d0,a1           ; And add with sign extension
 \end{lstlisting}
 
@@ -992,7 +991,7 @@ As per the description above (GETTING PARAMETERS), the name table is
 %\begin{tabular}{p{0.2\linewidth}p{0.5\linewidth}p{0.2\linewidth}}
 %\begin{tabular}{p{0.2\textwidth}p{0.5\textwidth}p{0.2\textwidth}}
 \begin{tabular}{p{0.2\columnwidth}p{0.4\columnwidth}p{0.3\columnwidth}}\toprule
-\textbf{Bytes 0 \& 1} & \textbf{Bytes 2 \& 3} & \textbf{Bytes 4 to 7} \\
+\textbf{Bytes 0 \& 1} & \textbf{Meaning} & \textbf{Bytes 4 to 7} \\
 \midrule
 %
 Type \& separator flag word. &
@@ -1012,7 +1011,7 @@ The low byte of the type word tells us what type of parameter we are
 \centering
 \begin{tabular}{l l}  % Set this correctly ...
 \toprule
-\textbf{Bytes 0 \& 1} & \textbf{Bytes 2 \& 3} \\
+\textbf{Bytes 0 \& 1} & \textbf{Meaning} \\
 \midrule
 %
 Bit 7 & 0 = There is not a hash (\#) in front of this parameter\\
@@ -1034,7 +1033,7 @@ Bits 3 -{} 0 & 0011 = Integer\\
 \label{tab:ParameterTypesAndSeparators}
 \end{table}
 
-For the first parameter, the type byte is at 1(a6,a3.l) as opposed
+For parameters, the type byte is at 1(a6,a3.l) as opposed
     to 0(a6,a3.l).
 
 For the rest of SuperBasic, the name table uses bytes 0 and 1 to
@@ -1108,7 +1107,7 @@ SBASIC, on the other hand, under SMSQ allows integer FOR loops and I presume
       will correct me if I am wrong!!
 \end{note}
 
-For all entries in the name table, be they parameters or `proper'
+All entries in the name table, be they parameters or `proper'
     names, have a word in bytes 2 \& 3 which points to the entry in the
     name list for this `name'. This simply gives an easy way of storing the
     names all in one place. Note that this value is simply the offset from the
@@ -1510,7 +1509,7 @@ We then add 3 to D1. This is 2 for the word count and one for a
 \label{ch7-returning-values}%\hyperlabel{ch7-returning-values}%
 
 When returning values on the maths stack you must be very careful.
-    When a function exits there must be a value on the top of the maths stack
+    When a function exits there must be a value on the top of the maths stack,
     the pointer to this value needs to be stored in BV\_RIP(A6) and D4 has to
     have a values in it which defines the returned parameter type. See Table ~\ref{tab:FunctionReturnDataTypes}.
 
